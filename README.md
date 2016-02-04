@@ -21,7 +21,7 @@ Python dependencies:
 - [`PySparse`](https://github.com/optimizers/pysparse.git)
 - [`Scipy`](http://scipy.org/scipylib/)
 - [`pyadolc`](https://github.com/b45ch1/pyadolc.git) 
-- algopy
+- [`algopy`](https://github.com/b45ch1/algopy.git)
 - [`pycppad`](https://github.com/b45ch1/pycppad.git)
 - [`HSL.py`](https://github.com/PythonOptimizers/HSL.py)
 - [`MUMPS.py`](https://github.com/PythonOptimizers/MUMPS.py`)
@@ -35,16 +35,15 @@ Installation
 
 1. Clone this repo::
 
-
-    git clone https://github.com/PythonOptimizers/NLPy2.0
+        git clone https://github.com/PythonOptimizers/NLPy2.0
 
 
 2. Copy `site.template.cfg` to `site.cfg` and modify `site.cfg` to match your configuration::
-
-    cp site.template.cfg site.cfg
+        
+        cp site.template.cfg site.cfg
     
     
 3. Install::
 
-    python setup.py build
-    python setup.py install [--prefix=...]
+        python setup.py build
+        python setup.py install [--prefix=...]
