@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# NLPy related
+site.cfg
+
 # C extensions
 *.so
 
