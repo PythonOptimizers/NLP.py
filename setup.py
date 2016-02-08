@@ -84,6 +84,7 @@ Operating System :: MacOS
 packages_list = ['nlpy',
                  'nlpy.model',
                  'nlpy.ls',
+                 'nlpy.optimize',
                  'nlpy.tools',
                  'tests']
 
