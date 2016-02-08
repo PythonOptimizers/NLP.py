@@ -46,6 +46,27 @@ nlpy_ext.append(Extension(name="nlpy.model._amplpy",
                 **amplpy_params))
 
 
+#############################
+# Strong Wolfe linesearches #
+#############################
+swls_params = {}
+swls_params['include_dirs'] = [np.get_include()]
+
+swls_src = [os.path.join('nlpy', 'ls', 'src', '_strong_wolfe_linesearch.c')]
+
+nlpy_ext.append(Extension(name="nlpy.ls._strong_wolfe_linesearch",
+                sources=swls_src,
+                **swls_params))
+
+mswls_params = {}
+mswls_params['include_dirs'] = [np.get_include()]
+
+mswls_src = [os.path.join('nlpy', 'ls', 'src', '_modified_strong_wolfe_linesearch.c')]
+
+nlpy_ext.append(Extension(name="nlpy.ls._modified_strong_wolfe_linesearch",
+                sources=mswls_src,
+                **mswls_params))
+
 CLASSIFIERS = """\
 Development Status :: 4 - Beta
 Intended Audience :: Science/Research
@@ -62,6 +83,7 @@ Operating System :: MacOS
 
 packages_list = ['nlpy',
                  'nlpy.model',
+                 'nlpy.ls',
                  'nlpy.tools',
                  'tests']
 
