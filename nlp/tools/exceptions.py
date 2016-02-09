@@ -1,4 +1,4 @@
-# NLPy-specific exceptions.
+# NLP.py-specific exceptions.
 
 
 class UserExitRequest(Exception):

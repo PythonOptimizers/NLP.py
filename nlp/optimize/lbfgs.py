@@ -1,7 +1,7 @@
 from pykrylov.linop.lbfgs import InverseLBFGSOperator as InverseLBFGS
-from nlpy.ls.pymswolfe import StrongWolfeLineSearch
-from nlpy.tools import norms
-from nlpy.tools.timing import cputime
+from nlp.ls.pymswolfe import StrongWolfeLineSearch
+from nlp.tools import norms
+from nlp.tools.timing import cputime
 
 __docformat__ = 'restructuredtext'
 
@@ -13,9 +13,9 @@ class LBFGSFramework(object):
 
     Instantiation is done by
 
-    lbfgs = LBFGSFramework(nlp)
+    lbfgs = LBFGSFramework(model)
 
-    where nlp is an instance of a nonlinear problem. A solution of the
+    where model is an instance of a nonlinear problem. A solution of the
     problem is obtained by called the solve member function, as in
 
     lbfgs.solve().
@@ -23,10 +23,10 @@ class LBFGSFramework(object):
     :keywords:
 
         :npairs:    the number of (s,y) pairs to store (default: 5)
-        :x0:        the starting point (default: nlp.x0)
+        :x0:        the starting point (default: model.x0)
         :maxiter:   the maximum number of iterations (default: max(10n,1000))
         :abstol:    absolute stopping tolerance (default: 1.0e-6)
-        :reltol:    relative stopping tolerance (default: `nlp.stop_d`)
+        :reltol:    relative stopping tolerance (default: `model.stop_d`)
 
     Other keyword arguments will be passed to InverseLBFGS.
 
@@ -35,28 +35,28 @@ class LBFGSFramework(object):
     conditions. The modifications attempt to limit the effects of rounding
     error inherent to the More and Thuente linesearch.
     """
-    def __init__(self, nlp, **kwargs):
+    def __init__(self, model, **kwargs):
 
-        self.nlp = nlp
+        self.model = model
         self.npairs = kwargs.get('npairs', 5)
         self.silent = kwargs.get('silent', False)
         self.abstol = kwargs.get('abstol', 1.0e-6)
-        self.reltol = kwargs.get('reltol', self.nlp.stop_d)
+        self.reltol = kwargs.get('reltol', self.model.stop_d)
         self.iter = 0
         self.nresets = 0
         self.converged = False
 
-        self.lbfgs = InverseLBFGS(self.nlp.n, **kwargs)
+        self.lbfgs = InverseLBFGS(self.model.n, **kwargs)
 
-        self.x = kwargs.get('x0', self.nlp.x0)
-        self.f = self.nlp.obj(self.x)
-        self.g = self.nlp.grad(self.x)
+        self.x = kwargs.get('x0', self.model.x0)
+        self.f = self.model.obj(self.x)
+        self.g = self.model.grad(self.x)
         self.gnorm = norms.norm2(self.g)
         self.f0 = self.f
         self.g0 = self.gnorm
 
         # Optional arguments
-        self.maxiter = kwargs.get('maxiter', max(10 * self.nlp.n, 1000))
+        self.maxiter = kwargs.get('maxiter', max(10 * self.model.n, 1000))
         self.tsolve = 0.0
 
     def solve(self):
@@ -67,7 +67,7 @@ class LBFGSFramework(object):
         # the initial search direction is the steepest descent direction.
 
         # This is the original L-BFGS stopping condition.
-        # stoptol = self.nlp.stop_d * max(1.0, norms.norm2(self.x))
+        # stoptol = self.model.stop_d * max(1.0, norms.norm2(self.x))
         stoptol = max(self.abstol, self.reltol * self.g0)
 
         while self.gnorm > stoptol and self.iter < self.maxiter:
@@ -87,8 +87,8 @@ class LBFGSFramework(object):
                                          self.x,
                                          self.g,
                                          d,
-                                         lambda z: self.nlp.obj(z),
-                                         lambda z: self.nlp.grad(z),
+                                         lambda z: self.model.obj(z),
+                                         lambda z: self.model.grad(z),
                                          stp=stp0)
             # Perform linesearch
             SWLS.search()

@@ -13,19 +13,19 @@ macheps = np.finfo(np.double).eps  # Machine epsilon.
 
 class DerivativeChecker(object):
 
-    def __init__(self, nlp, x, **kwargs):
+    def __init__(self, model, x, **kwargs):
         """
         The `DerivativeChecker` class provides facilities for verifying
         numerically the accuracy of first and second-order derivatives
         implemented in an optimization model.
 
-        `nlp` should be a `NLPModel` and `x` is the point about which we are
+        `model` should be a `NLPModel` and `x` is the point about which we are
         checking the derivative. See the documentation of the `check` method
         for available options.
         Note that it only works if the model has its flag `_sparse_coord` to
         `False` (that is the model returns an indexable object).
         """
-        if nlp._sparse_coord:
+        if model._sparse_coord:
             raise NotImplementedError('Derivative checker doesn''t work for this kind of model.'
                                       'Jacobian and Hessian must be indexable objects.')
 
@@ -37,7 +37,7 @@ class DerivativeChecker(object):
         self.step = kwargs.get('step', (macheps/3)**(1./3))
         self.h = self.step * (1 + norm(x, 1))
 
-        self.nlp = nlp
+        self.model = model
         self.x = x.copy()
         self.grad_errs = []
         self.jac_errs = []
@@ -78,8 +78,8 @@ class DerivativeChecker(object):
         cheap = kwargs.get('cheap_check', False)
 
         # Skip constraints if problem is unconstrained.
-        jac = (jac and self.nlp.m > 0)
-        chess = (chess and self.nlp.m > 0)
+        jac = (jac and self.model.m > 0)
+        chess = (chess and self.model.m > 0)
 
         if verbose:
             sys.stderr.write('Gradient checking\n')
@@ -110,7 +110,7 @@ class DerivativeChecker(object):
         return
 
     def display(self, log, header):
-        name = self.nlp.name
+        name = self.model.name
         nerrs = len(log)
         sys.stderr.write('Problem %s: Found %d errors.\n' % (name, nerrs))
         if nerrs > 0:
@@ -123,17 +123,17 @@ class DerivativeChecker(object):
         return
 
     def cheap_check_obj_gradient(self, verbose=False):
-        nlp = self.nlp
-        n = nlp.n
-        fx = nlp.obj(self.x)
-        gx = nlp.grad(self.x)
+        model = self.model
+        n = model.n
+        fx = model.obj(self.x)
+        gx = model.grad(self.x)
         h = self.h
 
         dx = np.random.standard_normal(n)
         dx /= norm(dx)
         xph = self.x.copy()
         xph += h*dx
-        dfdx = (nlp.obj(xph) - fx)/h      # finite-difference estimate
+        dfdx = (model.obj(xph) - fx)/h      # finite-difference estimate
         gtdx = np.dot(gx, dx)             # expected
         err = max(abs(dfdx - gtdx)/(1 + abs(gtdx)),
                   abs(dfdx - gtdx)/(1 + abs(dfdx)))
@@ -153,9 +153,9 @@ class DerivativeChecker(object):
         return (err, log)
 
     def check_obj_gradient(self, verbose=False):
-        nlp = self.nlp
-        n = nlp.n
-        gx = nlp.grad(self.x)
+        model = self.model
+        n = model.n
+        gx = model.grad(self.x)
         h = self.h
         log = []
         err = np.empty(n)
@@ -169,7 +169,7 @@ class DerivativeChecker(object):
         for i in xrange(n):
             xph = self.x.copy() ; xph[i] += h
             xmh = self.x.copy() ; xmh[i] -= h
-            dfdxi = (nlp.obj(xph) - nlp.obj(xmh))/(2*h)
+            dfdxi = (model.obj(xph) - model.obj(xmh))/(2*h)
             err[i] = abs(gx[i] - dfdxi)/max(1, abs(gx[i]))
 
             line = self.d1fmt % (0, i, gx[i], dfdxi, err[i])
@@ -182,9 +182,9 @@ class DerivativeChecker(object):
         return (err, log)
 
     def check_obj_hessian(self, verbose=False):
-        nlp = self.nlp
-        n = nlp.n
-        Hx = nlp.hess(self.x)
+        model = self.model
+        n = model.n
+        Hx = model.hess(self.x)
         h = self.step
         errs = []
 
@@ -195,7 +195,7 @@ class DerivativeChecker(object):
         for i in xrange(n):
             xph = self.x.copy() ; xph[i] += h
             xmh = self.x.copy() ; xmh[i] -= h
-            dgdx = (nlp.grad(xph) - nlp.grad(xmh))/(2*h)
+            dgdx = (model.grad(xph) - model.grad(xmh))/(2*h)
             for j in range(i+1):
                 dgjdxi = dgdx[j]
                 err = abs(Hx[i,j] - dgjdxi)/max(1, abs(Hx[i,j]))
@@ -210,12 +210,12 @@ class DerivativeChecker(object):
         return errs
 
     def check_con_jacobian(self, verbose=False):
-        nlp = self.nlp
-        n = nlp.n ; m = nlp.m
+        model = self.model
+        n = model.n ; m = model.m
         if m == 0:
             return []   # Problem is unconstrained.
 
-        Jx = nlp.jac(self.x)
+        Jx = model.jac(self.x)
         h = self.step
         errs = []
 
@@ -226,9 +226,9 @@ class DerivativeChecker(object):
         for i in xrange(n):
             xph = self.x.copy() ; xph[i] += h
             xmh = self.x.copy() ; xmh[i] -= h
-            dcdx = (nlp.cons(xph) - nlp.cons(xmh))/(2*h)
+            dcdx = (model.cons(xph) - model.cons(xmh))/(2*h)
             for j in range(m):
-                dcjdxi = dcdx[j] #(nlp.icons(j, xph) - nlp.icons(j, xmh))/(2*h)
+                dcjdxi = dcdx[j] #(model.icons(j, xph) - model.icons(j, xmh))/(2*h)
                 err = abs(Jx[j,i] - dcjdxi)/max(1, abs(Jx[j,i]))
 
                 line = self.d1fmt % (j+1, i, Jx[j,i], dcjdxi, err)
@@ -241,8 +241,8 @@ class DerivativeChecker(object):
         return errs
 
     def check_con_hessians(self, verbose=False):
-        nlp = self.nlp
-        n = nlp.n ; m = nlp.m
+        model = self.model
+        n = model.n ; m = model.m
         h = self.step
         errs = []
 
@@ -252,13 +252,13 @@ class DerivativeChecker(object):
         # Check each Hessian in turn.
         for k in range(m):
             y = np.zeros(m) ; y[k] = -1
-            Hk = nlp.hess(self.x, y, obj_weight=0)
+            Hk = model.hess(self.x, y, obj_weight=0)
 
             # Check second partial derivatives in turn.
             for i in xrange(n):
                 xph = self.x.copy() ; xph[i] += h
                 xmh = self.x.copy() ; xmh[i] -= h
-                dgdx = (nlp.igrad(k, xph) - nlp.igrad(k, xmh))/(2*h)
+                dgdx = (model.igrad(k, xph) - model.igrad(k, xmh))/(2*h)
                 for j in xrange(i+1):
                     dgjdxi = dgdx[j]
                     err = abs(Hk[i,j] - dgjdxi)/max(1, abs(Hk[i,j]))
@@ -275,9 +275,9 @@ class DerivativeChecker(object):
 
 if __name__ == '__main__':
 
-    from nlpy.model.pysparsemodel import PySparseAmplModel as Model
-    nlp = Model(sys.argv[1])
+    from nlp.model.pysparsemodel import PySparseAmplModel
+    model = PySparseAmplModel(sys.argv[1])
 
-    print 'Checking at x = ', nlp.x0
-    derchk = DerivativeChecker(nlp, nlp.x0)
+    print 'Checking at x = ', model.x0
+    derchk = DerivativeChecker(model, model.x0)
     derchk.check(verbose=True)

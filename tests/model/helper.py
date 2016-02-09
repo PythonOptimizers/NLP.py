@@ -1,4 +1,4 @@
-# Helper for nlpy.model tests
+# Helper for nlp.model tests
 from numpy.testing import *
 import numpy as np
 
@@ -36,18 +36,18 @@ class Hs7Data(object):
 
 class Rosenbrock(object):
 
-  def get_derivatives(self, nlp):
-    return get_derivatives_coord(nlp)
+  def get_derivatives(self, model):
+    return get_derivatives_coord(model)
 
   def get_expected(self):
     return RosenbrockData()
 
   def test_rosenbrock(self):
     rosenbrock_data = self.get_expected()
-    f = get_values(self.nlp)
+    f = get_values(self.model)
     assert_almost_equal(f, rosenbrock_data.expected_f)
 
-    (g, H, Hv) = self.get_derivatives(self.nlp)
+    (g, H, Hv) = self.get_derivatives(self.model)
     assert(np.allclose(g, rosenbrock_data.expected_g))
     assert(np.allclose(H, rosenbrock_data.expected_H))
     assert(np.allclose(Hv, rosenbrock_data.expected_Hv))
@@ -58,17 +58,17 @@ class Hs7(object):
   def get_expected(self):
     return Hs7Data()
 
-  def get_derivatives(self, nlp):
-    return get_derivatives_coord(nlp)
+  def get_derivatives(self, model):
+    return get_derivatives_coord(model)
 
   def test_hs7(self):
     hs7_data = self.get_expected()
-    (f, c, l) = get_values(self.nlp)
+    (f, c, l) = get_values(self.model)
     assert_almost_equal(f, hs7_data.expected_f)
     assert_allclose(c, hs7_data.expected_c)
     assert_almost_equal(l, hs7_data.expected_l)
 
-    (g, H, Hv, J, Jv, JTw) = self.get_derivatives(self.nlp)
+    (g, H, Hv, J, Jv, JTw) = self.get_derivatives(self.model)
 
     assert(np.allclose(g, hs7_data.expected_g))
     assert(np.allclose(H, hs7_data.expected_H))
@@ -78,76 +78,76 @@ class Hs7(object):
     assert(np.allclose(JTw, hs7_data.expected_JTw))
 
 
-def get_values(nlp):
-  f = nlp.obj(nlp.x0)
-  if nlp.m > 0:
-    c = nlp.cons(nlp.x0)
-    l = nlp.lag(nlp.x0, nlp.pi0)
+def get_values(model):
+  f = model.obj(model.x0)
+  if model.m > 0:
+    c = model.cons(model.x0)
+    l = model.lag(model.x0, model.pi0)
     return (f, c, l)
   else:
     return f
 
 
-def get_derivatives_plain(nlp):
-  g = nlp.grad(nlp.x0)
-  H = nlp.hess(nlp.x0, nlp.pi0)
-  v = np.arange(1, nlp.nvar + 1, dtype=np.float)
-  Hv = nlp.hprod(nlp.x0, nlp.pi0, v)
-  if nlp.m > 0:
-      J = nlp.jac(nlp.x0)
-      Jop = nlp.jop(nlp.x0)
+def get_derivatives_plain(model):
+  g = model.grad(model.x0)
+  H = model.hess(model.x0, model.pi0)
+  v = np.arange(1, model.nvar + 1, dtype=np.float)
+  Hv = model.hprod(model.x0, model.pi0, v)
+  if model.m > 0:
+      J = model.jac(model.x0)
+      Jop = model.jop(model.x0)
       Jv = Jop * v
-      w = 2 * np.ones(nlp.ncon)
+      w = 2 * np.ones(model.ncon)
       JTw = Jop.T * w
       return (g, H, Hv, J, Jv, JTw)
   else:
       return (g, H, Hv)
 
 
-def get_derivatives_coord(nlp):
-  g = nlp.grad(nlp.x0)
-  H = ndarray_from_coord(nlp.nvar, nlp.nvar,
-                         *nlp.hess(nlp.x0, nlp.pi0), symmetric=True)
-  v = np.arange(1, nlp.nvar + 1, dtype=np.float)
-  Hv = nlp.hprod(nlp.x0, nlp.pi0, v)
-  if nlp.m > 0:
-      J = ndarray_from_coord(nlp.ncon, nlp.nvar,
-                             *nlp.jac(nlp.x0), symmetric=False)
-      Jop = nlp.jop(nlp.x0)
+def get_derivatives_coord(model):
+  g = model.grad(model.x0)
+  H = ndarray_from_coord(model.nvar, model.nvar,
+                         *model.hess(model.x0, model.pi0), symmetric=True)
+  v = np.arange(1, model.nvar + 1, dtype=np.float)
+  Hv = model.hprod(model.x0, model.pi0, v)
+  if model.m > 0:
+      J = ndarray_from_coord(model.ncon, model.nvar,
+                             *model.jac(model.x0), symmetric=False)
+      Jop = model.jop(model.x0)
       Jv = Jop * v
-      w = 2 * np.ones(nlp.ncon)
+      w = 2 * np.ones(model.ncon)
       JTw = Jop.T * w
       return (g, H, Hv, J, Jv, JTw)
   else:
       return (g, H, Hv)
 
 
-def get_derivatives_llmat(nlp):
-  g = nlp.grad(nlp.x0)
-  H = ndarray_from_ll_mat_sym(nlp.hess(nlp.x0, nlp.pi0))
-  v = np.arange(1, nlp.nvar + 1, dtype=np.float)
-  Hv = nlp.hprod(nlp.x0, nlp.pi0, v)
-  if nlp.m > 0:
-      J = ndarray_from_ll_mat(nlp.jac(nlp.x0))
-      Jop = nlp.jop(nlp.x0)
+def get_derivatives_llmat(model):
+  g = model.grad(model.x0)
+  H = ndarray_from_ll_mat_sym(model.hess(model.x0, model.pi0))
+  v = np.arange(1, model.nvar + 1, dtype=np.float)
+  Hv = model.hprod(model.x0, model.pi0, v)
+  if model.m > 0:
+      J = ndarray_from_ll_mat(model.jac(model.x0))
+      Jop = model.jop(model.x0)
       Jv = Jop * v
-      w = 2 * np.ones(nlp.ncon)
+      w = 2 * np.ones(model.ncon)
       JTw = Jop.T * w
       return (g, H, Hv, J, Jv, JTw)
   else:
       return (g, H, Hv)
 
 
-def get_derivatives_scipy(nlp):
-  g = nlp.grad(nlp.x0)
-  H = nlp.hess(nlp.x0, nlp.pi0).todense()
-  v = np.arange(1, nlp.nvar + 1, dtype=np.float)
-  Hv = nlp.hprod(nlp.x0, nlp.pi0, v)
-  if nlp.m > 0:
-      J = nlp.jac(nlp.x0).todense()
-      Jop = nlp.jop(nlp.x0)
+def get_derivatives_scipy(model):
+  g = model.grad(model.x0)
+  H = model.hess(model.x0, model.pi0).todense()
+  v = np.arange(1, model.nvar + 1, dtype=np.float)
+  Hv = model.hprod(model.x0, model.pi0, v)
+  if model.m > 0:
+      J = model.jac(model.x0).todense()
+      Jop = model.jop(model.x0)
       Jv = Jop * v
-      w = 2 * np.ones(nlp.ncon)
+      w = 2 * np.ones(model.ncon)
       JTw = Jop.T * w
       return (g, H, Hv, J, Jv, JTw)
   else:

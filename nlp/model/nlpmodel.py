@@ -1,11 +1,11 @@
 # nlp.py
 # Define an abstract class to represent a general
 # nonlinear optimization problem.
-from nlpy.model.kkt import KKTresidual
+from nlp.model.kkt import KKTresidual
 from pykrylov.linop.linop import LinearOperator, DiagonalOperator, ReducedLinearOperator
 from pykrylov.linop.blkop import BlockLinearOperator
-from nlpy.tools.decorators import deprecated
-from nlpy.tools.utils import where
+from nlp.tools.decorators import deprecated
+from nlp.tools.utils import where
 import logging
 import numpy as np
 import sys

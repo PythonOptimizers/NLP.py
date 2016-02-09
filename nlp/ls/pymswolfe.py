@@ -4,7 +4,7 @@ guaranteeing satisfaction of the strong Wolfe conditions.
 """
 
 import numpy as np
-from nlpy.ls._modified_strong_wolfe_linesearch import mcsrch
+from nlp.ls._modified_strong_wolfe_linesearch import mcsrch
 
 class StrongWolfeLineSearch:
     """
@@ -119,20 +119,20 @@ class StrongWolfeLineSearch:
 
 if __name__ == '__main__':
 
-    from nlpy.model.amplpy import AmplModel
+    from nlp.model.amplpy import AmplModel
     from math import sqrt
     import sys
 
-    nlp = AmplModel(sys.argv[1])
-    f = nlp.obj(nlp.x0)
-    g = nlp.grad(nlp.x0)
+    model = AmplModel(sys.argv[1])
+    f = model.obj(model.x0)
+    g = model.grad(model.x0)
     d = -g
     SWLS = StrongWolfeLineSearch(f,
-                                  nlp.x0,
+                                  model.x0,
                                   g,
                                   d,
-                                  lambda z: nlp.obj(z),
-                                  lambda z: nlp.grad(z),
+                                  lambda z: model.obj(z),
+                                  lambda z: model.grad(z),
                                   stp = 1.0/sqrt(np.dot(g,g)))
     print ' Before search'
     print '   f = ', f

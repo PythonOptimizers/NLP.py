@@ -5,7 +5,7 @@ except ImportError as exc:
     print "Failed to import: ", exc, "  No tests run!"
     sys.exit(0)
 
-from nlpy.model.algopymodel import AlgopyModel
+from nlp.model.algopymodel import AlgopyModel
 from helper import *
 import numpy as np
 from numpy.testing import *
@@ -32,11 +32,11 @@ class AlgopyHS7(AlgopyModel):
 
 class Test_AlgopyRosenbrock(TestCase, Rosenbrock):  # Test def'd in Rosenbrock
 
-    def get_derivatives(self, nlp):
-        return get_derivatives_plain(nlp)
+    def get_derivatives(self, model):
+        return get_derivatives_plain(model)
 
     def setUp(self):
-        self.nlp = AlgopyRosenbrock(n=5, name='Rosenbrock', x0=-np.ones(5))
+        self.model = AlgopyRosenbrock(n=5, name='Rosenbrock', x0=-np.ones(5))
 
 
 class Test_AlgopyHS7(TestCase, Hs7):  # Test def'd in Hs7
@@ -47,13 +47,13 @@ class Test_AlgopyHS7(TestCase, Hs7):  # Test def'd in Hs7
         hs7_data.expected_c = np.array([25.])
         return hs7_data
 
-    def get_derivatives(self, nlp):
-        return get_derivatives_plain(nlp)
+    def get_derivatives(self, model):
+        return get_derivatives_plain(model)
 
     def setUp(self):
-        self.nlp = AlgopyHS7(n=2, m=1, name='HS7',
-                             x0=2*np.ones(2), pi0=np.ones(1),
-                             Lcon=np.array([0.]), Ucon=np.array([0.]))
+        self.model = AlgopyHS7(n=2, m=1, name='HS7',
+                               x0=2*np.ones(2), pi0=np.ones(1),
+                               Lcon=np.array([0.]), Ucon=np.array([0.]))
 
 if __name__ == '__main__':
 

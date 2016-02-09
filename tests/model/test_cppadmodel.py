@@ -1,12 +1,12 @@
 # Tests relative to algorithmic differentiation with CppAD.
 import sys
 try:
-    from nlpy.model.cppadmodel import CppADModel
+    from nlp.model.cppadmodel import CppADModel
 except ImportError as exc:
     print "Failed to import: ", exc, "  No tests run!"
     sys.exit(0)
 
-from nlpy.model.tests.helper import *
+from helper import *
 from numpy.testing import *
 
 
@@ -29,19 +29,19 @@ class CppADHS7(CppADModel):
 
 class Test_CppADRosenbrock(TestCase, Rosenbrock):    # Test def'd in Rosenbrock
 
-    def get_derivatives(self, nlp):
-        return get_derivatives_plain(nlp)
+    def get_derivatives(self, model):
+        return get_derivatives_plain(model)
 
     def setUp(self):
-        self.nlp = CppADRosenbrock(n=5, name='Rosenbrock', x0=-np.ones(5))
+        self.model = CppADRosenbrock(n=5, name='Rosenbrock', x0=-np.ones(5))
 
 
 class Test_CppADHS7(TestCase, Hs7):    # Test def'd in Hs7
 
-    def get_derivatives(self, nlp):
-        return get_derivatives_plain(nlp)
+    def get_derivatives(self, model):
+        return get_derivatives_plain(model)
 
     def setUp(self):
-        self.nlp = CppADHS7(n=2, m=1, name='HS7',
-                            x0=2*np.ones(2), pi0=np.ones(1),
-                            Lcon=np.array([4.]), Ucon=np.array([4.]))
+        self.model = CppADHS7(n=2, m=1, name='HS7',
+                              x0=2*np.ones(2), pi0=np.ones(1),
+                              Lcon=np.array([4.]), Ucon=np.array([4.]))

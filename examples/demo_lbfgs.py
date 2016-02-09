@@ -3,8 +3,8 @@ Demo of the limited-memory BFGS method. Each problem given on the command line
 is solved for several values of the limited-memory parameter.
 """
 
-from nlpy.model.amplpy import AmplModel
-from nlpy.optimize.lbfgs import LBFGSFramework
+from nlp.model.amplpy import AmplModel
+from nlp.optimize.lbfgs import LBFGSFramework
 import os
 import sys
 
@@ -16,14 +16,14 @@ sys.stdout.write(header)
 sys.stdout.write('-' * hlen + '\n')
 
 for ProblemName in sys.argv[1:]:
-    nlp = AmplModel( ProblemName )
+    model = AmplModel( ProblemName )
 
     for m in [1, 2, 3, 4, 5, 10, 15, 20]:
-        lbfgs = LBFGSFramework(nlp, npairs=m, scaling=True, silent=True)
+        lbfgs = LBFGSFramework(model, npairs=m, scaling=True, silent=True)
         lbfgs.solve()
 
         # Output final statistics
         probname = os.path.basename(ProblemName)
         if probname[-3:] == '.nl': probname = probname[:-3]
-        sys.stdout.write(format % (probname, nlp.n, lbfgs.npairs, lbfgs.f,
+        sys.stdout.write(format % (probname, model.n, lbfgs.npairs, lbfgs.f,
                                    lbfgs.gnorm, lbfgs.iter, lbfgs.tsolve))

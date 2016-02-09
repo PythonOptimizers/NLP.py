@@ -4,10 +4,10 @@ try:
 except:
     print "CySparse is not installed!"
 
-from nlpy.model.nlp import NLPModel
-from nlpy.model.snlp import SlackModel
-from nlpy.model.qnmodel import QuasiNewtonModel
-from nlpy.model.amplpy import AmplModel
+from nlp.model.nlpmodel import NLPModel
+from nlp.model.snlp import SlackModel
+from nlp.model.qnmodel import QuasiNewtonModel
+from nlp.model.amplpy import AmplModel
 from pykrylov.linop import CysparseLinearOperator
 
 
@@ -66,11 +66,11 @@ class CySparseAmplModel(CySparseNLPModel, AmplModel):
 
 
 class CySparseSlackModel(SlackModel):
-    def __init__(self, nlp, keep_variable_bounds=False, **kwargs):
-        if not isinstance(nlp, CySparseNLPModel):
-            raise TypeError("The model in `nlp` should be a CySparseNLPModel"
+    def __init__(self, model, keep_variable_bounds=False, **kwargs):
+        if not isinstance(model, CySparseNLPModel):
+            raise TypeError("The model in `model` should be a CySparseNLPModel"
                             "or a derived class of it.")
-        super(CySparseSlackModel, self).__init__(nlp,
+        super(CySparseSlackModel, self).__init__(model,
                                                  keep_variable_bounds=keep_variable_bounds)
 
 
@@ -84,28 +84,28 @@ class CySparseSlackModel(SlackModel):
         is known to be a linear program. In this case, the evaluation of the
         constraint matrix is cheaper and the argument `x` is ignored.
         """
-        m = self.m ; nlp = self.nlp
-        on = self.nlp.n ; om = self.nlp.m
+        m = self.m ; model = self.model
+        on = self.model.n ; om = self.model.m
 
-        lowerC = np.array(nlp.lowerC) ; nlowerC = nlp.nlowerC
-        upperC = np.array(nlp.upperC) ; nupperC = nlp.nupperC
-        rangeC = np.array(nlp.rangeC) ; nrangeC = nlp.nrangeC
-        lowerB = np.array(nlp.lowerB) ; nlowerB = nlp.nlowerB
-        upperB = np.array(nlp.upperB) ; nupperB = nlp.nupperB
-        rangeB = np.array(nlp.rangeB) ; nrangeB = nlp.nrangeB
+        lowerC = np.array(model.lowerC) ; nlowerC = model.nlowerC
+        upperC = np.array(model.upperC) ; nupperC = model.nupperC
+        rangeC = np.array(model.rangeC) ; nrangeC = model.nrangeC
+        lowerB = np.array(model.lowerB) ; nlowerB = model.nlowerB
+        upperB = np.array(model.upperB) ; nupperB = model.nupperB
+        rangeB = np.array(model.rangeB) ; nrangeB = model.nrangeB
         nbnds = nlowerB + nupperB + 2*nrangeB
         nSlacks = nlowerC + nupperC + 2*nrangeC
 
         # Initialize sparse Jacobian
-        nnzJ = 2 * self.nlp.nnzj + m + nrangeC + nbnds + nrangeB  # Overestimate
+        nnzJ = 2 * self.model.nnzj + m + nrangeC + nbnds + nrangeB  # Overestimate
         J = LLSparseMatrix(nrow=self.ncon, ncol=self.nvar, size_hint=nnzJ,
                            is_symmetric=False, itype=types.INT64_T,
                            dtype=types.FLOAT64_T)
         # Insert contribution of general constraints.
         if lp:
-            J[:om, :on] = self.nlp.A()
+            J[:om, :on] = self.model.A()
         else:
-            J[:om, :on] = self.nlp.jac(x[:on])
+            J[:om, :on] = self.model.jac(x[:on])
 
         # TODO: NOT WORKING, scaling should be done using J *= D
         # where D is a sparse diagonal matrix containing the scaling factors.
@@ -148,15 +148,15 @@ class CySparseSlackModel(SlackModel):
         """
         Evaluate the Hessian of the Lagrangian.
         """
-        nlp = self.nlp
-        if isinstance(nlp, QuasiNewtonModel):
+        model = self.model
+        if isinstance(model, QuasiNewtonModel):
             return self.hop(x, z, *args, **kwargs)
 
-        on = nlp.n
+        on = model.n
 
         pi = self.convert_multipliers(z)
-        H = LLSparseMatrix(size=self.nvar, size_hint=self.nlp.nnzh,
+        H = LLSparseMatrix(size=self.nvar, size_hint=self.model.nnzh,
                            is_symmetric=True, itype=types.INT64_T,
                            dtype=types.FLOAT64_T)
-        H[:on, :on] = self.nlp.hess(x[:on], pi, *args, **kwargs)
+        H[:on, :on] = self.model.hess(x[:on], pi, *args, **kwargs)
         return H

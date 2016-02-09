@@ -1,4 +1,4 @@
-from nlpy.model.nlp import NLPModel
+from nlp.model.nlpmodel import NLPModel
 
 try:
     import pycppad

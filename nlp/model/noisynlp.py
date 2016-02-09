@@ -2,7 +2,7 @@
 # noisy problems. In these problems, second derivatives are not available.
 # Random noise is added to function values and first derivatives.
 
-from amplpy import AmplModel
+from nlp.model.amplpy import AmplModel
 from numpy.random import random as random_array
 import random
 

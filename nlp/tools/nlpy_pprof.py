@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # Main driver for performance profiles.
 
-from nlpy import __version__
-from nlpy.tools.pprof import PerformanceProfile
+from nlp import __version__
+from nlp.tools.pprof import PerformanceProfile
 from optparse import OptionParser
 
 

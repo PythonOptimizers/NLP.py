@@ -1,6 +1,6 @@
 # Tests relative to pure Python models.
 from numpy.testing import *
-from nlpy.model.nlp import QPModel, LPModel
+from nlp.model.nlpmodel import QPModel, LPModel
 from pykrylov.linop.linop import LinearOperator, linop_from_ndarray
 import numpy as np
 

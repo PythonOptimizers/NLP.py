@@ -1,6 +1,6 @@
-from nlpy.model.nlp import NLPModel
-from nlpy.model.pysparsemodel import PySparseNLPModel
-from nlpy.model.scipymodel import SciPyNLPModel
+from nlp.model.nlpmodel import NLPModel
+from nlp.model.pysparsemodel import PySparseNLPModel
+from nlp.model.scipymodel import SciPyNLPModel
 import numpy as np
 
 try:

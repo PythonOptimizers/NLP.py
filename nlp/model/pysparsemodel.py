@@ -3,10 +3,10 @@ try:
 except:
     print "PySparse is not installed!"
 
-from nlpy.model.nlp import NLPModel
-from nlpy.model.snlp import SlackModel
-from nlpy.model.qnmodel import QuasiNewtonModel
-from nlpy.model.amplpy import AmplModel
+from nlp.model.nlpmodel import NLPModel
+from nlp.model.snlp import SlackModel
+from nlp.model.qnmodel import QuasiNewtonModel
+from nlp.model.amplpy import AmplModel
 from pykrylov.linop.linop import PysparseLinearOperator
 
 import numpy as np
@@ -64,11 +64,11 @@ class PySparseAmplModel(PySparseNLPModel, AmplModel):
 
 
 class PySparseSlackModel(SlackModel):
-    def __init__(self, nlp, keep_variable_bounds=False, **kwargs):
-        if not isinstance(nlp, PySparseNLPModel):
-            raise TypeError("The model in `nlp` should be a PySparseNLPModel"
+    def __init__(self, model, keep_variable_bounds=False, **kwargs):
+        if not isinstance(model, PySparseNLPModel):
+            raise TypeError("The model in `model` should be a PySparseNLPModel"
                             "or a derived class of it.")
-        super(PySparseSlackModel, self).__init__(nlp,
+        super(PySparseSlackModel, self).__init__(model,
                                                  keep_variable_bounds=keep_variable_bounds)
 
 
@@ -82,27 +82,27 @@ class PySparseSlackModel(SlackModel):
         is known to be a linear program. In this case, the evaluation of the
         constraint matrix is cheaper and the argument `x` is ignored.
         """
-        n = self.n ; m = self.m ; nlp = self.nlp
-        on = self.nlp.n ; om = self.nlp.m
+        n = self.n ; m = self.m ; model = self.model
+        on = self.model.n ; om = self.model.m
 
-        lowerC = np.array(nlp.lowerC) ; nlowerC = nlp.nlowerC
-        upperC = np.array(nlp.upperC) ; nupperC = nlp.nupperC
-        rangeC = np.array(nlp.rangeC) ; nrangeC = nlp.nrangeC
-        lowerB = np.array(nlp.lowerB) ; nlowerB = nlp.nlowerB
-        upperB = np.array(nlp.upperB) ; nupperB = nlp.nupperB
-        rangeB = np.array(nlp.rangeB) ; nrangeB = nlp.nrangeB
+        lowerC = np.array(model.lowerC) ; nlowerC = model.nlowerC
+        upperC = np.array(model.upperC) ; nupperC = model.nupperC
+        rangeC = np.array(model.rangeC) ; nrangeC = model.nrangeC
+        lowerB = np.array(model.lowerB) ; nlowerB = model.nlowerB
+        upperB = np.array(model.upperB) ; nupperB = model.nupperB
+        rangeB = np.array(model.rangeB) ; nrangeB = model.nrangeB
         nbnds  = nlowerB + nupperB + 2*nrangeB
         nSlacks = nlowerC + nupperC + 2*nrangeC
 
         # Initialize sparse Jacobian
-        nnzJ = 2 * self.nlp.nnzj + m + nrangeC + nbnds + nrangeB  # Overestimate
+        nnzJ = 2 * self.model.nnzj + m + nrangeC + nbnds + nrangeB  # Overestimate
         J = psp(nrow=m, ncol=n, sizeHint=nnzJ)
 
         # Insert contribution of general constraints.
         if lp:
-            J[:om, :on] = self.nlp.A()
+            J[:om, :on] = self.model.A()
         else:
-            J[:om, :on] = self.nlp.jac(x[:on])
+            J[:om, :on] = self.model.jac(x[:on])
         J[upperC, :on] *= -1.0
         J[om:om + nrangeC, :on] = J[rangeC, :on]  # upper side of range const.
         J[om:om + nrangeC, :on] *= -1.0
@@ -142,13 +142,13 @@ class PySparseSlackModel(SlackModel):
         """
         Evaluate the Hessian of the Lagrangian.
         """
-        nlp = self.nlp
-        if isinstance(nlp, QuasiNewtonModel):
+        model = self.model
+        if isinstance(model, QuasiNewtonModel):
             return self.hop(x, z, *args, **kwargs)
 
-        on = nlp.n
+        on = model.n
 
         pi = self.convert_multipliers(z)
-        H = psp(nrow=self.n, ncol=self.n, symmetric=True, sizeHint=self.nlp.nnzh)
-        H[:on, :on] = self.nlp.hess(x[:on], pi, *args, **kwargs)
+        H = psp(nrow=self.n, ncol=self.n, symmetric=True, sizeHint=self.model.nnzh)
+        H[:on, :on] = self.model.hess(x[:on], pi, *args, **kwargs)
         return H

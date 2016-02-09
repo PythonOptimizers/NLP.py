@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from nlpy.model import NLPModel, QuasiNewtonModel, SlackModel
+from nlp.model import NLPModel, QuasiNewtonModel, SlackModel
 
 import numpy as np
 
@@ -18,7 +18,7 @@ class AugmentedLagrangian(NLPModel):
 
     :parameters:
 
-        :nlp:   original NLPModel.
+        :model:   original NLPModel.
 
     :keywords:
 
@@ -26,22 +26,22 @@ class AugmentedLagrangian(NLPModel):
         :pi:   vector of initial multipliers (default: all zero.)
     """
 
-    def __init__(self, nlp, **kwargs):
+    def __init__(self, model, **kwargs):
 
-        if nlp.m == nlp.nequalC:
-            self.nlp = nlp
+        if model.m == model.nequalC:
+            self.model = model
         else:
-            self.nlp = SlackModel(nlp, keep_variable_bounds=True, **kwargs)
+            self.model = SlackModel(model, keep_variable_bounds=True, **kwargs)
 
-        NLPModel.__init__(self, n=self.nlp.n, m=0, name='Al-'+self.nlp.name,
-                          Lvar=self.nlp.Lvar, Uvar=self.nlp.Uvar)
+        NLPModel.__init__(self, n=self.model.n, m=0, name='Al-'+self.model.name,
+                          Lvar=self.model.Lvar, Uvar=self.model.Uvar)
 
         self.rho_init = kwargs.get('rho', 10.)
         self._rho = self.rho_init
 
-        self.pi0 = np.zeros(self.nlp.m)
+        self.pi0 = np.zeros(self.model.m)
         self.pi = self.pi0.copy()
-        self.x0 = self.nlp.x0
+        self.x0 = self.model.x0
 
     @property
     def rho(self):
@@ -55,9 +55,9 @@ class AugmentedLagrangian(NLPModel):
         """
         Evaluate augmented Lagrangian function.
         """
-        cons = self.nlp.cons(x)
+        cons = self.model.cons(x)
 
-        alfunc = self.nlp.obj(x)
+        alfunc = self.model.obj(x)
         alfunc -= np.dot(self.pi, cons)
         alfunc += 0.5 * self.rho * np.dot(cons, cons)
         return alfunc
@@ -66,19 +66,19 @@ class AugmentedLagrangian(NLPModel):
         """
         Evaluate augmented Lagrangian gradient.
         """
-        nlp = self.nlp
-        J = nlp.jop(x)
-        cons = nlp.cons(x)
-        algrad = nlp.grad(x) + J.T * (self.rho * cons - self.pi)
+        model = self.model
+        J = model.jop(x)
+        cons = model.cons(x)
+        algrad = model.grad(x) + J.T * (self.rho * cons - self.pi)
         return algrad
 
     def dual_feasibility(self, x, **kwargs):
         """
         Evaluate Lagrangian gradient.
         """
-        nlp = self.nlp
-        J = nlp.jop(x)
-        lgrad = nlp.grad(x) - J.T * self.pi
+        model = self.model
+        J = model.jop(x)
+        lgrad = model.grad(x) - J.T * self.pi
         return lgrad
 
     def hprod(self, x, z, v, **kwargs):
@@ -86,11 +86,11 @@ class AugmentedLagrangian(NLPModel):
         Compute the Hessian-vector product of the Hessian of the augmented
         Lagrangian with arbitrary vector v.
         """
-        nlp = self.nlp
-        cons = nlp.cons(x)
+        model = self.model
+        cons = model.cons(x)
 
-        w = nlp.hprod(x, self.rho * cons - self.pi, v)
-        J = nlp.jop(x)
+        w = model.hprod(x, self.rho * cons - self.pi, v)
+        J = model.jop(x)
         return w + self.rho * J.T * J * v
 
     def hess(self, *args, **kwargs):

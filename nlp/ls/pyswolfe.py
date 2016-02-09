@@ -3,7 +3,7 @@ Linesearch methods guaranteeing satisfaction of the strong Wolfe conditions.
 """
 
 import numpy as np
-from nlpy.ls._strong_wolfe_linesearch import dcsrch
+from nlp.ls._strong_wolfe_linesearch import dcsrch
 
 class StrongWolfeLineSearch:
     """
@@ -129,19 +129,19 @@ class StrongWolfeLineSearch:
 
 if __name__ == '__main__':
 
-    from nlpy.model.amplpy import AmplModel
+    from nlp.model.amplpy import AmplModel
     from math import sqrt
     import sys
 
-    nlp = AmplModel(sys.argv[1])
-    f = nlp.obj(nlp.x0)
-    g = nlp.grad(nlp.x0)
+    model = AmplModel(sys.argv[1])
+    f = model.obj(model.x0)
+    g = model.grad(model.x0)
     d = -g
     SWLS = StrongWolfeLineSearch(f,
                                   g,
                                   d,
-                                  lambda t: nlp.obj(nlp.x0 + t * d),
-                                  lambda t: nlp.grad(nlp.x0 + t * d))
+                                  lambda t: model.obj(model.x0 + t * d),
+                                  lambda t: model.grad(model.x0 + t * d))
     print ' Before search'
     print '   f = ', f
     print '   initial slope = ', SWLS.slope
@@ -161,6 +161,6 @@ if __name__ == '__main__':
     # stepmin = SWLS.stpmin
     # delta = (stepmax - stepmin)/npoints
     # t = np.arange(stepmin, stepmax, delta)
-    # y = map(lambda u: nlp.obj(nlp.x0 + u * d)/f, t)
+    # y = map(lambda u: model.obj(model.x0 + u * d)/f, t)
     # pylab.plot(t, y)
     # pylab.show()

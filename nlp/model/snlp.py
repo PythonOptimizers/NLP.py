@@ -1,8 +1,8 @@
 """
-A slack framework for NLPy.
+A slack framework for NLP.py.
 """
-from nlpy.model.nlp import NLPModel
-from nlpy.model.qnmodel import QuasiNewtonModel
+from nlp.model.nlpmodel import NLPModel
+from nlp.model.qnmodel import QuasiNewtonModel
 
 import numpy as np
 
@@ -48,7 +48,7 @@ class SlackModel(NLPModel):
     model implicitly.
 
     :parameters:
-        :nlp:  Original NLP to transform to a slack form.
+        :model:  Original NLP to transform to a slack form.
 
     :keywords:
         :keep_variable_bounds: set to `True` if you don't want to convert
@@ -58,71 +58,71 @@ class SlackModel(NLPModel):
 
     """
 
-    def __init__(self, nlp, keep_variable_bounds=False, **kwargs):
+    def __init__(self, model, keep_variable_bounds=False, **kwargs):
 
-        self.nlp = nlp
+        self.model = model
         self.keep_variable_bounds = keep_variable_bounds
 
-        n_con_low = nlp.nlowerC + nlp.nrangeC  # ineqs with lower bound.
-        n_con_upp = nlp.nupperC + nlp.nrangeC  # ineqs with upper bound.
-        n_var_low = nlp.nlowerB + nlp.nrangeB  # vars  with lower bound.
-        n_var_upp = nlp.nupperB + nlp.nrangeB  # vars  with upper bound.
+        n_con_low = model.nlowerC + model.nrangeC  # ineqs with lower bound.
+        n_con_upp = model.nupperC + model.nrangeC  # ineqs with upper bound.
+        n_var_low = model.nlowerB + model.nrangeB  # vars  with lower bound.
+        n_var_upp = model.nupperB + model.nrangeB  # vars  with upper bound.
         n_slacks = n_con_low + n_con_upp       # slacks for constraints.
 
-        bot = nlp.n;
-        self.sLL = range(bot, bot + nlp.nlowerC); bot += nlp.nlowerC
-        self.sLR = range(bot, bot + nlp.nrangeC); bot += nlp.nrangeC
-        self.sUU = range(bot, bot + nlp.nupperC); bot += nlp.nupperC
-        self.sUR = range(bot, bot + nlp.nrangeC)
+        bot = model.n;
+        self.sLL = range(bot, bot + model.nlowerC); bot += model.nlowerC
+        self.sLR = range(bot, bot + model.nrangeC); bot += model.nrangeC
+        self.sUU = range(bot, bot + model.nupperC); bot += model.nupperC
+        self.sUR = range(bot, bot + model.nrangeC)
 
         # Update effective number of variables and constraints
         if keep_variable_bounds:
-            n = nlp.n + n_slacks
-            m = nlp.m + nlp.nrangeC
+            n = model.n + n_slacks
+            m = model.m + model.nrangeC
 
             Lvar = np.zeros(n)
-            Lvar[:nlp.n] = nlp.Lvar
+            Lvar[:model.n] = model.Lvar
             Uvar = np.inf * np.ones(n)
-            Uvar[:nlp.n] = nlp.Uvar
+            Uvar[:model.n] = model.Uvar
 
         else:
-            bot += nlp.nrangeC;
-            self.tLL = range(bot, bot + nlp.nlowerB); bot += nlp.nlowerB
-            self.tLR = range(bot, bot + nlp.nrangeB); bot += nlp.nrangeB
-            self.tUU = range(bot, bot + nlp.nupperB); bot += nlp.nupperB
-            self.tUR = range(bot, bot + nlp.nrangeB)
+            bot += model.nrangeC;
+            self.tLL = range(bot, bot + model.nlowerB); bot += model.nlowerB
+            self.tLR = range(bot, bot + model.nrangeB); bot += model.nrangeB
+            self.tUU = range(bot, bot + model.nupperB); bot += model.nupperB
+            self.tUR = range(bot, bot + model.nrangeB)
 
-            n = nlp.n + n_con_low + n_con_upp + n_var_low + n_var_upp
-            m = nlp.m + nlp.nrangeC + n_var_low + n_var_upp
+            n = model.n + n_con_low + n_con_upp + n_var_low + n_var_upp
+            m = model.m + model.nrangeC + n_var_low + n_var_upp
             Lvar = np.zeros(n)
-            Lvar[:nlp.n] = -np.inf * np.ones(nlp.n)
+            Lvar[:model.n] = -np.inf * np.ones(model.n)
             Uvar = np.inf * np.ones(n)
 
-        NLPModel.__init__(self, n=n, m=m, name='slack-' + nlp.name,
+        NLPModel.__init__(self, n=n, m=m, name='slack-' + model.name,
                           Lvar=Lvar, Uvar=Uvar, Lcon=np.zeros(m))
 
         # Redefine primal and dual initial guesses
         self.x0 = np.empty(self.n)
-        self.x0[:nlp.n] = nlp.x0[:]
-        self.x0[nlp.n:] = 0
+        self.x0[:model.n] = model.x0[:]
+        self.x0[model.n:] = 0
 
         self.pi0 = np.empty(self.m)
-        self.pi0[:nlp.m] = nlp.pi0[:]
-        self.pi0[nlp.m:] = 0
+        self.pi0[:model.m] = model.pi0[:]
+        self.pi0[model.m:] = 0
         return
 
     def obj(self, x):
         """
         Return the value of the objective function at `x`.
         """
-        return self.nlp.obj(x[:self.nlp.n])
+        return self.model.obj(x[:self.model.n])
 
     def grad(self, x):
         """
         Return the value of the gradient of the objective function at `x`.
         """
         g = np.zeros(self.n)
-        g[:self.nlp.n] = self.nlp.grad(x[:self.nlp.n])
+        g[:self.model.n] = self.model.grad(x[:self.model.n])
         return g
 
     def cons(self, x):
@@ -136,12 +136,12 @@ class SlackModel(NLPModel):
         rangeC, i.e., k=0 iff constraint i is the range constraint that
         appears first, k=1 iff it appears second, etc.
         """
-        nlp = self.nlp; on = nlp.n; m = self.m; om = nlp.m
-        lowerC = nlp.lowerC; upperC = nlp.upperC
-        rangeC = nlp.rangeC; nrangeC = nlp.nrangeC
+        model = self.model; on = model.n; m = self.m; om = model.m
+        lowerC = model.lowerC; upperC = model.upperC
+        rangeC = model.rangeC; nrangeC = model.nrangeC
 
         c = np.empty(m)
-        c[:om + nrangeC] = nlp.cons_pos(x[:on])
+        c[:om + nrangeC] = model.cons_pos(x[:on])
         c[lowerC] -= x[self.sLL]
         c[upperC] -= x[self.sUU]
         c[rangeC] -= x[self.sLR]
@@ -159,14 +159,14 @@ class SlackModel(NLPModel):
         constraints are ordered.
         """
         # Create some shortcuts for convenience
-        nlp = self.nlp
-        on = nlp.n; om = nlp.m; m = self.m
-        lowerC = nlp.lowerC; upperC = nlp.upperC; rangeC = nlp.rangeC
-        nrangeC = nlp.nrangeC
+        model = self.model
+        on = model.n; om = model.m; m = self.m
+        lowerC = model.lowerC; upperC = model.upperC; rangeC = model.rangeC
+        nrangeC = model.nrangeC
 
         p = np.zeros(m)
 
-        J = nlp.jop(x[:on])
+        J = model.jop(x[:on])
         p[:om] = J * v[:on]
         p[upperC] *= -1.0
         p[om:om+nrangeC] = p[rangeC]
@@ -182,8 +182,8 @@ class SlackModel(NLPModel):
             return p
 
         # Create some more shortcuts
-        lowerB = nlp.lowerB ; upperB = nlp.upperB ; rangeB = nlp.rangeB
-        nlowerB = nlp.nlowerB ; nupperB = nlp.nupperB ; nrangeB = nlp.nrangeB
+        lowerB = model.lowerB ; upperB = model.upperB ; rangeB = model.rangeB
+        nlowerB = model.nlowerB ; nupperB = model.nupperB ; nrangeB = model.nrangeB
 
         # Insert contribution of bound constraints on the original problem
         bot = om+nrangeC; p[bot:bot+nlowerB] += v[lowerB]
@@ -206,17 +206,17 @@ class SlackModel(NLPModel):
         constraints are ordered.
         """
         # Create some shortcuts for convenience
-        nlp = self.nlp
-        on = nlp.n ; om = nlp.m ; n = self.n
-        lowerC = nlp.lowerC ; upperC = nlp.upperC ; rangeC = nlp.rangeC
-        nrangeC = nlp.nrangeC;
+        model = self.model
+        on = model.n ; om = model.m ; n = self.n
+        lowerC = model.lowerC ; upperC = model.upperC ; rangeC = model.rangeC
+        nrangeC = model.nrangeC;
 
         p = np.zeros(n)
         vmp = v[:om].copy()
         vmp[upperC] *= -1.0
         vmp[rangeC] -= v[om:om+nrangeC]
 
-        J = nlp.jop(x[:on])
+        J = model.jop(x[:on])
         p[:on] = J.T * vmp
 
         # Insert contribution of slacks on general constraints
@@ -229,8 +229,8 @@ class SlackModel(NLPModel):
             return p
 
         # Create some more shortcuts
-        lowerB = nlp.lowerB ; upperB = nlp.upperB ; rangeB = nlp.rangeB
-        nlowerB = nlp.nlowerB ; nupperB = nlp.nupperB ; nrangeB = nlp.nrangeB
+        lowerB = model.lowerB ; upperB = model.upperB ; rangeB = model.rangeB
+        nlowerB = model.nlowerB ; nupperB = model.nupperB ; nrangeB = model.nrangeB
 
         # Insert contribution of bound constraints on the original problem
         bot = om+nrangeC; p[lowerB] += v[bot:bot+nlowerB]
@@ -302,8 +302,8 @@ class SlackModel(NLPModel):
         """
         if z is None:
             return np.zeros(self.m)
-        om = self.nlp.m; upperC = self.nlp.upperC
-        rangeC = self.nlp.rangeC; nrangeC = self.nlp.nrangeC
+        om = self.model.m; upperC = self.model.upperC
+        rangeC = self.model.rangeC; nrangeC = self.model.nrangeC
         pi = z[:om].copy()
         pi[upperC] *= -1.
         pi[rangeC] -= z[om:om + nrangeC]
@@ -314,15 +314,12 @@ class SlackModel(NLPModel):
         Evaluate the Hessian vector product of the Hessian of the Lagrangian
         at (x,y) with the vector v.
         """
-        nlp = self.nlp; on = nlp.n
+        model = self.model; on = model.n
 
         Hv = np.zeros(self.n)
         pi = self.convert_multipliers(y)
-        Hv[:on] = nlp.hprod(x[:on], pi, v[:on], **kwargs)
+        Hv[:on] = model.hprod(x[:on], pi, v[:on], **kwargs)
         return Hv
 
     def hess(self, x, z=None, *args, **kwargs):
         raise NotImplementedError("Please subclass")
-
-
-

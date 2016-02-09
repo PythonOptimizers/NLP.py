@@ -1,6 +1,6 @@
 # Tests relative to null vectors.
 from numpy.testing import *
-from nlpy.tools.nullvector import NullVector
+from nlp.tools.nullvector import NullVector
 import numpy as np
 
 

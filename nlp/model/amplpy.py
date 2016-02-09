@@ -6,10 +6,10 @@ Python interface to the AMPL modeling language
 """
 
 import numpy as np
-from nlpy.model.nlp import NLPModel
-from nlpy.model import _amplpy
+from nlp.model.nlpmodel import NLPModel
+from nlp.model import _amplpy
 from pykrylov.linop import CoordLinearOperator
-from nlpy.tools import sparse_vector_class as sv
+from nlp.tools import sparse_vector_class as sv
 import warnings
 import tempfile
 import os

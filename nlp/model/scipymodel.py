@@ -1,7 +1,7 @@
 from scipy import sparse as sp
 
-from nlpy.model.nlp import NLPModel
-from nlpy.model.amplpy import AmplModel
+from nlp.model.nlpmodel import NLPModel
+from nlp.model.amplpy import AmplModel
 from pykrylov.linop.linop import linop_from_ndarray
 import numpy as np
 

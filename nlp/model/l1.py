@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from nlpy.model import NLPModel
+from nlp.model import NLPModel
 from pysparse.sparse import spmatrix
 from pysparse.sparse.pysparseMatrix import PysparseMatrix as sp
 
@@ -50,13 +50,13 @@ class L1MeritFunction(NLPModel):
               GERAD Technical Report G-2009-74, Montreal, Canada, 2009.
     """
 
-    def __init__(self, nlp, nuE=1.0, nuS=1.0, nuT=1.0, **kwargs):
+    def __init__(self, model, nuE=1.0, nuS=1.0, nuT=1.0, **kwargs):
         """
         An ``L1MeritFunction`` object represents a nonlinear optimization
         problem in expanded elastic form.
 
         :parameters:
-           :nlp:  Original NLP
+           :model:  Original NLP
 
         :keywords:
            :nuE: Initial penalty parameter for equality constraints
@@ -66,40 +66,40 @@ class L1MeritFunction(NLPModel):
                   to bounds.
         """
 
-        nB   = nlp.nlowerB + nlp.nupperB + nlp.nrangeB
-        nB2  = nlp.nlowerB + nlp.nupperB + 2*nlp.nrangeB
-        nvar = nlp.n + nlp.m + nB
-        ncon = nlp.m + nlp.nrangeC + nB2
+        nB   = model.nlowerB + model.nupperB + model.nrangeB
+        nB2  = model.nlowerB + model.nupperB + 2*model.nrangeB
+        nvar = model.n + model.m + nB
+        ncon = model.m + model.nrangeC + nB2
 
         # Lower bounds on the variables of the l1 problem.
         Lvar = np.empty(nvar)
-        Lvar[:nlp.n] = -np.inf
-        Lvar[nlp.n:] = 0
+        Lvar[:model.n] = -np.inf
+        Lvar[model.n:] = 0
 
         super(L1MeritFunction, self).__init__(n=nvar, m=ncon,
-                                              name=nlp.name + ' (l1)', Lvar=Lvar,
+                                              name=model.name + ' (l1)', Lvar=Lvar,
                                               Lcon=np.zeros(ncon), **kwargs)
 
-        self.nlp = nlp
+        self.model = model
 
         # Indices of bounded variables.
-        self.Bounds = nlp.lowerB + nlp.upperB + nlp.rangeB
+        self.Bounds = model.lowerB + model.upperB + model.rangeB
 
         # Maintain counters for effective number of bounds.
         self.nBounds  = nB
         self.nBounds2 = nB2
 
-        eqC  = nlp.equalC  ; lC   = nlp.lowerC
-        uC   = nlp.upperC  ; rC   = nlp.rangeC
-        neqC = nlp.nequalC ; nlC  = nlp.nlowerC
-        nuC  = nlp.nupperC ; nrC  = nlp.nrangeC
-        Lvar = nlp.Lvar    ; Uvar = nlp.Uvar
-        Lcon = nlp.Lcon    ; Ucon = nlp.Ucon
+        eqC  = model.equalC  ; lC   = model.lowerC
+        uC   = model.upperC  ; rC   = model.rangeC
+        neqC = model.nequalC ; nlC  = model.nlowerC
+        nuC  = model.nupperC ; nrC  = model.nrangeC
+        Lvar = model.Lvar    ; Uvar = model.Uvar
+        Lcon = model.Lcon    ; Ucon = model.Ucon
 
         # Initial point.
-        n = nlp.n ; m = nlp.m ; nB = self.nBounds
+        n = model.n ; m = model.m ; nB = self.nBounds
         self.x0 = np.zeros(n + m + nB)
-        self.x0[:n] = nlp.x0[:]
+        self.x0[:n] = model.x0[:]
         x0 = self.x0[:n]
 
         # Stopping tolerances.
@@ -130,8 +130,8 @@ class L1MeritFunction(NLPModel):
         self.s += self.ethresh
 
         # Shortcuts
-        lB  = nlp.lowerB  ; uB  = nlp.upperB  ; rB  = nlp.rangeB
-        nlB = nlp.nlowerB ; nuB = nlp.nupperB ; nrB = nlp.nrangeB
+        lB  = model.lowerB  ; uB  = model.upperB  ; rB  = model.rangeB
+        nlB = model.nlowerB ; nuB = model.nupperB ; nrB = model.nrangeB
 
         # Set initial elastics for the bound constraints so (x0, t0)
         # strictly satisfies the bounds. Single elastic for 2-sided bounds.
@@ -181,14 +181,14 @@ class L1MeritFunction(NLPModel):
 
     def get_xst(self, xst):
         """Split vector xst into x, s and t subvectors."""
-        nlp = self.nlp ; n = nlp.n ; m = nlp.m
+        model = self.model ; n = model.n ; m = model.m
         x = xst[:n] ; s = xst[n:n+m] ; t = xst[n+m:]
         return (x, s, t)
 
     def get_yzuv(self, yzuv):
         """Split vector of multipliers yzuv into y, z, u and v subvectors."""
-        nlp = self.nlp ; n = nlp.n ; m = nlp.m
-        nrC = nlp.nrangeC ; nB2 = self.nBounds2
+        model = self.model ; n = model.n ; m = model.m
+        nrC = model.nrangeC ; nB2 = self.nBounds2
         y = yzuv[:m+nrC] ; z = yzuv[m+nrC:m+nrC+nB2]
         u = yzuv[m+nrC+nB2:m+nrC+nB2+m] ; v = yzuv[m+nrC+nB2+m:]
         return (y, z, u, v)
@@ -196,27 +196,27 @@ class L1MeritFunction(NLPModel):
     def shifted_multipliers(self, y):
         """(yE, yL, yU, yRL, yRU) -> (yE-nuE, yL, yU, yRL, yRU)"""
 
-        nlp = self.nlp ; eC = nlp.equalC
+        model = self.model ; eC = model.equalC
         (nuE, nuS, nuT) = self.get_penalty_parameters()
 
-        y_nlp = y.copy()
-        y_nlp[eC] -= nuE
+        y_model = y.copy()
+        y_model[eC] -= nuE
 
-        return y_nlp
+        return y_model
 
     def nlp_multipliers(self, y, shift=True):
         "(yE, yL, yU, yRL, yRU) -> (yE-nuE, yL, -yU, yRL-yRU)"
 
-        nlp = self.nlp ; m = nlp.m
-        eC = nlp.equalC ; uC = nlp.upperC ; rC = nlp.rangeC
+        model = self.model ; m = model.m
+        eC = model.equalC ; uC = model.upperC ; rC = model.rangeC
         (nuE, nuS, nuT) = self.get_penalty_parameters()
 
-        y_nlp = y[:m].copy()
-        if shift: y_nlp[eC] -= nuE
-        y_nlp[uC] *= -1
-        y_nlp[rC] -= y[m:]
+        y_model = y[:m].copy()
+        if shift: y_model[eC] -= nuE
+        y_model[uC] *= -1
+        y_model[rC] -= y[m:]
 
-        return y_nlp
+        return y_model
 
     def obj(self, xst, f=None, c=None):
         """
@@ -231,13 +231,13 @@ class L1MeritFunction(NLPModel):
         """
 
         # Shortcuts.
-        nlp = self.nlp
-        eqC = nlp.equalC ; lC = nlp.lowerC
-        uC = nlp.upperC ; rC = nlp.rangeC
+        model = self.model
+        eqC = model.equalC ; lC = model.lowerC
+        uC = model.upperC ; rC = model.rangeC
 
         (x,s,t) = self.get_xst(xst)
 
-        p = nlp.obj(x) if f is None else f
+        p = model.obj(x) if f is None else f
         if c is None: c = self.cons_pos(x)
 
         # Add contribution from ...
@@ -269,16 +269,16 @@ class L1MeritFunction(NLPModel):
         """
 
         # Shortcuts.
-        nlp = self.nlp
-        n = nlp.n ; m = nlp.m ; nB = self.nBounds ; nB2 = self.nBounds2
-        eqC = nlp.equalC ; lC = nlp.lowerC ; uC = nlp.upperC
-        rC = nlp.rangeC ; nrC = nlp.nrangeC
-        Lcon = nlp.Lcon ; Ucon = nlp.Ucon
+        model = self.model
+        n = model.n ; m = model.m ; nB = self.nBounds ; nB2 = self.nBounds2
+        eqC = model.equalC ; lC = model.lowerC ; uC = model.upperC
+        rC = model.rangeC ; nrC = model.nrangeC
+        Lcon = model.Lcon ; Ucon = model.Ucon
 
         ec = np.empty(self.m)  # Reformulated constraints.
 
         # General constraints.
-        ec[:m] = nlp.cons(x) if c is None else c[:]
+        ec[:m] = model.cons(x) if c is None else c[:]
         ec[m:m+nrC] = ec[rC]
         ec[eqC] -= Lcon[eqC]
         ec[lC]  -= Lcon[lC]
@@ -314,22 +314,22 @@ class L1MeritFunction(NLPModel):
         """
 
         # Shortcuts.
-        nlp = self.nlp
-        n = nlp.n ; m = nlp.m ; nB = self.nBounds ; nB2 = self.nBounds2
-        eqC = nlp.equalC ; lC = nlp.lowerC ; uC = nlp.upperC
-        rC = nlp.rangeC ; nrC = nlp.nrangeC
-        Lcon = nlp.Lcon ; Ucon = nlp.Ucon
-        lB = nlp.lowerB ; nlB = nlp.nlowerB
-        uB = nlp.upperB ; nuB = nlp.nupperB
-        rB = nlp.rangeB ; nrB = nlp.nrangeB
-        Lvar = nlp.Lvar ; Uvar = nlp.Uvar
+        model = self.model
+        n = model.n ; m = model.m ; nB = self.nBounds ; nB2 = self.nBounds2
+        eqC = model.equalC ; lC = model.lowerC ; uC = model.upperC
+        rC = model.rangeC ; nrC = model.nrangeC
+        Lcon = model.Lcon ; Ucon = model.Ucon
+        lB = model.lowerB ; nlB = model.nlowerB
+        uB = model.upperB ; nuB = model.nupperB
+        rB = model.rangeB ; nrB = model.nrangeB
+        Lvar = model.Lvar ; Uvar = model.Uvar
 
         (x,s,t) = self.get_xst(xst)
 
         ec = np.empty(m + nrC + nB2)  # Elastic constraints.
 
         # General constraints.
-        ec[:m] = nlp.cons(x) if c is None else c[:]
+        ec[:m] = model.cons(x) if c is None else c[:]
         ec[m:m+nrC] = ec[rC]
         ec[eqC] -= Lcon[eqC]
         ec[lC]  -= Lcon[lC]
@@ -362,19 +362,19 @@ class L1MeritFunction(NLPModel):
         """
 
         # Shortcuts.
-        nlp = self.nlp ; n = nlp.n ; m = nlp.m
-        eqC = nlp.equalC ; neqC = nlp.nequalC
-        lC = nlp.lowerC ; uC = nlp.upperC ; rC = nlp.rangeC
-        nlB = nlp.nlowerB ; nuB = nlp.nupperB ; nrB = nlp.nrangeB
+        model = self.model ; n = model.n ; m = model.m
+        eqC = model.equalC ; neqC = model.nequalC
+        lC = model.lowerC ; uC = model.upperC ; rC = model.rangeC
+        nlB = model.nlowerB ; nuB = model.nupperB ; nrB = model.nrangeB
         nB = self.nBounds
         (x,s,t) = self.get_xst(xst)
 
         grad = np.empty(self.n)
 
         # Assemble x-part of gradient.
-        grad[:n] = nlp.grad(x) if g is None else g[:]
+        grad[:n] = model.grad(x) if g is None else g[:]
         if neqC > 0:
-            _JE = nlp.jac(x)[eqC,:]
+            _JE = model.jac(x)[eqC,:]
             JE = PysparseLinearOperator(_JE)
             eE = np.ones(neqC)
             grad[:n] += self.nuE * (JE.T * eE)
@@ -419,16 +419,16 @@ class L1MeritFunction(NLPModel):
         """
         store_zeros = kwargs.get('store_zeros', False)
         store_zeros = 1 if store_zeros else 0
-        nlp = self.nlp
-        n = nlp.n ; m = nlp.m ; nrC = nlp.nrangeC
-        uC = nlp.upperC ; rC = nlp.rangeC
+        model = self.model
+        n = model.n ; m = model.m ; nrC = model.nrangeC
+        uC = model.upperC ; rC = model.rangeC
 
         # Initialize sparse Jacobian
-        J = sp(nrow=m + nrC, ncol=n, sizeHint=nlp.nnzj+10*nrC,
+        J = sp(nrow=m + nrC, ncol=n, sizeHint=model.nnzj+10*nrC,
                storeZeros=store_zeros)
 
         # Insert contribution of general constraints
-        J[:m,:n]  = nlp.jac(x, store_zeros=store_zeros)
+        J[:m,:n]  = model.jac(x, store_zeros=store_zeros)
         J[uC,:n] *= -1                 # Flip sign of 'upper' gradients
         J[m:,:n]  = -J[rC,:n]          # Append 'upper' side of range const.
         return J
@@ -450,14 +450,14 @@ class L1MeritFunction(NLPModel):
             return np.arange(*args, dtype=np.int)
 
         # Shortcuts.
-        nlp = self.nlp ; n = nlp.n ; m = nlp.m
-        eqC = nlp.equalC   ; neqC = nlp.nequalC
-        lC  = nlp.lowerC   ; nlC  = nlp.nlowerC
-        uC  = nlp.upperC   ; nuC  = nlp.nupperC
-        rC  = nlp.rangeC   ; nrC  = nlp.nrangeC
-        lB  = nlp.lowerB   ; nlB  = nlp.nlowerB
-        uB  = nlp.upperB   ; nuB  = nlp.nupperB
-        rB  = nlp.rangeB   ; nrB  = nlp.nrangeB
+        model = self.model ; n = model.n ; m = model.m
+        eqC = model.equalC   ; neqC = model.nequalC
+        lC  = model.lowerC   ; nlC  = model.nlowerC
+        uC  = model.upperC   ; nuC  = model.nupperC
+        rC  = model.rangeC   ; nrC  = model.nrangeC
+        lB  = model.lowerB   ; nlB  = model.nlowerB
+        uB  = model.upperB   ; nuB  = model.nupperB
+        rB  = model.rangeB   ; nrB  = model.nrangeB
         nB  = self.nBounds ; nB2  = self.nBounds2
         (x,s,t) = self.get_xst(xst)
 
@@ -474,7 +474,7 @@ class L1MeritFunction(NLPModel):
         #                    n   m   nB
 
         Jp = sp(nrow=m+nrC+nB2, ncol=n+m+nB, symmetric=False,
-                sizeHint=nlp.nnzj+10*nrC+2*m+2*nB+nB2)
+                sizeHint=model.nnzj+10*nrC+2*m+2*nB+nB2)
 
         # Contributions from original problem variables.
         r_lB = Range(nlB) ; r_uB = Range(nuB) ; r_rB = Range(nrB)
@@ -536,7 +536,7 @@ class L1MeritFunction(NLPModel):
         """
 
         # Shortcuts.
-        nlp = self.nlp ; m = nlp.m ; nrC = nlp.nrangeC
+        model = self.model ; m = model.m ; nrC = model.nrangeC
 
         (x,s,t) = self.get_xst(xst)
         obj_weight = kwargs.get('obj_weight', 1.0)
@@ -547,8 +547,8 @@ class L1MeritFunction(NLPModel):
             y = np.zeros(m+nrC)
         y2 = self.nlp_multipliers(y, shift=shift)
 
-        H = sp(nrow=self.n, ncol=self.n, symmetric=True, sizeHint=nlp.nnzh)
-        H[:nlp.n,:nlp.n] = nlp.hess(x, y2, **kwargs)
+        H = sp(nrow=self.n, ncol=self.n, symmetric=True, sizeHint=model.nnzh)
+        H[:model.n,:model.n] = model.hess(x, y2, **kwargs)
         return H
 
     def hop(self, *args, **kwargs):
@@ -556,7 +556,7 @@ class L1MeritFunction(NLPModel):
 
     def bounds(self, xst):
         """Return the vector of bound constraints."""
-        n = self.nlp.n
+        n = self.model.n
         return xst[n:].copy()
 
     def primal_feasibility(self, xst, c=None):
@@ -596,7 +596,7 @@ class L1MeritFunction(NLPModel):
         """
 
         # Shortcuts.
-        nlp = self.nlp ; n = nlp.n
+        model = self.model ; n = model.n
 
         if g is None: g = self.grad(xst)
         if J is None: J = self.jop(xst)
@@ -629,8 +629,8 @@ class L1MeritFunction(NLPModel):
             :stuv:  complementarity residual for bound constraints.
         """
         # Shortcuts.
-        nlp = self.nlp
-        st = xst[nlp.n:]
+        model = self.model
+        st = xst[model.n:]
         yz = yzuv[:self.m] ; uv = yzuv[self.m:]
 
         if c is None: c = self.cons(xst)
@@ -675,17 +675,17 @@ class L1BarrierMeritFunction(NLPModel):
               GERAD Technical Report G-2009-74, Montreal, Canada, 2009.
     """
 
-    def __init__(self, nlp, mu=5.0, **kwargs):
+    def __init__(self, model, mu=5.0, **kwargs):
 
 
-        nB  = nlp.nlowerB + nlp.nupperB + nlp.nrangeB
-        nvar = nlp.n + nlp.m + nB
+        nB  = model.nlowerB + model.nupperB + model.nrangeB
+        nvar = model.n + model.m + nB
 
         super(L1BarrierMeritFunction, self).__init__(n=nvar, m=0,
-                                                     name=nlp.name + ' (l1barrier)',
+                                                     name=model.name + ' (l1barrier)',
                                                      **kwargs)
 
-        self.l1 = L1MeritFunction(nlp, **kwargs)
+        self.l1 = L1MeritFunction(model, **kwargs)
         self.x0 = self.l1.x0
         self.pi0 = self.l1.pi0
         self._mu = mu
@@ -781,7 +781,7 @@ class L1BarrierMeritFunction(NLPModel):
         """
 
         # Shortcuts
-        l1 = self.l1 ; nlp = l1.nlp ; n = nlp.n
+        l1 = self.l1 ; model = l1.model ; n = model.n
 
         if c is None: c = l1.cons(xst)
         if J is None: J = l1.jac(xst)
