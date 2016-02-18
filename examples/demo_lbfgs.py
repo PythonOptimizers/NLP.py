@@ -1,6 +1,7 @@
-"""
-Demo of the limited-memory BFGS method. Each problem given on the command line
-is solved for several values of the limited-memory parameter.
+"""Demo of the limited-memory BFGS method.
+
+Each problem given on the command line is solved
+for several values of the limited-memory parameter.
 """
 
 from nlp.model.amplpy import AmplModel
@@ -10,20 +11,21 @@ import sys
 
 headerfmt = '%-15s  %-6s  %-5s  %-12s  %-12s  %-6s  %-7s\n'
 header = headerfmt % ('Problem', 'n', 'pairs', 'Obj', 'Grad', 'Iter', 'Time')
-hlen = len( header )
+hlen = len(header)
 format = '%-15s  %-6d  %-5d  %-12g  %-12g  %-6d  %-7g\n'
 sys.stdout.write(header)
 sys.stdout.write('-' * hlen + '\n')
 
-for ProblemName in sys.argv[1:]:
-    model = AmplModel( ProblemName )
+for problem_name in sys.argv[1:]:
+    model = AmplModel(problem_name)
 
     for m in [1, 2, 3, 4, 5, 10, 15, 20]:
         lbfgs = LBFGSFramework(model, npairs=m, scaling=True, silent=True)
         lbfgs.solve()
 
         # Output final statistics
-        probname = os.path.basename(ProblemName)
-        if probname[-3:] == '.nl': probname = probname[:-3]
+        probname = os.path.basename(problem_name)
+        if probname[-3:] == '.nl':
+            probname = probname[:-3]
         sys.stdout.write(format % (probname, model.n, lbfgs.npairs, lbfgs.f,
                                    lbfgs.gnorm, lbfgs.iter, lbfgs.tsolve))
