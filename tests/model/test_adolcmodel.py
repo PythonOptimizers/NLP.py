@@ -47,7 +47,8 @@ class Test_AdolcRosenbrock(TestCase, Rosenbrock):  # Test def'd in Rosenbrock
 
     @dec.skipif(module_missing('adolc'), "Test skipped because ADOL-C is not available.")
     def setUp(self):
-        self.model = AdolcRosenbrock(n=5, name='Rosenbrock', x0=-np.ones(5))
+        n = 5
+        self.model = AdolcRosenbrock(n, name='Rosenbrock', x0=-np.ones(n))
 
 
 class Test_AdolcHS7(TestCase, Hs7):  # Test def'd in Hs7
@@ -57,6 +58,13 @@ class Test_AdolcHS7(TestCase, Hs7):  # Test def'd in Hs7
 
     @dec.skipif(module_missing('adolc'), "Test skipped because ADOL-C is not available.")
     def setUp(self):
-        self.model = AdolcHS7(n=2, m=1, name='HS7',
-                              x0=2*np.ones(2), pi0=np.ones(1),
-                              Lcon=np.array([4.]), Ucon=np.array([4.]))
+        n = 2
+        m = 1
+        self.model = AdolcHS7(2, m=m, name='HS7',
+                              x0=2 * np.ones(n), pi0=np.ones(m),
+                              Lcon=4 * np.ones(m), Ucon=4 * np.ones(m))
+
+if __name__ == '__main__':
+
+    import unittest
+    unittest.main()
