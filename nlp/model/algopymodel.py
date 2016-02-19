@@ -21,7 +21,7 @@ class AlgopyModel(NLPModel):
     See the documentation of `NLPModel` for further information.
     """
 
-    def __init__(self, n, m, name='Algopy-Generic', **kwargs):
+    def __init__(self, n, m=0, name='Algopy-Generic', **kwargs):
         """Initialize a model with `n` variables and `m` constraints.
 
         :parameters:
@@ -30,7 +30,7 @@ class AlgopyModel(NLPModel):
             :m:       number of general (non bound) constraints (default: 0)
             :name:    model name (default: 'Generic')
         """
-        super(AlgopyModel, self).__init__(n, m, name, **kwargs)
+        super(AlgopyModel, self).__init__(n, m=m, name=name, **kwargs)
 
         self._cg_obj = None
         self._cg_cons = None

@@ -1,6 +1,5 @@
-# nlp.py
-# Define an abstract class to represent a general
-# nonlinear optimization problem.
+"""Abstract base classes to represent continuous optimization models."""
+
 from nlp.model.kkt import KKTresidual
 from pykrylov.linop.linop import LinearOperator, DiagonalOperator, \
                                  ReducedLinearOperator
@@ -13,38 +12,40 @@ import sys
 
 
 class NLPModel(object):
-    """An abstract nonlinear optimization problem. It features methods to
-    evaluate the objective and constraint functions, and their derivatives.
-    Instances of the general class do not do anything interesting; they must
-    be subclassed and specialized.
+    """Abstract continuous optimization model.
 
-    :parameters:
-
-        :n:       number of variables (default: 0)
-        :m:       number of general (non bound) constraints (default: 0)
-        :name:    model name (default: 'Generic')
-
-    :keywords:
-
-        :x0:      initial point (default: all 0)
-        :pi0:     vector of initial multipliers (default: all 0)
-        :Lvar:    vector of lower bounds on the variables
-                  (default: all -Infinity)
-        :Uvar:    vector of upper bounds on the variables
-                  (default: all +Infinity)
-        :Lcon:    vector of lower bounds on the constraints
-                  (default: all -Infinity)
-        :Ucon:    vector of upper bounds on the constraints
-                  (default: all +Infinity)
+    The model features methods to evaluate the objective and constraints,
+    and their derivatives. Instances of the general class do not do anything
+    interesting; they must be subclassed and specialized.
     """
 
     _id = -1
 
     def __init__(self, n, m=0, name='Generic', **kwargs):
+        """Initialize a model with `n` variables and `m` constraints.
 
+        :parameters:
+
+            :n:       number of variables
+            :m:       number of general (non bound) constraints (default: 0)
+            :name:    model name (default: 'Generic')
+
+        :keywords:
+
+            :x0:      initial point (default: all 0)
+            :pi0:     vector of initial multipliers (default: all 0)
+            :Lvar:    vector of lower bounds on the variables
+                      (default: all -Infinity)
+            :Uvar:    vector of upper bounds on the variables
+                      (default: all +Infinity)
+            :Lcon:    vector of lower bounds on the constraints
+                      (default: all -Infinity)
+            :Ucon:    vector of upper bounds on the constraints
+                      (default: all +Infinity)
+        """
         self._nvar = self._n = n   # Number of variables
         self._ncon = self._m = m   # Number of general constraints
-        self._name = name         # Problem name
+        self._name = name          # Problem name
 
         # Set initial point
         if 'x0' in kwargs.keys():
@@ -143,8 +144,8 @@ class NLPModel(object):
         self.nbounds = self.n - self.nfreeB
 
         # Define permutations to order bound constraints / multipliers.
-        self.permB = (self.fixedB + self.lowerB + self.upperB +
-                      self.rangeB + self.freeB)
+        self.permB = self.fixedB + self.lowerB + self.upperB + \
+            self.rangeB + self.freeB
 
         # Define default stopping tolerances
         self._stop_d = 1.0e-6    # Dual feasibility
@@ -152,9 +153,9 @@ class NLPModel(object):
         self._stop_p = 1.0e-6    # Primal feasibility
 
         # Define scaling attributes.
-        self.g_max = 1.0e2       # max gradient entry (constant)
-        self.scale_obj = None    # Objective scaling
-        self.scale_con = None    # Constraint scaling
+        self.g_max = 1.0e2      # max gradient entry (constant)
+        self.scale_obj = None   # Objective scaling
+        self.scale_con = None   # Constraint scaling
 
         # Problem-specific logger.
         self.__class__._id += 1
@@ -193,7 +194,7 @@ class NLPModel(object):
 
     @property
     def lin(self):
-        """Indices of linear constraints."""
+        """Return the indices of linear constraints."""
         return self._lin
 
     @property
@@ -203,7 +204,7 @@ class NLPModel(object):
 
     @property
     def nln(self):
-        """Indices of nonlinear constraints."""
+        """Return the indices of nonlinear constraints."""
         return self._nln
 
     @property
@@ -218,12 +219,12 @@ class NLPModel(object):
 
     @property
     def net(self):
-        """Indices of network constraints."""
+        """Return the indices of network constraints."""
         return self._net
 
     @property
     def stop_d(self):
-        """Tolerance on dual feasibility"""
+        """Tolerance on dual feasibility."""
         return self._stop_d
 
     @stop_d.setter
@@ -232,7 +233,7 @@ class NLPModel(object):
 
     @property
     def stop_c(self):
-        """Tolerance on complementarity"""
+        """Tolerance on complementarity."""
         return self._stop_c
 
     @stop_c.setter
@@ -241,7 +242,7 @@ class NLPModel(object):
 
     @property
     def stop_p(self):
-        """Tolerance on primal feasibility"""
+        """Tolerance on primal feasibility."""
         return self._stop_p
 
     @stop_p.setter
@@ -250,11 +251,12 @@ class NLPModel(object):
 
     @deprecated
     def get_stopping_tolerances(self):
-        """Return current stopping tolerances"""
+        """Return current stopping tolerances."""
         return (self.stop_d, self.stop_p, self.stop_c)
 
     @deprecated
     def set_stopping_tolerances(self, stop_d, stop_p, stop_c):
+        """Set stopping tolerances."""
         self.stop_d = stop_d
         self.stop_p = stop_p
         self.stop_c = stop_c
@@ -486,11 +488,12 @@ class NLPModel(object):
         return KKTresidual(dFeas, pFeas[:m+nrC], pFeas[m+nrC:], cy, xz)
 
     def at_optimality(self, x, z, **kwargs):
-        """Checks whether the KKT residuals meet the stopping conditions."""
+        """Check whether the KKT residuals meet the stopping conditions."""
         kkt = self.optimality_residuals(x, z, **kwargs)
-        return (kkt.dFeas <= self.stop_d and
-                kkt.comp <= self.stop_c and
-                kkt.feas <= self.stop_p)
+        dFeas = kkt.dFeas <= self.stop_d
+        pFeas = kkt.feas <= self.stop_p
+        compl = kkt.comp <= self.stop_c
+        return dFeas and pFeas and compl
 
     def bounds(self, x):
         """Return the vector with components x[i]-Lvar[i] or Uvar[i]-x[i].
@@ -705,13 +708,13 @@ class NLPModel(object):
         return
 
     def __repr__(self):
+        """Brief info about model."""
         dat = (self.__class__.__name__, self.name, self.n, self.m)
         return '%s %s with %d variables and %d constraints' % dat
 
 
 class QPModel(NLPModel):
-    """
-    A generic class to represent a quadratic programming problem
+    """Generic class to represent a quadratic programming (QP) problem.
 
     minimize    c'x + 1/2 x'Hx
     subject to  L <= A*x <= U
@@ -719,7 +722,8 @@ class QPModel(NLPModel):
     """
 
     def __init__(self, c, H, A=None, name='GenericQP', **kwargs):
-        """
+        """Initialize a QP with linear term `c`, Hessian `H` and Jacobian `A`.
+
         :parameters:
             :c:   Numpy array to represent the linear objective
             :A:   linear operator to represent the constraint matrix.
@@ -734,7 +738,6 @@ class QPModel(NLPModel):
 
         See the documentation of `NLPModel` for futher information.
         """
-
         # Basic checks.
         n = c.shape[0]
         if A is None:
@@ -762,63 +765,76 @@ class QPModel(NLPModel):
         self._nnet = len(self.net)            # Number of network constraints
 
     def obj(self, x):
+        """Evaluate the objective function at x."""
         cHx = self.hprod(x, 0, x)
         cHx *= 0.5
         cHx += self.c
         return np.dot(cHx, x)
 
     def grad(self, x):
+        """Evaluate the objective gradient at x."""
         Hx = self.hprod(x, 0, x)
         Hx += self.c
         return Hx
 
     def cons(self, x):
+        """Evaluate the constraints at x."""
         if isinstance(self.A, np.ndarray):
             return np.dot(self.A, x)
         return self.A * x
 
     def A(self, x):
+        """Evaluate the constraints Jacobian at x."""
         return self.A
 
     def jac(self, x):
+        """Evaluate the constraints Jacobian at x."""
         return self.A
 
     def jprod(self, x, p):
+        """Evaluate Jacobian-vector product at x with p."""
         return self.cons(p)
 
     def jtprod(self, x, p):
+        """Evaluate transposed-Jacobian-vector product at x with p."""
         if isinstance(self.A, np.ndarray):
             return np.dot(self.A.T, p)
         return self.A.T * p
 
     def hess(self, x, z):
+        """Evaluate Lagrangian Hessian at (x, z)."""
         return self.H
 
     def hprod(self, x, z, p):
+        """Hessian-vector product.
+
+        Evaluate matrix-vector product between the Hessian of the Lagrangian at
+        (x, z) and p.
+        """
         if isinstance(self.H, np.ndarray):
             return np.dot(self.H, p)
         return self.H * p
 
 
 class LPModel(QPModel):
-    """
-    A generic class to represent a linear programming problem
+    """Generic class to represent a linear programming (LP) problem.
 
     minimize    c'x
     subject to  L <= A*x <= U
                 l <=  x  <= u.
-
-    :parameters:
-        :c:   Numpy array to represent the linear objective
-        :A:   linear operator to represent the constraint matrix.
-              It must be possible to perform the operations `A*x`
-              and `A.T*y` for Numpy arrays `x` and `y` of appropriate size.
-
-    See the documentation of `NLPModel` for futher information.
     """
 
     def __init__(self, c, A=None, name='GenericLP', **kwargs):
+        """Initialize a LP with linear term `c` and Jacobian `A`.
 
+        :parameters:
+            :c:   Numpy array to represent the linear objective
+            :A:   linear operator to represent the constraint matrix.
+                  It must be possible to perform the operations `A*x`
+                  and `A.T*y` for Numpy arrays `x` and `y` of appropriate size.
+
+        See the documentation of `NLPModel` for futher information.
+        """
         n = c.shape[0]
         H = LinearOperator(n, n,
                            lambda x: np.zeros(n),

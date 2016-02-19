@@ -20,9 +20,9 @@ class BaseAdolcModel(NLPModel):
     See the documentation of `NLPModel` for further information.
     """
 
-    def __init__(self, n, m, name='Adolc-Generic', **kwargs):
+    def __init__(self, n, m=0, name='Adolc-Generic', **kwargs):
         """Initialize a model with `n` variables and `m` constraints."""
-        super(BaseAdolcModel, self).__init__(n, m, name, **kwargs)
+        super(BaseAdolcModel, self).__init__(n, m=m, name=name, **kwargs)
 
         # Trace objective and constraint functions.
         self._obj_trace_id = None
