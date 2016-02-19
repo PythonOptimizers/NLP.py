@@ -24,6 +24,7 @@ class RosenbrockData(object):
                                     [   0.,  400., 1802.,  400.,   0.],
                                     [   0.,    0.,  400., 1802., 400.],
                                     [   0.,    0.,    0.,  400., 200.]])
+
         v = np.arange(1, self.expected_H.shape[0] + 1, dtype=np.float)
         self.expected_Hv = np.dot(self.expected_H, v)
 
@@ -37,12 +38,14 @@ class Hs7Data(object):
         self.expected_g = np.array([0.8, -1.])
         self.expected_H = np.array([[-52.24, 0.],
                                     [0., -2.]])
+
         v = np.arange(1, self.expected_H.shape[0] + 1, dtype=np.float)
         self.expected_Hv = np.dot(self.expected_H, v)
         self.expected_J = np.array([[40., 4.]])
         self.expected_Jv = np.dot(self.expected_J, v)
         w = 2 * np.ones(self.expected_J.shape[0])
         self.expected_JTw = np.dot(self.expected_J.T, w)
+
 
 class Hs7SlackData(Hs7Data):
 
@@ -158,6 +161,7 @@ def get_derivatives_plain(model):
 
 def get_derivatives_coord(model):
     g = model.grad(model.x0)
+
     H = ndarray_from_coord(model.nvar, model.nvar,
                            *model.hess(model.x0, model.pi0), symmetric=True)
     v = np.arange(1, model.nvar + 1, dtype=np.float)
@@ -210,7 +214,7 @@ def ndarray_from_ll_mat_sym(spA):
     n = spA.shape[0]
     A = np.zeros((n, n), dtype=np.float)
     for i in range(n):
-        for j in range(i+1):
+        for j in range(i + 1):
             A[i, j] = spA[i, j]
             A[j, i] = A[i, j]
     return A
