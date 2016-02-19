@@ -1,5 +1,4 @@
-"""
-Python interface to the AMPL modeling language
+"""Python interface to the AMPL modeling language.
 
 .. moduleauthor:: M. P. Friedlander <mpf@cs.ubc.ca>
 .. moduleauthor:: D. Orban <dominique.orban@gerad.ca>
@@ -15,8 +14,6 @@ import tempfile
 import os
 
 __docformat__ = 'restructuredtext'
-
-warnings.simplefilter('always')   # Never ignore warnings.
 
 
 def GenTemplate(model, data=None, opts=None):
@@ -45,7 +42,7 @@ def GenTemplate(model, data=None, opts=None):
     if data is not None:
         if data[-4:] == '.dat':
             data = data[:-4]
-    template.write("data  %s.dat;\n" % data)
+        template.write("data  %s.dat;\n" % data)
     template.write("write g%s;\n" % model)
 
     # Finish off the template file.
@@ -101,7 +98,7 @@ class AmplModel(NLPModel):
 
         # Get basic info on problem
         self.minimize = (model.objtype == 0)
-
+        (self._lin, self._nln, self._net) = model.get_CType()  # Constr. types
         # Constraint types
         (self._lin, self._nln, self._net) = model.get_CType()
         self._nlin = len(self.lin)       # number of linear  constraints
@@ -122,14 +119,14 @@ class AmplModel(NLPModel):
         self.model._dealloc()
 
     def writesol(self, x, z, msg):
-        """Write primal-dual solution and message msg to stub.sol."""
+        """Write primal-dual solution and message msg to `stub.sol`."""
         return self.model.ampl_sol(x, z, msg)
 
     # The following methods mirror the module functions defined in _amplpy.c.
 
     def obj(self, x, obj_num=0):
-        """
-        Evaluate objective function value at x.
+        """Evaluate objective function value at x.
+
         Returns a floating-point number. This method changes the sign of the
         objective value if the problem is a maximization problem.
         """
@@ -146,8 +143,8 @@ class AmplModel(NLPModel):
         return f
 
     def grad(self, x, obj_num=0):
-        """
-        Evaluate objective gradient at x.
+        """Evaluate objective gradient at x.
+
         Returns a Numpy array. This method changes the sign of the objective
         gradient if the problem is a maximization problem.
         """
@@ -159,14 +156,13 @@ class AmplModel(NLPModel):
         g = self.model.grad_obj(x)
         if self.scale_obj:
             g *= self.scale_obj
-
         if not self.minimize:
             g *= -1
         return g
 
     def sgrad(self, x):
-        """
-        Evaluate sparse objective gradient at x.
+        """Evaluate sparse objective gradient at x.
+
         Returns a sparse vector. This method changes the sign of the objective
         gradient if the problem is a maximization problem.
         """
@@ -178,8 +174,8 @@ class AmplModel(NLPModel):
         return sg
 
     def cost(self):
-        """
-        Evaluate sparse cost vector.
+        """Evaluate sparse cost vector.
+
         Useful when problem is a linear program.
         Return a sparse vector. This method changes the sign of the cost vector
         if the problem is a maximization problem.
@@ -192,8 +188,8 @@ class AmplModel(NLPModel):
         return sc
 
     def cons(self, x):
-        """
-        Evaluate vector of constraints at x.
+        """Evaluate vector of constraints at x.
+
         Returns a Numpy array.
         The constraints appear in natural order. To order them as follows
 
@@ -210,8 +206,8 @@ class AmplModel(NLPModel):
         return c
 
     def icons(self, i, x):
-        """
-        Evaluate value of i-th constraint at x.
+        """Evaluate value of i-th constraint at x.
+
         Returns a floating-point number.
         """
         ci = self.model.eval_ci(i, x)
@@ -220,8 +216,8 @@ class AmplModel(NLPModel):
         return ci
 
     def igrad(self, i, x):
-        """
-        Evaluate dense gradient of i-th constraint at x.
+        """Evaluate dense gradient of i-th constraint at x.
+
         Returns a Numpy array.
         """
         gi = self.model.eval_gi(i, x)
@@ -230,8 +226,8 @@ class AmplModel(NLPModel):
         return gi
 
     def sigrad(self, i, x):
-        """
-        Evaluate sparse gradient of i-th constraint at x.
+        """Evaluate sparse gradient of i-th constraint at x.
+
         Returns a sparse vector representing the sparse gradient
         in coordinate format.
         """
@@ -241,10 +237,10 @@ class AmplModel(NLPModel):
         return sci
 
     def irow(self, i):
-        """
-        Evaluate sparse gradient of the linear part of the
-        i-th constraint. Useful to obtain constraint rows
-        when problem is a linear programming problem.
+        """Evaluate sparse gradient of the linear part of the i-th constraint.
+
+        Useful to obtain constraint rows when problem
+        is a linear programming problem.
         """
         sri = sv.SparseVector(self.n, self.model.eval_row(i))
         if self.scale_con is not None:
@@ -252,10 +248,10 @@ class AmplModel(NLPModel):
         return sri
 
     def A(self, *args, **kwargs):
-        """
-        Evaluate sparse Jacobian of the linear part of the
-        constraints. Useful to obtain constraint matrix
-        when problem is a linear programming problem.
+        """Evaluate sparse Jacobian of the linear part of the constraints.
+
+        Useful to obtain constraint matrix when problem
+        is a linear programming problem.
         """
         store_zeros = kwargs.get('store_zeros', False)
         store_zeros = 1 if store_zeros else 0
@@ -265,8 +261,8 @@ class AmplModel(NLPModel):
         return (vals, rows, cols)
 
     def jac(self, x, *args, **kwargs):
-        """
-        Evaluate sparse Jacobian of constraints at x.
+        """Evaluate sparse Jacobian of constraints at x.
+
         Returns a sparse matrix in coordinate format.
         """
         store_zeros = kwargs.get('store_zeros', False)
@@ -281,11 +277,11 @@ class AmplModel(NLPModel):
         Convenience function to evaluate the Jacobian matrix of the constraints
         reformulated as
 
-            ci(x) = ai     for i in equalC
-            ci(x) - Li >= 0  for i in lowerC
-            ci(x) - Li >= 0  for i in rangeC
-            Ui - ci(x) >= 0  for i in upperC
-            Ui - ci(x) >= 0  for i in rangeC.
+          ci(x) = ai     for i in equalC
+          ci(x) - Li >= 0  for i in lowerC
+          ci(x) - Li >= 0  for i in rangeC
+          Ui - ci(x) >= 0  for i in upperC
+          Ui - ci(x) >= 0  for i in rangeC.
 
         The gradients of the general constraints appear in 'natural' order,
         i.e., in the order in which they appear in the problem. The gradients
@@ -323,9 +319,7 @@ class AmplModel(NLPModel):
 
     # Implement jop because AMPL models don't define jprod / jtprod.
     def jop(self, x, *args, **kwargs):
-        """
-        Obtain Jacobian at x as a linear operator.
-        """
+        """Jacobian at x as a linear operator."""
         vals, rows, cols = self.jac(x, *args, **kwargs)
         return CoordLinearOperator(vals, rows, cols,
                                    nargin=self.nvar,
@@ -333,25 +327,26 @@ class AmplModel(NLPModel):
                                    symmetric=False)
 
     def hess(self, x, z=None, obj_num=0, *args, **kwargs):
-        """
-        Evaluate sparse lower triangular Lagrangian Hessian at (x, z).
+        """Evaluate Hessian.
 
+        Evaluate sparse lower triangular Lagrangian Hessian at (x, z).
         By convention, the Lagrangian has the form L = f - c'z.
         """
         obj_weight = kwargs.get('obj_weight', 1.0)
         store_zeros = kwargs.get('store_zeros', False)
         store_zeros = 1 if store_zeros else 0
         if z is None:
-                z = np.zeros(self.m)
+            z = np.zeros(self.m)
         vals, rows, cols = self.model.eval_H(x, z, obj_weight, store_zeros)
         if self.scale_obj:
-                vals *= self.scale_obj
+            vals *= self.scale_obj
         if not self.minimize:
-                vals *= -1
+            vals *= -1
         return (vals, rows, cols)
 
     def hprod(self, x, z, v, **kwargs):
-        """
+        """Hessian-vector product.
+
         Evaluate matrix-vector product H(x,z) * v, where H is the Hessian of
         the Lagrangian evaluated at the primal-dual pair (x,z).
         Zero multipliers can be specified as an array of zeros or as `None`.
@@ -362,10 +357,10 @@ class AmplModel(NLPModel):
         objective or gradient were last evaluated.
 
         :keywords:
-            :obj_weight: Add a weight to the Hessian of the objective function.
-                          By default, the weight is one. Setting it to zero
-                          allows to exclude the Hessian of the objective from
-                          the Hessian of the Lagrangian.
+          :obj_weight: Add a weight to the Hessian of the objective function.
+                 By default, the weight is one. Setting it to zero
+                 allows to exclude the Hessian of the objective from
+                 the Hessian of the Lagrangian.
         """
         obj_weight = kwargs.get('obj_weight', 1.0)
         if z is None:
@@ -378,10 +373,9 @@ class AmplModel(NLPModel):
         return Hv
 
     def hiprod(self, x, i, v, **kwargs):
-        """
-        Evaluate matrix-vector product Hi(x) * v.
-        Returns a Numpy array.
+        """Constraint Hessian-vector product.
 
+        Returns a Numpy array.
         Bug: x is ignored. See hprod above.
         """
         z = np.zeros(self.m)
@@ -392,7 +386,8 @@ class AmplModel(NLPModel):
         return Hv
 
     def ghivprod(self, g, v, **kwargs):
-        """
+        """Evaluate individual dot products (g, Hi*v).
+
         Evaluate the vector of dot products (g, Hi*v) where Hi is the Hessian
         of the i-th constraint, i=1..m.
         """
@@ -404,15 +399,14 @@ class AmplModel(NLPModel):
         return gHi
 
     def islp(self):
-        """
-        Determines whether problem is a linear programming problem.
-        """
+        """Determine whether problem is a linear programming problem."""
         if self.model.nlo or self.model.nlc or self.model.nlnc:
             return False
         return True
 
     def set_x(self, x):
-        """
+        """Freeze independent variables.
+
         Set `x` as current value for subsequent calls
         to :meth:`obj`, :meth:`grad`, :meth:`jac`, etc. If several
         of :meth:`obj`, :meth:`grad`, :meth:`jac`, ..., will be called with the
@@ -426,7 +420,8 @@ class AmplModel(NLPModel):
         return self.model.set_x(x)
 
     def unset_x(self):
-        """
+        """Release independent variables.
+
         Reinstates the default behavior of :meth:`obj`, :meth:`grad`, `jac`,
         etc., which is to check whether their argument has changed since the
         last call.
@@ -444,6 +439,6 @@ class AmplModel(NLPModel):
         write('Number of nonzeros in Jacobian: %d\n' % self.nnzj)
         write('Number of nonzeros in Lagrangian Hessian: %d\n' % self.nnzh)
         if self.islp():
-                write('This problem is a linear program.\n')
+            write('This problem is a linear program.\n')
 
         return

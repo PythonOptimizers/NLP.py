@@ -19,7 +19,8 @@ class CySparseNLPModel(NLPModel):
     """
 
     def hess(self, *args, **kwargs):
-        """
+        """Evaluate Lagrangian Hessian at (x, z).
+
         Note that `rows`, `cols` and `vals` must represent a LOWER triangular
         sparse matrix in the coordinate format (COO).
         """
@@ -31,6 +32,7 @@ class CySparseNLPModel(NLPModel):
         return H
 
     def jac(self, *args, **kwargs):
+        """Evaluate constraints Jacobian at x."""
         vals, rows, cols = super(CySparseNLPModel, self).jac(*args, **kwargs)
         J = LLSparseMatrix(nrow=self.ncon, ncol=self.nvar,
                            size_hint=vals.size, is_symmetric=False,
@@ -62,6 +64,7 @@ class CySparseAmplModel(CySparseNLPModel, AmplModel):
         return A
 
     def jop(self, *args, **kwargs):
+        """Obtain Jacobian at x as a linear operator."""
         return CysparseLinearOperator(self.jac(*args, **kwargs))
 
 
@@ -177,7 +180,7 @@ class CySparseSlackModel(SlackModel):
         return J
 
     def hess(self, x, z=None, *args, **kwargs):
-        """Evaluate the Hessian of the Lagrangian."""
+        """Evaluate Lagrangian Hessian at (x, z)."""
         model = self.model
         if isinstance(model, QuasiNewtonModel):
             return self.hop(x, z, *args, **kwargs)

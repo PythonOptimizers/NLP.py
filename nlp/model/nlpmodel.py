@@ -262,8 +262,7 @@ class NLPModel(object):
         return
 
     def compute_scaling_obj(self, x=None, g_max=1.0e2, reset=False):
-        """
-        Compute objective scaling.
+        """Compute objective scaling.
 
         :parameters:
 
@@ -304,8 +303,7 @@ class NLPModel(object):
         return gNorm
 
     def compute_scaling_cons(self, x=None, g_max=1.0e2, reset=False):
-        """
-        Compute constraint scaling.
+        """Compute constraint scaling.
 
         :parameters:
 
@@ -355,9 +353,9 @@ class NLPModel(object):
         return (imaxNorm, gmaxNorm)
 
     def primal_feasibility(self, x, c=None):
-        """
-        Evaluate the primal feasibility residual at x. If `c` is given, it
-        should conform to :meth:`cons_pos`.
+        """Evaluate the primal feasibility residual at x.
+
+        If `c` is given, it should conform to :meth:`cons_pos`.
         """
         # Shortcuts.
         eC = self.equalC
@@ -378,11 +376,11 @@ class NLPModel(object):
         return pFeas
 
     def dual_feasibility(self, x, y, z, g=None, J=None, **kwargs):
-        """
-        Evaluate the dual feasibility residual at (x,y,z). The argument `J`,
-        if supplied, should be a linear operator representing the constraints
-        Jacobian. It should conform to either :meth:`jac` or :meth:`jac_pos`
-        depending on the value of `all_pos` (see below).
+        """Evaluate the dual feasibility residual at (x,y,z).
+
+        The argument `J`, if supplied, should be a linear operator representing
+        the constraints Jacobian. It should conform to either :meth:`jac` or
+        :meth:`jac_pos` depending on the value of `all_pos` (see below).
 
         The multipliers `z` should conform to :meth:`get_bounds`.
 
@@ -425,11 +423,11 @@ class NLPModel(object):
         return dFeas
 
     def complementarity(self, x, y, z, c=None):
-        """
-        Evaluate the complementarity residuals at (x,y,z). If `c` is specified,
-        it should conform to :meth:`cons_pos` and the multipliers `y` should
-        appear in the same order. The multipliers `z` should conform to
-        :meth:`get_bounds`.
+        """Evaluate the complementarity residuals at (x,y,z).
+
+        If `c` is specified, it should conform to :meth:`cons_pos` and the
+        multipliers `y` should appear in the same order. The multipliers `z`
+        should conform to :meth:`get_bounds`.
 
         :returns:
             :cy:  complementarity residual for general constraints
@@ -453,11 +451,12 @@ class NLPModel(object):
         return (cy, xz)
 
     def kkt_residuals(self, x, y, z, c=None, g=None, J=None, **kwargs):
-        """
-        Return the first-order residuals. There is no check on the sign of the
-        multipliers unless `check` is set to `True`. Keyword arguments not
-        specified below are passed directly to :meth:`primal_feasibility`,
-        :meth:`dual_feasibility` and :meth:`complementarity`.
+        """Compute the first-order residuals.
+
+        There is no check on the sign of the multipliers unless `check` is set
+        to `True`. Keyword arguments not specified below are passed directly to
+        :meth:`primal_feasibility`, :meth:`dual_feasibility` and
+        :meth:`complementarity`.
 
         If `J` is specified, it should conform to :meth:`jac_pos` and the
         multipliers `y` should be consistent with the Jacobian.
@@ -495,10 +494,10 @@ class NLPModel(object):
                kkt.feas <= self.stop_p
 
     def bounds(self, x):
-        """
-        Return the vector with components x[i]-Lvar[i] or Uvar[i]-x[i] in such
-        a way that the bound constraints on the problem variables are
-        equivalent to bounds(x) >= 0. The bounds are odered as follows:
+        """Return the vector with components x[i]-Lvar[i] or Uvar[i]-x[i].
+
+        Bound constraints on the problem variables are then equivalent to
+        bounds(x) >= 0. The bounds are odered as follows:
 
         [lowerB | upperB | rangeB (lower) | rangeB (upper) ].
         """
@@ -532,9 +531,9 @@ class NLPModel(object):
         raise NotImplementedError('This method must be subclassed.')
 
     def cons_pos(self, x):
-        """
-        Convenience function to return the vector of constraints
-        reformulated as
+        """Convenience function to return constraints as non negative ones.
+
+        Constraints are reformulated as
 
           ci(x) - ai  = 0  for i in equalC
           ci(x) - Li >= 0  for i in lowerC + rangeC
@@ -597,7 +596,7 @@ class NLPModel(object):
         raise NotImplementedError('This method must be subclassed')
 
     def jop(self, x):
-        """Obtain Jacobian at xas a linear operator."""
+        """Obtain Jacobian at x as a linear operator."""
         return LinearOperator(self.n, self.m,
                               lambda v: self.jprod(x, v),
                               matvec_transp=lambda u: self.jtprod(x, u),
@@ -616,9 +615,10 @@ class NLPModel(object):
         return D * Jpos  # Flip sign of 'upper' constraints.
 
     def lag(self, x, z, **kwargs):
-        """
-        Evaluate Lagrangian at (x, z). The constraints and bounds are
-        assumed to be ordered as in :meth:`cons_pos` and :meth:`bounds`.
+        """Evaluate Lagrangian at (x, z).
+
+        The constraints and bounds are assumed to be ordered as in
+        :meth:`cons_pos` and :meth:`bounds`.
         """
         m = self.m
         nrC = self.nrangeC
@@ -637,21 +637,24 @@ class NLPModel(object):
         raise NotImplementedError('This method must be subclassed.')
 
     def hprod(self, x, z, p, **kwargs):
-        """
-        Evaluate matrix-vector product between
-        the Hessian of the Lagrangian at (x, z) and p.
+        """Hessian-vector product.
+
+        Evaluate matrix-vector product between the Hessian of the Lagrangian at
+        (x, z) and p.
         """
         raise NotImplementedError('This method must be subclassed.')
 
     def hiprod(self, i, x, p, **kwargs):
-        """
-        Evaluate matrix-vector product between
-        the Hessian of the i-th constraint at x and p.
-        """
+        """Constraint Hessian-vector product.
+
+        Evaluate matrix-vector product between the Hessian of the i-th
+        constraint at x and p.
+        """"
         raise NotImplementedError('This method must be subclassed.')
 
     def ghivprod(self, g, v, **kwargs):
-        """
+        """Evaluate individual dot products (g, Hi*v).
+
         Evaluate the vector of dot products (g, Hi*v) where Hi is the Hessian
         of the i-th constraint at x, i = 1, ..., ncon.
         """

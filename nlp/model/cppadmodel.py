@@ -1,3 +1,5 @@
+"""Models where derivatives are computed by CPPAD."""
+
 from nlp.model.nlpmodel import NLPModel
 
 try:
@@ -9,14 +11,15 @@ import numpy as np
 
 
 class CppADModel(NLPModel):
-    """
+    """Model with derivatives computed by CPPAD.
+
     A class to represent optimization problems in which derivatives
     are computed via algorithmic differentiation through CPPAD.
     See the documentation of `NLPModel` for further information.
     """
 
-    def __init__(self, n=0, m=0, name='CppAD-Generic', **kwargs):
-        """
+    def __init__(self, n, m, name='CppAD-Generic', **kwargs):
+        """Initialize a model with `n` variables and `m` constraints.
         :parameters:
 
             :n:       number of variables (default: 0)

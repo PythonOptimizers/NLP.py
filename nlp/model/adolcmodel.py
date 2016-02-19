@@ -1,3 +1,5 @@
+"""Models where derivatives are computed by ADOL-C."""
+
 from nlp.model.nlpmodel import NLPModel
 from nlp.model.pysparsemodel import PySparseNLPModel
 from nlp.model.scipymodel import SciPyNLPModel
@@ -10,14 +12,16 @@ except:
 
 
 class BaseAdolcModel(NLPModel):
-    """
+    """Model with derivatives computed by ADOL-C.
+
     A class to represent optimization problems in which derivatives
     are computed via algorithmic differentiation through ADOL-C. By
     default, the Jacobian and Hessian are returned in dense format.
     See the documentation of `NLPModel` for further information.
     """
 
-    def __init__(self, n=0, m=0, name='Adolc-Generic', **kwargs):
+    def __init__(self, n, m, name='Adolc-Generic', **kwargs):
+        """Initialize a model with `n` variables and `m` constraints."""
         super(BaseAdolcModel, self).__init__(n, m, name, **kwargs)
 
         # Trace objective and constraint functions.
@@ -155,13 +159,14 @@ class BaseAdolcModel(NLPModel):
 
 
 class SparseAdolcModel(BaseAdolcModel):
-    """
-    An `AdolcModel` with sparse Jacobian and Hessian.
+    """`AdolcModel` with sparse Jacobian and Hessian.
+
     AdolC must have been built with Colpack support for the sparse
     option to be available.
     """
 
     def __init__(self, *args, **kwargs):
+        """See `BaseAdolcModel.__init__`."""
         super(SparseAdolcModel, self).__init__(*args, **kwargs)
         self.__first_sparse_hess_eval = True
         self.__first_sparse_jac_eval = True
@@ -217,9 +222,7 @@ class SparseAdolcModel(BaseAdolcModel):
 
 
 class PySparseAdolcModel(PySparseNLPModel, SparseAdolcModel):
-    """
-    An `AdolcModel` where sparse matrices are returned in PySparse format.
-    """
+    """`AdolcModel` with PySparse sparse matrices."""
 
     # MRO: 1. PySparseAdolcModel
     #      2. PySparseNLPModel
@@ -230,10 +233,7 @@ class PySparseAdolcModel(PySparseNLPModel, SparseAdolcModel):
 
 
 class SciPyAdolcModel(SciPyNLPModel, SparseAdolcModel):
-    """
-    An `AdolcModel` where sparse matrices are returned in SciPy
-    coordinate (COO) format.
-    """
+    """`AdolcModel` with SciPy COO sparse matrices."""
 
     # MRO: 1. SciPyAdolcModel
     #      2. SciPyNLPModel

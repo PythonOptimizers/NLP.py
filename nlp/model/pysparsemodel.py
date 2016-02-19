@@ -20,12 +20,14 @@ class PySparseNLPModel(NLPModel):
     """
 
     def hess(self, *args, **kwargs):
+        """Evaluate Lagrangian Hessian at (x, z)."""
         vals, rows, cols = super(PySparseNLPModel, self).hess(*args, **kwargs)
         H = psp(size=self.nvar, sizeHint=vals.size, symmetric=True)
         H.put(vals, rows, cols)
         return H
 
     def jac(self, *args, **kwargs):
+        """Evaluate constraints Jacobian at x."""
         vals, rows, cols = super(PySparseNLPModel,
                                  self).jac(*args, **kwargs)
         J = psp(nrow=self.ncon, ncol=self.nvar,
@@ -47,10 +49,10 @@ class PySparseAmplModel(PySparseNLPModel, AmplModel):
         super(PySparseAmplModel, self).__init__(*args, **kwargs)
 
     def A(self, *args, **kwargs):
-        """
-        Evaluate sparse Jacobian of the linear part of the
-        constraints. Useful to obtain constraint matrix
-        when problem is a linear programming problem.
+        """Evaluate sparse Jacobian of the linear part of the constraints.
+
+        Useful to obtain constraint matrix when problem is a linear programming
+        problem.
         """
         vals, rows, cols = super(PySparseNLPModel,
                                  self).A(*args, **kwargs)
@@ -60,10 +62,23 @@ class PySparseAmplModel(PySparseNLPModel, AmplModel):
         return A
 
     def jop(self, *args, **kwargs):
+        """Obtain Jacobian at x as a linear operator."""
         return PysparseLinearOperator(self.jac(*args, **kwargs))
 
 
 class PySparseSlackModel(SlackModel):
+    """SlackModel in wich matrices are PySparse matrices.
+
+    :parameters:
+        :model:  Original NLP to transform to a slack form.
+
+    :keywords:
+        :keep_variable_bounds: set to `True` if you don't want to convert
+                               bounds on variables to inequalities. In this
+                               case bounds are kept as they were in the
+                               original NLP.
+    """
+
     def __init__(self, model, keep_variable_bounds=False, **kwargs):
         if not isinstance(model, PySparseNLPModel):
             raise TypeError("The model in `model` should be a PySparseNLPModel"
@@ -73,10 +88,9 @@ class PySparseSlackModel(SlackModel):
                                                  keep_variable_bounds=kvb)
 
     def _jac(self, x, lp=False):
-        """
-        Helper method to assemble the Jacobian matrix of the constraints of the
-        transformed problems. See the documentation of :meth:`jac` for more
-        information.
+        """Helper method to assemble the Jacobian matrix.
+
+        See the documentation of :meth:`jac` for more information.
 
         The positional argument `lp` should be set to `True` only if the
         problem is known to be a linear program. In this case, the evaluation
@@ -157,7 +171,7 @@ class PySparseSlackModel(SlackModel):
         return J
 
     def hess(self, x, z=None, *args, **kwargs):
-        """Evaluate the Hessian of the Lagrangian."""
+        """Evaluate Lagrangian Hessian at (x, z)."""
         model = self.model
         if isinstance(model, QuasiNewtonModel):
             return self.hop(x, z, *args, **kwargs)
