@@ -66,38 +66,63 @@ class CySparseAmplModel(CySparseNLPModel, AmplModel):
 
 
 class CySparseSlackModel(SlackModel):
+    """
+    Reformulate an optimization problem using slack variables.
+
+    New model represents matrices as `CySparse` matrices.
+
+    :parameters:
+        :model: Original NLP to transform to a slack form.
+
+    :keywords:
+        :keep_variable_bounds: set to `True` if you don't want to convert
+                               bounds on variables to inequalities. In this
+                               case bounds are kept as they were in the
+                               original NLP.
+    """
+
     def __init__(self, model, keep_variable_bounds=False, **kwargs):
+
         if not isinstance(model, CySparseNLPModel):
             raise TypeError("The model in `model` should be a CySparseNLPModel"
                             "or a derived class of it.")
+        kvb = keep_variable_bounds
         super(CySparseSlackModel, self).__init__(model,
-                                                 keep_variable_bounds=keep_variable_bounds)
-
+                                                 keep_variable_bounds=kvb)
 
     def _jac(self, x, lp=False):
         """
-        Helper method to assemble the Jacobian matrix of the constraints of the
-        transformed problems. See the documentation of :meth:`jac` for more
-        information.
+        Helper method to assemble the Jacobian matrix.
+        See the documentation of :meth:`jac` for more information.
 
-        The positional argument `lp` should be set to `True` only if the problem
-        is known to be a linear program. In this case, the evaluation of the
-        constraint matrix is cheaper and the argument `x` is ignored.
+        The positional argument `lp` should be set to `True` only if the
+        problem is known to be a linear program. In this case, the evaluation
+        of the constraint matrix is cheaper and the argument `x` is ignored.
         """
-        m = self.m ; model = self.model
-        on = self.model.n ; om = self.model.m
+        model = self.model
+        m = self.m
+        on = model.n
+        om = model.m
 
-        lowerC = np.array(model.lowerC) ; nlowerC = model.nlowerC
-        upperC = np.array(model.upperC) ; nupperC = model.nupperC
-        rangeC = np.array(model.rangeC) ; nrangeC = model.nrangeC
-        lowerB = np.array(model.lowerB) ; nlowerB = model.nlowerB
-        upperB = np.array(model.upperB) ; nupperB = model.nupperB
-        rangeB = np.array(model.rangeB) ; nrangeB = model.nrangeB
+        lowerC = np.array(model.lowerC)
+        nlowerC = model.nlowerC
+        upperC = np.array(model.upperC)
+        nupperC = model.nupperC
+        rangeC = np.array(model.rangeC)
+        nrangeC = model.nrangeC
+        lowerB = np.array(model.lowerB)
+        nlowerB = model.nlowerB
+        upperB = np.array(model.upperB)
+        nupperB = model.nupperB
+        rangeB = np.array(model.rangeB)
+        nrangeB = model.nrangeB
         nbnds = nlowerB + nupperB + 2*nrangeB
         nSlacks = nlowerC + nupperC + 2*nrangeC
 
+        # Overestimate of nnz elements in Jacobian
+        nnzJ = 2 * self.model.nnzj + m + nrangeC + nbnds + nrangeB
+
         # Initialize sparse Jacobian
-        nnzJ = 2 * self.model.nnzj + m + nrangeC + nbnds + nrangeB  # Overestimate
         J = LLSparseMatrix(nrow=self.ncon, ncol=self.nvar, size_hint=nnzJ,
                            is_symmetric=False, itype=types.INT64_T,
                            dtype=types.FLOAT64_T)
@@ -114,9 +139,12 @@ class CySparseSlackModel(SlackModel):
         J[om:om + nrangeC, :on] *= -1.0
 
         # Create a few index lists
-        rlowerC = np.array(range(nlowerC)) ; rlowerB = np.array(range(nlowerB))
-        rupperC = np.array(range(nupperC)) ; rupperB = np.array(range(nupperB))
-        rrangeC = np.array(range(nrangeC)) ; rrangeB = np.array(range(nrangeB))
+        rlowerC = np.array(range(nlowerC))
+        rlowerB = np.array(range(nlowerB))
+        rupperC = np.array(range(nupperC))
+        rupperB = np.array(range(nupperB))
+        rrangeC = np.array(range(nrangeC))
+        rrangeB = np.array(range(nrangeB))
 
         # Insert contribution of slacks on general constraints
         J.put(lowerC,  on + rlowerC, -1.0)
@@ -128,10 +156,14 @@ class CySparseSlackModel(SlackModel):
             return J
 
         # Insert contribution of bound constraints on the original problem
-        bot  = om+nrangeC ; J.put(bot + rlowerB, lowerB,  1.0)
-        bot += nlowerB    ; J.put(bot + rrangeB, rangeB,  1.0)
-        bot += nrangeB    ; J.put(bot + rupperB, upperB, -1.0)
-        bot += nupperB    ; J.put(bot + rrangeB, rangeB, -1.0)
+        bot = om + nrangeC
+        J.put(bot + rlowerB, lowerB, 1.0)
+        bot += nlowerB
+        J.put(bot + rrangeB, rangeB, 1.0)
+        bot += nrangeB
+        J.put(bot + rupperB, upperB, -1.0)
+        bot += nupperB
+        J.put(bot + rrangeB, rangeB, -1.0)
 
         # Insert contribution of slacks on the bound constraints
         bot = om+nrangeC
@@ -145,9 +177,7 @@ class CySparseSlackModel(SlackModel):
         return J
 
     def hess(self, x, z=None, *args, **kwargs):
-        """
-        Evaluate the Hessian of the Lagrangian.
-        """
+        """Evaluate the Hessian of the Lagrangian."""
         model = self.model
         if isinstance(model, QuasiNewtonModel):
             return self.hop(x, z, *args, **kwargs)

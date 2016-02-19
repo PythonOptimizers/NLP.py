@@ -31,15 +31,15 @@ class KKTresidual(object):
 
     @property
     def scaling(self):
-            return self._scaling
+        return self._scaling
 
     @scaling.setter
     def scaling(self, *args, **kwargs):
-            self.set_scaling(*args, **kwargs)
+        self.set_scaling(*args, **kwargs)
 
     @property
     def is_scaling(self):
-        """Indicates whether instance is a scaling or residual instance."""
+        """Indicate whether instance is a scaling or residual instance."""
         return self._is_scaling
 
     @property
@@ -54,7 +54,7 @@ class KKTresidual(object):
 
     @property
     def pFeas(self):
-        "Scaled primal feasibility with respect to general constraints."
+        """Scaled primal feasibility with respect to general constraints."""
         pf = self._pFeas
         return pf if self.is_scaling else pf / self._scaling._pFeas
 
@@ -64,7 +64,7 @@ class KKTresidual(object):
 
     @property
     def bFeas(self):
-        "Scaled primal feasibility with respect to bounds."
+        """Scaled primal feasibility with respect to bounds."""
         bf = self._bFeas
         return bf if self.is_scaling else bf / self._scaling._bFeas
 
@@ -74,12 +74,12 @@ class KKTresidual(object):
 
     @property
     def feas(self):
-        "Scaled primal feasibility with respect to constraints and bounds."
+        """Scaled primal feasibility with respect to constraints and bounds."""
         return max(self.pFeas, self.bFeas)
 
     @property
     def gComp(self):
-        "Scaled complementarity with respect to general constraints."
+        """Scaled complementarity with respect to general constraints."""
         gc = self._gComp
         return gc if self.is_scaling else gc / self._scaling._gComp
 
@@ -89,7 +89,7 @@ class KKTresidual(object):
 
     @property
     def bComp(self):
-        "Scaled complementarity with respect to bounds."
+        """Scaled complementarity with respect to bounds."""
         bc = self._bComp
         return bc if self.is_scaling else bc / self._scaling._bComp
 
@@ -99,15 +99,15 @@ class KKTresidual(object):
 
     @property
     def comp(self):
-        "Scaled complementarity with respect to constraints and bounds."
+        """Scaled complementarity with respect to constraints and bounds."""
         return max(self.gComp, self.bComp)
 
     def set_scaling(self, scaling, **kwargs):
-            "Assign scaling values. `scaling` must be a `KKTresidual` instance."
-            if self._is_scaling:
-                    raise ValueError('instance represents scaling factors.')
-            if not isinstance(scaling, KKTresidual):
-                    raise ValueError('scaling must be a KKTresidual instance.')
-            self._scaling = scaling
-            self._scaling._is_scaling = True
-            return
+        """Set scaling values. `scaling` must be a `KKTresidual` instance."""
+        if self._is_scaling:
+                raise ValueError('instance represents scaling factors.')
+        if not isinstance(scaling, KKTresidual):
+                raise ValueError('scaling must be a KKTresidual instance.')
+        self._scaling = scaling
+        self._scaling._is_scaling = True
+        return

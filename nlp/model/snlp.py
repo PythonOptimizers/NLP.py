@@ -69,7 +69,7 @@ class SlackModel(NLPModel):
         n_var_upp = model.nupperB + model.nrangeB  # vars  with upper bound.
         n_slacks = n_con_low + n_con_upp       # slacks for constraints.
 
-        bot = model.n;
+        bot = model.n
         self.sLL = range(bot, bot + model.nlowerC); bot += model.nlowerC
         self.sLR = range(bot, bot + model.nrangeC); bot += model.nrangeC
         self.sUU = range(bot, bot + model.nupperC); bot += model.nupperC

@@ -7,16 +7,17 @@ class QuasiNewtonModel(NLPModel):
     """
     An ``NLPModel`` in which the Hessian is given by a quasi-Newton
     approximation.
-
-    :keywords:
-        :H: the `class` of a quasi-Newton linear operator.
-            This keyword is mandatory.
-
-    Keywords accepted by the quasi-Newton class will be passed
-    directly to its constructor.
     """
 
     def __init__(self, *args, **kwargs):
+        """
+        :keywords:
+            :H: the `class` of a quasi-Newton linear operator.
+                This keyword is mandatory.
+
+        Keywords accepted by the quasi-Newton class will be passed
+        directly to its constructor.
+        """
         super(QuasiNewtonModel, self).__init__(*args, **kwargs)
         qn_cls = kwargs.pop('H')
         self._H = qn_cls(self.nvar, **kwargs)

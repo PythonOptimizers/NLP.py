@@ -68,9 +68,9 @@ class PySparseSlackModel(SlackModel):
         if not isinstance(model, PySparseNLPModel):
             raise TypeError("The model in `model` should be a PySparseNLPModel"
                             "or a derived class of it.")
+        kvb = keep_variable_bounds
         super(PySparseSlackModel, self).__init__(model,
-                                                 keep_variable_bounds=keep_variable_bounds)
-
+                                                 keep_variable_bounds=kvb)
 
     def _jac(self, x, lp=False):
         """
@@ -78,24 +78,35 @@ class PySparseSlackModel(SlackModel):
         transformed problems. See the documentation of :meth:`jac` for more
         information.
 
-        The positional argument `lp` should be set to `True` only if the problem
-        is known to be a linear program. In this case, the evaluation of the
-        constraint matrix is cheaper and the argument `x` is ignored.
+        The positional argument `lp` should be set to `True` only if the
+        problem is known to be a linear program. In this case, the evaluation
+        of the constraint matrix is cheaper and the argument `x` is ignored.
         """
-        n = self.n ; m = self.m ; model = self.model
-        on = self.model.n ; om = self.model.m
+        n = self.n
+        m = self.m
+        model = self.model
+        on = self.model.n
+        om = self.model.m
 
-        lowerC = np.array(model.lowerC) ; nlowerC = model.nlowerC
-        upperC = np.array(model.upperC) ; nupperC = model.nupperC
-        rangeC = np.array(model.rangeC) ; nrangeC = model.nrangeC
-        lowerB = np.array(model.lowerB) ; nlowerB = model.nlowerB
-        upperB = np.array(model.upperB) ; nupperB = model.nupperB
-        rangeB = np.array(model.rangeB) ; nrangeB = model.nrangeB
-        nbnds  = nlowerB + nupperB + 2*nrangeB
+        lowerC = np.array(model.lowerC)
+        nlowerC = model.nlowerC
+        upperC = np.array(model.upperC)
+        nupperC = model.nupperC
+        rangeC = np.array(model.rangeC)
+        nrangeC = model.nrangeC
+        lowerB = np.array(model.lowerB)
+        nlowerB = model.nlowerB
+        upperB = np.array(model.upperB)
+        nupperB = model.nupperB
+        rangeB = np.array(model.rangeB)
+        nrangeB = model.nrangeB
+        nbnds = nlowerB + nupperB + 2*nrangeB
         nSlacks = nlowerC + nupperC + 2*nrangeC
 
+        # Overestimate of nnz elements in Jacobian
+        nnzJ = 2 * self.model.nnzj + m + nrangeC + nbnds + nrangeB
+
         # Initialize sparse Jacobian
-        nnzJ = 2 * self.model.nnzj + m + nrangeC + nbnds + nrangeB  # Overestimate
         J = psp(nrow=m, ncol=n, sizeHint=nnzJ)
 
         # Insert contribution of general constraints.
@@ -108,9 +119,12 @@ class PySparseSlackModel(SlackModel):
         J[om:om + nrangeC, :on] *= -1.0
 
         # Create a few index lists
-        rlowerC = np.array(range(nlowerC)) ; rlowerB = np.array(range(nlowerB))
-        rupperC = np.array(range(nupperC)) ; rupperB = np.array(range(nupperB))
-        rrangeC = np.array(range(nrangeC)) ; rrangeB = np.array(range(nrangeB))
+        rlowerC = np.array(range(nlowerC))
+        rlowerB = np.array(range(nlowerB))
+        rupperC = np.array(range(nupperC))
+        rupperB = np.array(range(nupperB))
+        rrangeC = np.array(range(nrangeC))
+        rrangeB = np.array(range(nrangeB))
 
         # Insert contribution of slacks on general constraints
         J.put(-1.0,      lowerC,  on + rlowerC)
@@ -122,13 +136,17 @@ class PySparseSlackModel(SlackModel):
             return J
 
         # Insert contribution of bound constraints on the original problem
-        bot  = om+nrangeC ; J.put( 1.0, bot + rlowerB, lowerB)
-        bot += nlowerB    ; J.put( 1.0, bot + rrangeB, rangeB)
-        bot += nrangeB    ; J.put(-1.0, bot + rupperB, upperB)
-        bot += nupperB    ; J.put(-1.0, bot + rrangeB, rangeB)
+        bot = om+nrangeC
+        J.put(1.0, bot + rlowerB, lowerB)
+        bot += nlowerB
+        J.put(1.0, bot + rrangeB, rangeB)
+        bot += nrangeB
+        J.put(-1.0, bot + rupperB, upperB)
+        bot += nupperB
+        J.put(-1.0, bot + rrangeB, rangeB)
 
         # Insert contribution of slacks on the bound constraints
-        bot  = om+nrangeC
+        bot = om + nrangeC
         J.put(-1.0, bot + rlowerB, on + nSlacks + rlowerB)
         bot += nlowerB
         J.put(-1.0, bot + rrangeB, on + nSlacks + nlowerB + rrangeB)
@@ -139,9 +157,7 @@ class PySparseSlackModel(SlackModel):
         return J
 
     def hess(self, x, z=None, *args, **kwargs):
-        """
-        Evaluate the Hessian of the Lagrangian.
-        """
+        """Evaluate the Hessian of the Lagrangian."""
         model = self.model
         if isinstance(model, QuasiNewtonModel):
             return self.hop(x, z, *args, **kwargs)
@@ -149,6 +165,8 @@ class PySparseSlackModel(SlackModel):
         on = model.n
 
         pi = self.convert_multipliers(z)
-        H = psp(nrow=self.n, ncol=self.n, symmetric=True, sizeHint=self.model.nnzh)
+        H = psp(nrow=self.n, ncol=self.n,
+                symmetric=True,
+                sizeHint=self.model.nnzh)
         H[:on, :on] = self.model.hess(x[:on], pi, *args, **kwargs)
         return H

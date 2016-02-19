@@ -2,6 +2,7 @@ from nlp.model.nlpmodel import NLPModel
 import numpy as np
 import algopy
 
+
 class AlgopyModel(NLPModel):
     """
     A class to represent optimization problems in which derivatives
@@ -11,6 +12,13 @@ class AlgopyModel(NLPModel):
     """
 
     def __init__(self, n=0, m=0, name='Algopy-Generic', **kwargs):
+        """
+        :parameters:
+
+            :n:       number of variables (default: 0)
+            :m:       number of general (non bound) constraints (default: 0)
+            :name:    model name (default: 'Generic')
+        """
         super(AlgopyModel, self).__init__(n, m, name, **kwargs)
 
         self._cg_obj = None
@@ -95,7 +103,8 @@ class AlgopyModel(NLPModel):
         Evaluate Lagrangian at (x, z). The constraints and bounds are
         assumed to be ordered as in :meth:`cons_pos` and :meth:`bounds`.
         """
-        m = self.m ; nrC = self.nrangeC
+        m = self.m
+        nrC = self.nrangeC
         l = self.obj(x)
         # The following ifs are necessary because np.dot returns None
         # when passed empty arrays of objects (i.e., dtype = np.object).

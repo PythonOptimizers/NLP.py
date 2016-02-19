@@ -53,11 +53,12 @@ class SciPyAmplModel(AmplModel):
 
     def hess(self, *args, **kwargs):
         """
-        AMPL only returns lower triangular part of the Hessian and `scipy.coo_matrix`
-        doesn't have a `symmetric` attributes, so we need to copy the upper part of
-        the matrix.
+        AMPL only returns lower triangular part of the Hessian and
+        `scipy.coo_matrix` doesn't have a `symmetric` attributes, so we need to
+        copy the upper part of the matrix.
         """
-        l_vals, l_rows, l_cols = super(SciPyAmplModel, self).hess(*args, **kwargs)
+        l_vals, l_rows, l_cols = super(SciPyAmplModel, self).hess(*args,
+                                                                  **kwargs)
 
         indices = []
         for i in xrange(len(l_rows)):
@@ -66,7 +67,7 @@ class SciPyAmplModel(AmplModel):
 
         # stricly upper triangular part of H is obtained by switching rows and
         # cols indices and removing values on the diagonal.
-        u_rows = np.delete(l_cols, indices)  # np.delete remove items (a copy is done)
+        u_rows = np.delete(l_cols, indices)  # a copy is done
         u_cols = np.delete(l_rows, indices)
         u_vals = np.delete(l_vals, indices)
 
