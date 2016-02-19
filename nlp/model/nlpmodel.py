@@ -649,7 +649,7 @@ class NLPModel(object):
 
         Evaluate matrix-vector product between the Hessian of the i-th
         constraint at x and p.
-        """"
+        """
         raise NotImplementedError('This method must be subclassed.')
 
     def ghivprod(self, g, v, **kwargs):
@@ -808,18 +808,17 @@ class LPModel(QPModel):
     minimize    c'x
     subject to  L <= A*x <= U
                 l <=  x  <= u.
+
+    :parameters:
+        :c:   Numpy array to represent the linear objective
+        :A:   linear operator to represent the constraint matrix.
+              It must be possible to perform the operations `A*x`
+              and `A.T*y` for Numpy arrays `x` and `y` of appropriate size.
+
+    See the documentation of `NLPModel` for futher information.
     """
 
     def __init__(self, c, A=None, name='GenericLP', **kwargs):
-        """
-        :parameters:
-            :c:   Numpy array to represent the linear objective
-            :A:   linear operator to represent the constraint matrix.
-                  It must be possible to perform the operations `A*x`
-                  and `A.T*y` for Numpy arrays `x` and `y` of appropriate size.
-
-        See the documentation of `NLPModel` for futher information.
-        """
 
         n = c.shape[0]
         H = LinearOperator(n, n,
