@@ -1,3 +1,5 @@
+"""Models where derivatives are computed by CPPAD."""
+
 from nlp.model.nlpmodel import NLPModel
 
 try:
@@ -9,13 +11,15 @@ import numpy as np
 
 
 class CppADModel(NLPModel):
-    """
+    """Model with derivatives computed by CPPAD.
+
     A class to represent optimization problems in which derivatives
     are computed via algorithmic differentiation through CPPAD.
     See the documentation of `NLPModel` for further information.
     """
 
-    def __init__(self, n=0, m=0, name='CppAD-Generic', **kwargs):
+    def __init__(self, n, m, name='CppAD-Generic', **kwargs):
+        """Initialize a model with `n` variables and `m` constraints."""
         super(CppADModel, self).__init__(n, m, name, **kwargs)
 
         self._cppad_adfun_obj = None
@@ -27,8 +31,8 @@ class CppADModel(NLPModel):
         self._trace_obj(self.x0)
         self._trace_lag(self.x0, self.pi0)
         if self.m > 0:
-          self._trace_cons(self.x0)
-          self._trace_cons_pos(self.x0)
+            self._trace_cons(self.x0)
+            self._trace_cons_pos(self.x0)
 
     def _trace_obj(self, x):
         ax = pycppad.independent(x)
@@ -55,8 +59,8 @@ class CppADModel(NLPModel):
 
     def _trace_lag(self, x, z):
         if self.m == 0 and self.nbounds == 0:
-          self._cppad_adfun_lag = self._cppad_adfun_obj
-          return
+            self._cppad_adfun_lag = self._cppad_adfun_obj
+            return
         axz = pycppad.independent(np.concatenate((x, z)))
         ax = axz[:self.nvar]
         az = axz[self.nvar:]
@@ -64,22 +68,22 @@ class CppADModel(NLPModel):
         self._cppad_adfun_lag = pycppad.adfun(axz, np.array([ay]))
 
     def _cppad_obj(self, x):
-        "Return the objective function from the CppAD tape."
+        """Return the objective function from the CppAD tape."""
         return self._cppad_adfun_obj.function(x)
 
     def grad(self, x, **kwargs):
-        "Return the objective gradient at x."
+        """Return the objective gradient at x."""
         self._cppad_adfun_obj.forward(0, x)
         return self._cppad_adfun_obj.reverse(1, np.array([1.]))
 
     def hess(self, x, z, **kwargs):
-        "Return the Hessian of the Lagrangian at (x,z)."
+        """Return the Hessian of the Lagrangian at (x,z)."""
         xz = np.concatenate((x, z))
         H = self._cppad_adfun_lag.hessian(xz, np.array([1.]))
         return H[:self.nvar, :self.nvar]
 
     def hprod(self, x, z, v, **kwargs):
-        "Return the Hessian-vector product at x with v."
+        """Return the Hessian-vector product at x with v."""
         # forward: order zero (computes function value)
         xz = np.concatenate((x, z))
         v0 = np.concatenate((v, np.zeros(self.ncon)))
@@ -92,15 +96,15 @@ class CppADModel(NLPModel):
         return self._cppad_adfun_lag.reverse(2, np.array([1.]))[:self.nvar]
 
     def _cppad_cons(self, x, **kwargs):
-        "Return the constraints from the CppAD tape."
+        """Return the constraints from the CppAD tape."""
         return self._cppad_adfun_cons.function(x)
 
     def jac(self, x, **kwargs):
-        "Return constraints Jacobian at x."
+        """Return constraints Jacobian at x."""
         return self._cppad_adfun_cons.jacobian(x)
 
     def jprod(self, x, v, **kwargs):
-        "Return the product of v with the Jacobian at x."
+        """Return the product of v with the Jacobian at x."""
         # forward: order zero (computes function value)
         self._cppad_adfun_cons.forward(0, x)
 
@@ -108,7 +112,7 @@ class CppADModel(NLPModel):
         return self._cppad_adfun_cons.forward(1, v)
 
     def jtprod(self, x, v, **kwargs):
-        "Return the product of v with the transpose Jacobian at x."
+        """Return the product of v with the transpose Jacobian at x."""
         # forward: order zero (computes function value)
         self._cppad_adfun_cons.forward(0, x)
 

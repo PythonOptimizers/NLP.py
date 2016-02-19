@@ -1,16 +1,28 @@
+"""Models with derivatives computed by AlgoPy.
+
+Because AlgoPy does not support fancy indexing, it is necessary
+to formulate constraints in the form
+
+    ci(x)  = 0  for i in equalC
+    ci(x) >= 0  for i in lowerC.
+"""
+
 from nlp.model.nlpmodel import NLPModel
 import numpy as np
 import algopy
 
+
 class AlgopyModel(NLPModel):
-    """
+    """Model with derivatives computed by AlgoPy.
+
     A class to represent optimization problems in which derivatives
-    are computed via algorithmic differentiation through Algopy.
-    Algopy only supplies dense derivatives.
+    are computed via algorithmic differentiation through AlgoPy.
+    AlgoPy only supplies dense derivatives.
     See the documentation of `NLPModel` for further information.
     """
 
-    def __init__(self, n=0, m=0, name='Algopy-Generic', **kwargs):
+    def __init__(self, n, m, name='Algopy-Generic', **kwargs):
+        """Initialize a model with `n` variables and `m` constraints."""
         super(AlgopyModel, self).__init__(n, m, name, **kwargs)
 
         self._cg_obj = None
@@ -29,7 +41,7 @@ class AlgopyModel(NLPModel):
 
     @property
     def cg_cons(self):
-        """Constraints call graph."""
+        """Constraint call graph."""
         return self._cg_cons
 
     @property
@@ -39,7 +51,6 @@ class AlgopyModel(NLPModel):
 
     def _trace_obj(self, x):
         """Trace the objective function evaluation."""
-
         if self._cg_obj is not None:
             return
         cg = algopy.CGraph()
@@ -52,7 +63,6 @@ class AlgopyModel(NLPModel):
 
     def _trace_cons(self, x):
         """Trace the constraints evaluation."""
-
         if self._cg_cons is not None or self.m == 0:
             return
         cg = algopy.CGraph()
@@ -65,7 +75,6 @@ class AlgopyModel(NLPModel):
 
     def _trace_lag(self, x, z):
         """Trace the Lagrangian evaluation."""
-
         if self._cg_lag is not None:
             return
         self._trace_obj(x)
@@ -91,11 +100,13 @@ class AlgopyModel(NLPModel):
     # Override lag because Algopy won't apply numpy.dot() between a
     # Numpy array and an array of Functions.
     def lag(self, x, z, **kwargs):
+        """Evaluate Lagrangian at (x, z).
+
+        The constraints and bounds are assumed to be ordered as in
+        :meth:`cons_pos` and :meth:`bounds`.
         """
-        Evaluate Lagrangian at (x, z). The constraints and bounds are
-        assumed to be ordered as in :meth:`cons_pos` and :meth:`bounds`.
-        """
-        m = self.m ; nrC = self.nrangeC
+        m = self.m
+        nrC = self.nrangeC
         l = self.obj(x)
         # The following ifs are necessary because np.dot returns None
         # when passed empty arrays of objects (i.e., dtype = np.object).
@@ -118,13 +129,7 @@ class AlgopyModel(NLPModel):
         return self._cg_lag.hess_vec(xz, v0)[:self.nvar]
 
     def cons_pos(self, x):
-        """
-        Because AlgoPy does not support fancy indexing, it is necessary
-        to formulate constraints in the form
-
-            ci(x)  = 0  for i in equalC
-            ci(x) >= 0  for i in lowerC.
-        """
+        """Identical to `cons` for `AlgopyModel`s."""
         return self.cons(x)
 
     def jac(self, x, **kwargs):
