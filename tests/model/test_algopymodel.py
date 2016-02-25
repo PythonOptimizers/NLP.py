@@ -1,33 +1,30 @@
-import sys
-try:
-    import algopy
-except ImportError as exc:
-    print "Failed to import: ", exc, "  No tests run!"
-    sys.exit(0)
+#!/usr/bin/env python
 
-from nlp.model.algopymodel import AlgopyModel
-from helper import *
+import sys
+from .helper import *
 import numpy as np
 from numpy.testing import *
 
+if not module_missing('algopy'):
+    from nlp.model.algopymodel import AlgopyModel
 
-class AlgopyRosenbrock(AlgopyModel):
-    """The standard Rosenbrock function."""
+    class AlgopyRosenbrock(AlgopyModel):
+        """The standard Rosenbrock function."""
 
-    def obj(self, x, **kwargs):
-        return algopy.sum(100*(x[1:] - x[:-1]**2)**2 + (1 - x[:-1])**2)
+        def obj(self, x, **kwargs):
+            return algopy.sum(100*(x[1:] - x[:-1]**2)**2 + (1 - x[:-1])**2)
 
 
-class AlgopyHS7(AlgopyModel):
-    """Problem #7 in the Hock and Schittkowski collection."""
+    class AlgopyHS7(AlgopyModel):
+        """Problem #7 in the Hock and Schittkowski collection."""
 
-    def obj(self, x, **kwargs):
-        return algopy.log(1 + x[0]**2) - x[1]
+        def obj(self, x, **kwargs):
+            return algopy.log(1 + x[0]**2) - x[1]
 
-    def cons(self, x, **kwargs):
-        c = algopy.zeros(1, dtype=x)
-        c[0] = (1 + x[0]**2)**2 + x[1]**2 - 4  # AlgoPy doesn't support cons_pos()
-        return c
+        def cons(self, x, **kwargs):
+            c = algopy.zeros(1, dtype=x)
+            c[0] = (1 + x[0]**2)**2 + x[1]**2 - 4  # AlgoPy doesn't support cons_pos()
+            return c
 
 
 class Test_AlgopyRosenbrock(TestCase, Rosenbrock):  # Test def'd in Rosenbrock
@@ -35,8 +32,11 @@ class Test_AlgopyRosenbrock(TestCase, Rosenbrock):  # Test def'd in Rosenbrock
     def get_derivatives(self, model):
         return get_derivatives_plain(model)
 
+    @dec.skipif(module_missing('algopy'), "Test skipped because algopy is not available.")
     def setUp(self):
-        self.model = AlgopyRosenbrock(n=5, name='Rosenbrock', x0=-np.ones(5))
+        self.model = AlgopyRosenbrock(n=5, m=0,
+                                      name='Rosenbrock',
+                                      x0=-np.ones(5))
 
 
 class Test_AlgopyHS7(TestCase, Hs7):  # Test def'd in Hs7
@@ -50,6 +50,7 @@ class Test_AlgopyHS7(TestCase, Hs7):  # Test def'd in Hs7
     def get_derivatives(self, model):
         return get_derivatives_plain(model)
 
+    @dec.skipif(module_missing('algopy'), "Test skipped because algopy is not available.")
     def setUp(self):
         self.model = AlgopyHS7(n=2, m=1, name='HS7',
                                x0=2*np.ones(2), pi0=np.ones(1),
@@ -58,5 +59,4 @@ class Test_AlgopyHS7(TestCase, Hs7):  # Test def'd in Hs7
 if __name__ == '__main__':
 
     import unittest
-
     unittest.main()

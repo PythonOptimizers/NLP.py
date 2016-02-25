@@ -1,6 +1,6 @@
 # Tests relative to algorithmic differentiation with AMPL.
 from nlp.model.amplpy import AmplModel
-from helper import *
+from .helper import *
 import numpy as np
 import os
 
