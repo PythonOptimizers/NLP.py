@@ -14,20 +14,20 @@ macheps = np.finfo(np.double).eps  # Machine epsilon.
 class DerivativeChecker(object):
 
     def __init__(self, model, x, **kwargs):
-        """
-        The `DerivativeChecker` class provides facilities for verifying
-        numerically the accuracy of first and second-order derivatives
-        implemented in an optimization model.
+        """Verify derivatives in an optimization model.
 
-        `model` should be a `NLPModel` and `x` is the point about which we are
-        checking the derivative. See the documentation of the `check` method
-        for available options.
+        :keywords:
+            :model: a `NLPModel`
+            :x:     the point about which we are checking the derivatives.
+
+        See the documentation of the `check` method for available options.
         Note that it only works if the model has its flag `_sparse_coord` to
         `False` (that is the model returns an indexable object).
         """
         if model._sparse_coord:
-            raise NotImplementedError('Derivative checker doesn''t work for this kind of model.'
-                                      'Jacobian and Hessian must be indexable objects.')
+            raise NotImplementedError('Derivative checker doesn''t work for'
+                                      'this kind of model. Jacobian and'
+                                      'Hessian must be indexable objects.')
 
         # Tolerance for determining if gradient seems correct.
         self.tol = kwargs.get('tol', 100*sqrt(macheps))
@@ -45,21 +45,24 @@ class DerivativeChecker(object):
         self.chess_errs = []
 
         headfmt = '%4s  %4s        %22s  %22s  %7s\n'
-        self.head = headfmt % ('Fun', 'Comp', 'Expected', 'Finite Diff', 'Rel.Err')
+        self.head = headfmt % ('Fun', 'Comp', 'Expected',
+                               'Finite Diff', 'Rel.Err')
         self.d1fmt = '%4d  %4d        %22.15e  %22.15e  %7.1e\n'
         head2fmt = '%4s  %4s  %4s  %22s  %22s  %7s\n'
         self.head2 = head2fmt % ('Fun', 'Comp', 'Comp', 'Expected',
                                  'Finite Diff', 'Rel.Err')
         self.d2fmt = '%4d  %4d  %4d  %22.15e  %22.15e  %7.1e\n'
         head3fmt = '%17s %22s  %22s  %7s\n'
-        self.head3 = head3fmt % ('Directional Deriv', 'Expected', 'Finite Diff', 'Rel.Err')
+        self.head3 = head3fmt % ('Directional Deriv', 'Expected',
+                                 'Finite Diff', 'Rel.Err')
         self.d3fmt = '%17s %22.15e  %22.15e  %7.1e\n'
 
         return
 
     def check(self, **kwargs):
-        """
-        Perform derivative check. Recognized keyword arguments are:
+        """Perform derivative check.
+
+        Recognized keyword arguments are:
 
         :keywords:
             :grad:      Check objective gradient  (default `True`)
@@ -68,8 +71,8 @@ class DerivativeChecker(object):
             :chess:     Check constraints Hessian (default `True`)
             :verbose:   Do not only display inaccurate
                         derivatives (default `True`)
+            :cheap:     Perform cheap derivative check
         """
-
         grad = kwargs.get('grad', True)
         hess = kwargs.get('hess', True)
         jac = kwargs.get('jac', True)
@@ -110,6 +113,7 @@ class DerivativeChecker(object):
         return
 
     def display(self, log, header):
+        """Display errors found when testing derivatives."""
         name = self.model.name
         nerrs = len(log)
         sys.stderr.write('Problem %s: Found %d errors.\n' % (name, nerrs))
@@ -123,6 +127,7 @@ class DerivativeChecker(object):
         return
 
     def cheap_check_obj_gradient(self, verbose=False):
+        """Use directional derivative to test objective gradient accuracy."""
         model = self.model
         n = model.n
         fx = model.obj(self.x)
@@ -134,7 +139,7 @@ class DerivativeChecker(object):
         xph = self.x.copy()
         xph += h*dx
         dfdx = (model.obj(xph) - fx)/h      # finite-difference estimate
-        gtdx = np.dot(gx, dx)             # expected
+        gtdx = np.dot(gx, dx)               # expected
         err = max(abs(dfdx - gtdx)/(1 + abs(gtdx)),
                   abs(dfdx - gtdx)/(1 + abs(dfdx)))
 
@@ -153,6 +158,7 @@ class DerivativeChecker(object):
         return (err, log)
 
     def check_obj_gradient(self, verbose=False):
+        """Test first-order derivatives of the objective function."""
         model = self.model
         n = model.n
         gx = model.grad(self.x)
@@ -167,8 +173,10 @@ class DerivativeChecker(object):
 
         # Check partial derivatives in turn.
         for i in xrange(n):
-            xph = self.x.copy() ; xph[i] += h
-            xmh = self.x.copy() ; xmh[i] -= h
+            xph = self.x.copy()
+            xph[i] += h
+            xmh = self.x.copy()
+            xmh[i] -= h
             dfdxi = (model.obj(xph) - model.obj(xmh))/(2*h)
             err[i] = abs(gx[i] - dfdxi)/max(1, abs(gx[i]))
 
@@ -182,6 +190,7 @@ class DerivativeChecker(object):
         return (err, log)
 
     def check_obj_hessian(self, verbose=False):
+        """Test second-order derivatives of the objective function."""
         model = self.model
         n = model.n
         Hx = model.hess(self.x)
@@ -193,14 +202,16 @@ class DerivativeChecker(object):
 
         # Check second partial derivatives in turn.
         for i in xrange(n):
-            xph = self.x.copy() ; xph[i] += h
-            xmh = self.x.copy() ; xmh[i] -= h
+            xph = self.x.copy()
+            xph[i] += h
+            xmh = self.x.copy()
+            xmh[i] -= h
             dgdx = (model.grad(xph) - model.grad(xmh))/(2*h)
             for j in range(i+1):
                 dgjdxi = dgdx[j]
-                err = abs(Hx[i,j] - dgjdxi)/max(1, abs(Hx[i,j]))
+                err = abs(Hx[i, j] - dgjdxi)/max(1, abs(Hx[i, j]))
 
-                line = self.d2fmt % (0, i, j, Hx[i,j], dgjdxi, err)
+                line = self.d2fmt % (0, i, j, Hx[i, j], dgjdxi, err)
                 if verbose:
                     sys.stderr.write(line)
 
@@ -210,8 +221,10 @@ class DerivativeChecker(object):
         return errs
 
     def check_con_jacobian(self, verbose=False):
+        """Test first-order derivatives of the constraints functions."""
         model = self.model
-        n = model.n ; m = model.m
+        n = model.n
+        m = model.m
         if m == 0:
             return []   # Problem is unconstrained.
 
@@ -224,14 +237,16 @@ class DerivativeChecker(object):
 
         # Check partial derivatives of each constraint in turn.
         for i in xrange(n):
-            xph = self.x.copy() ; xph[i] += h
-            xmh = self.x.copy() ; xmh[i] -= h
+            xph = self.x.copy()
+            xph[i] += h
+            xmh = self.x.copy()
+            xmh[i] -= h
             dcdx = (model.cons(xph) - model.cons(xmh))/(2*h)
             for j in range(m):
-                dcjdxi = dcdx[j] #(model.icons(j, xph) - model.icons(j, xmh))/(2*h)
-                err = abs(Jx[j,i] - dcjdxi)/max(1, abs(Jx[j,i]))
+                dcjdxi = dcdx[j]
+                err = abs(Jx[j, i] - dcjdxi)/max(1, abs(Jx[j, i]))
 
-                line = self.d1fmt % (j+1, i, Jx[j,i], dcjdxi, err)
+                line = self.d1fmt % (j+1, i, Jx[j, i], dcjdxi, err)
                 if verbose:
                     sys.stderr.write(line)
 
@@ -241,8 +256,10 @@ class DerivativeChecker(object):
         return errs
 
     def check_con_hessians(self, verbose=False):
+        """Test second-order derivatives of the constraints functions."""
         model = self.model
-        n = model.n ; m = model.m
+        n = model.n
+        m = model.m
         h = self.step
         errs = []
 
@@ -251,19 +268,22 @@ class DerivativeChecker(object):
 
         # Check each Hessian in turn.
         for k in range(m):
-            y = np.zeros(m) ; y[k] = -1
+            y = np.zeros(m)
+            y[k] = -1
             Hk = model.hess(self.x, y, obj_weight=0)
 
             # Check second partial derivatives in turn.
             for i in xrange(n):
-                xph = self.x.copy() ; xph[i] += h
-                xmh = self.x.copy() ; xmh[i] -= h
+                xph = self.x.copy()
+                xph[i] += h
+                xmh = self.x.copy()
+                xmh[i] -= h
                 dgdx = (model.igrad(k, xph) - model.igrad(k, xmh))/(2*h)
                 for j in xrange(i+1):
                     dgjdxi = dgdx[j]
-                    err = abs(Hk[i,j] - dgjdxi)/max(1, abs(Hk[i,j]))
+                    err = abs(Hk[i, j] - dgjdxi)/max(1, abs(Hk[i, j]))
 
-                    line = self.d2fmt % (k+1, i, j, Hk[i,j], dgjdxi, err)
+                    line = self.d2fmt % (k+1, i, j, Hk[i, j], dgjdxi, err)
                     if verbose:
                         sys.stderr.write(line)
 

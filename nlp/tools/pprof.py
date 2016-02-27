@@ -1,6 +1,5 @@
-"""
-A module to create and plot performance profiles.
-"""
+"""A module to create and plot performance profiles."""
+
 import re
 from string import atof
 import numpy as np
@@ -14,7 +13,8 @@ default_options = {'datacol': 2, 'logscale': True, 'sep': '\s+', 'bw': False,
 class PerformanceProfile(object):
 
     def __init__(self, solvers, **opts):
-        """
+        """Draw performance profile of Dolan and More.
+
         :parameters:
             :solvers: a list of file names containing solver statistics
                       Failures must be indicated with negative statistics
@@ -22,8 +22,8 @@ class PerformanceProfile(object):
                       listed below.
 
         :options:
-            :datacol:  the (1-based) column index containing the relevant metric
-                       in the solver files
+            :datacol:  the (1-based) column index containing the relevant
+                       metric in the solver files
             :logscale: True if log-scale ratios are requested
             :sep:      the column separator as a regexp (default: '\s+')
             :bw:       True if a black and white plot is requested
@@ -45,7 +45,6 @@ class PerformanceProfile(object):
 
     def add_solver(self, fname):
         """Collect metrics for each solver."""
-
         comment = re.compile(r'^[\s]*[%#]')
         column = re.compile(self.options['sep'])
 
@@ -65,17 +64,16 @@ class PerformanceProfile(object):
 
     def compute_ratios(self):
         """Compute performance ratios."""
-
         self.ratios = np.array(self.metrics, dtype=np.float)
         nsolvs, nprobs = self.ratios.shape
 
         # Scale each problem metric by the best performance across solvers.
         for prob in range(nprobs):
-            metrics = self.ratios[:,prob]
+            metrics = self.ratios[:, prob]
             try:
                 # There are no > 0 vals if all solvers fail on this problem.
                 best = metrics[metrics > 0].min()
-                self.ratios[:,prob] /= best
+                self.ratios[:, prob] /= best
             except:
                 pass
 
@@ -85,11 +83,10 @@ class PerformanceProfile(object):
 
         # Sort the performance of each solver (in place).
         for solv in range(nsolvs):
-            self.ratios[solv,:].sort()
+            self.ratios[solv, :].sort()
 
     def plot(self):
         """Need we say more?"""
-
         import matplotlib.pyplot as plt
         nsolvs, nprobs = self.ratios.shape
         y = np.arange(nprobs, dtype=np.float)/nprobs
@@ -106,8 +103,8 @@ class PerformanceProfile(object):
             if self.options['bw']:
                 pltargs = (grays[solv % ngrays],)
             # Draw profile tail all the way.
-            self.ratios[solv,-1] = xmax
-            pltcmd(self.ratios[solv,:], y,
+            self.ratios[solv, -1] = xmax
+            pltcmd(self.ratios[solv, :], y,
                    linewidth=2.5,
                    drawstyle='steps-pre',
                    antialiased=True,

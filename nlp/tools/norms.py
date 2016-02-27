@@ -1,35 +1,41 @@
+"""Convenience functions for computing vector and matrix norms."""
+
 import numpy as np
 from numpy import infty
 from numpy.linalg import norm
 
 
 def norm1(x):
+    """Compute 1-norm of `x`."""
     if len(x) > 0:
         return norm(x, ord=1)
     return 0.0
 
 
 def norm2(x):
+    """Compute 2-norm of `x`."""
     if len(x) > 0:
         return norm(x)
     return 0.0
 
 
 def normp(x, p):
+    """Compute p-norm of `x`."""
     if len(x) > 0:
         return norm(x, ord=p)
     return 0.0
 
 
 def norm_infty(x):
+    """Compute infinity norm of `x`."""
     if len(x) > 0:
         return norm(x, ord=infty)
     return 0.0
 
 
 def normest(A, tol=1.0e-6, maxits=100):
-    """
-    Estimate the spectral norm of the matrix A.
+    """Estimate the spectral norm of the matrix A.
+
     The matrix should behave like a linear operator, i.e. allow for
     matrix-vector products and transposed-matrix-vector products to
     be performed via A*x and A.T*y.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Main driver for performance profiles.
+"""Main driver for performance profiles."""
 
 from nlp import __version__
 from nlp.tools.pprof import PerformanceProfile

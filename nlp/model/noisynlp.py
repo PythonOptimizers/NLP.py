@@ -24,7 +24,7 @@ class NoisyAmplModel(AmplModel):
         A noisy nonlinear problem in which only first derivatives can be
         evaluated. For help on individual methods, see `AmplModel`.
         """
-        AmplModel.__init__(self, model, **kwargs)
+        super(NoisyAmplModel, self).__init__(model, **kwargs)
         self.noise_amplitude = noise_amplitude
 
     def obj(self, x):

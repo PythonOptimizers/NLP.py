@@ -5,8 +5,8 @@ import numpy as np
 
 
 def deprecated(func):
-    """
-    This decorator can be used to mark functions as deprecated.
+    """Mark functions as deprecated.
+
     It will emit a warning when the function is called.
 
     From http://wiki.python.org/moin/PythonDecoratorLibrary
@@ -24,10 +24,7 @@ def deprecated(func):
 
 
 def counter(func):
-    """
-    This decorator counts the number of calls to the wrapped
-    function or method.
-    """
+    """Count the number of calls to the wrapped function or method."""
     @functools.wraps(func)
     def _counted(*args, **kwargs):
         _counted.ncalls += 1
@@ -37,8 +34,8 @@ def counter(func):
 
 
 def get_signature(x):
-    """
-    Return signature of argument.
+    """Return signature of argument.
+
     The signature is the value of the argument or the sha1 digest if the
     argument is a numpy array.
     """
@@ -49,9 +46,9 @@ def get_signature(x):
 
 
 def memoize_full(fcn):
-    """
-    Decorator used to cache the all values of a function or method
-    based on the sha1 signature of its arguments. If any single argument
+    """Cache the all values of a function or method.
+
+    It is based on the sha1 signature of its arguments. If any single argument
     changes, the function or method is evaluated afresh.
     """
     _cache = {}
@@ -69,9 +66,9 @@ def memoize_full(fcn):
 
 
 def memoize_cheap(fcn):
-    """
-    Decorator used to cache the most recent value of a function or method
-    based on the sha1 signature of its arguments. If any single argument
+    """Cache the most recent value of a function or method.
+
+    It is based on the sha1 signature of its arguments. If any single argument
     changes, the function or method is evaluated afresh.
     """
     _cached_signature = [None]  # Must be mutable.

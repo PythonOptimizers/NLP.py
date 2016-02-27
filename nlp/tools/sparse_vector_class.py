@@ -15,9 +15,9 @@ operations and operations with other sparse vectors and numpy arrays.
 
 
 class SparseVector:
-    """
-    A dictionary-based sparse vector class. To initialize
-    a sparse vector in R^1000, use, e.g.,
+    """A dictionary-based sparse vector class.
+
+    To initialize a sparse vector in R^1000, use, e.g.,
         v = SparseVector(1000, { 1 : 0.1, 10: 0.01, 100 : 0.001 })
     v contains only 3 nonzero elements, at (0-based) indices
     1, 10 and 100 with respective values 0.1, 0.01 and 0.001.
@@ -63,7 +63,8 @@ class SparseVector:
 
     # Obtain segment of sparse vector --- treat vector as circular
     def __getslice__(self, i, j):
-        if not isinstance(i, types.IntType) or not isinstance(j, types.IntType):
+        if not isinstance(i, types.IntType) or \
+           not isinstance(j, types.IntType):
             raise KeyError("Indices must be integer")
         slice = {}
         K = self.keys()
@@ -107,6 +108,7 @@ class SparseVector:
             raise TypeError("Cannot add with SparseVector")
 
     def __radd__(self, other):
+        """The same as __add__."""
         return SparseVector.__add__(self, other)
 
     def __iadd__(self, other):
@@ -119,7 +121,8 @@ class SparseVector:
         elif isSparseVector(other):
             self.n = max(self.n, other.n)
             inter = filter(self.values.has_key, other.values.keys())
-            other_only = filter(lambda x: not self.values.has_key, other.values.keys())
+            other_only = filter(lambda x: not self.values.has_key,
+                                other.values.keys())
             for k in inter + other_only:
                 self[k] += other[k]
             return self
@@ -134,9 +137,9 @@ class SparseVector:
         return SparseVector.__iadd__(self, -other)
 
     def __imul__(self, other):
-        """
-        Element by element multiplication. For dot product,
-        see the helper function dot().
+        """Element by element multiplication.
+
+        For dot product, see the helper function dot().
         """
         if isinstance(other, numpy.ndarray):
             self.n = max(self.n, other.shape[0])
@@ -146,7 +149,8 @@ class SparseVector:
         elif isSparseVector(other):
             self.n = max(self.n, other.n)
             inter = filter(self.values.has_key, other.values.keys())
-            other_only = filter(lambda x: not self.values.has_key, other.values.keys())
+            other_only = filter(lambda x: not self.values.has_key,
+                                other.values.keys())
             for k in inter + other_only:
                 self.values[k] *= other.values[k]
             return self
@@ -167,7 +171,8 @@ class SparseVector:
         elif isSparseVector(other):
             self.n = max(self.n, other.n)
             inter = filter(self.values.has_key, other.values.keys())
-            other_only = filter(lambda x: not self.values.has_key, other.values.keys())
+            other_only = filter(lambda x: not self.values.has_key,
+                                other.values.keys())
             for k in inter + other_only:
                 self[k] /= other.values[k]
             return self
@@ -179,21 +184,24 @@ class SparseVector:
             raise TypeError("Cannot multiply with SparseVector")
 
     def __neg__(self):
+        """Element by element opposite."""
         rv = SparseVector(self.n, {})
         for k in self.values.keys():
             rv[k] = -self[k]
         return rv
 
     def __sub__(self, other):
+        """Element by element substraction."""
         return SparseVector.__add__(self, -other)
 
     def __rsub__(self, other):
+        """The same as __sub__."""
         return SparseVector.__sub__(self, other)
 
     def __mul__(self, other):
-        """
-        Element by element multiplication. For dot product,
-        see the helper function dot().
+        """Element by element multiplication.
+
+        For dot product, see the helper function dot().
         """
         if isinstance(other, numpy.ndarray):
             rv = SparseVector(max(self.n, other.shape[0]), {})
@@ -214,6 +222,7 @@ class SparseVector:
             raise TypeError("Cannot multiply with SparseVector")
 
     def __rmul__(self, other):
+        """The same as __mul__."""
         return SparseVector.__mul__(self, other)
 
     def __div__(self, other):
@@ -241,8 +250,8 @@ class SparseVector:
         return SparseVector.__div__(self, other)
 
     def __pow__(self, other):
-        """
-        Raise each element of sparse vector to a power.
+        """Raise each element of sparse vector to a power.
+
         If power is another sparse vector, compute elementwise power.
         In this latter case, by convention, 0^0 = 0.
         """
@@ -296,21 +305,22 @@ class SparseVector:
     ###########################################################################
 
     def keys(self):
+        """Return keys."""
         return self.values.keys()
 
     def size(self):
-        "Return vector size"
+        """Return vector size."""
         return self.n
 
     def nnz(self):
-        "Return number of nonzero elements"
+        """Return number of nonzero elements."""
         return len(self.values)
 
     def resize(self, m):
-        """
-        Adjust vector size. If m is larger than current size,
-        reset current size to m. Otherwise, reset current size
-        to m and drop each value whose index is beyond m.
+        """Adjust vector size.
+
+        If m is larger than current size, reset current size to m. Otherwise,
+        reset current size to m and drop each value whose index is beyond m.
         """
         if m < self.n:
             # Drop all elements beyon m
@@ -347,6 +357,7 @@ class SparseVector:
         return rv
 
     def out(self):
+        """Printable representation."""
         print self
         return
 
@@ -354,19 +365,18 @@ class SparseVector:
 
 
 def isSparseVector(x):
-    """Determines if the argument is a SparseVector object."""
+    """Determine if the argument is a SparseVector object."""
     return hasattr(x, '__class__') and x.__class__ is SparseVector
 
 
 def zeros(n):
-    """Returns a zero vector of length n."""
+    """Return a zero vector of length n."""
     return SparseVector(n, {})
 
 
 def ones(n, indlist=None):
-    """
-    Returns a vector of length n with all ones in the
-    specified positions (default: range(n)).
+    """Return a vector of length n with all ones in the specified positions.
+    (default: range(n)).
     """
     if indlist is None:
         indlist = range(n)
@@ -377,10 +387,10 @@ def ones(n, indlist=None):
 
 
 def random(n, lmin=0.0, lmax=1.0, indlist=None):
-    """
-    Returns a sparse vector of length n with random
-    values in the range [lmin,lmax] in the specified
-    positions (default: max(5,n/100) random positions).
+    """Return a sparse vector of length n with random values.
+
+    Values are taken in the range [lmin,lmax] in the specified positions
+    (default: max(5,n/100) random positions).
     """
     import whrandom
     import random
@@ -426,29 +436,29 @@ def dot(a, b):
 
 
 def norm(a):
-    """Computes the 2-norm of vector a."""
+    """Compute the 2-norm of vector a."""
     if not isSparseVector(a):
         raise TypeError("Argument must be a SparseVector")
     return math.sqrt(dot(a, a))
 
 
 def norm2(a):
-    """Computes the 2-norm of vector a."""
+    """Compute the 2-norm of vector a."""
     return norm(a)
 
 
 def norm1(a):
-    """Computes the 1-norm of vector a."""
+    """Compute the 1-norm of vector a."""
     return sum([abs(a.values[k]) for k in a.values.keys()])
 
 
 def norm_infty(a):
-    """Computes the infinity-norm of vector a."""
+    """Compute the infinity-norm of vector a."""
     return max([abs(a.values[k]) for k in a.values.keys()])
 
 
 def normp(a, p):
-    """Computes the p-norm of vector a."""
+    """Compute the p-norm of vector a."""
     if p <= 0:
         raise ValueError("p must be positive")
     if p == 1:
@@ -459,7 +469,7 @@ def normp(a, p):
 
 
 def sum(a):
-    """Returns the sum of the elements of a."""
+    """Return the sum of the elements of a."""
     if not isSparseVector(a):
         raise TypeError("Argument must be a SparseVector")
     return sum([a.values[k] for k in a.values.keys()])

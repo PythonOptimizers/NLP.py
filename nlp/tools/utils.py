@@ -15,8 +15,7 @@ def Min(a):
 
 
 class NullHandler(logging.Handler):
-    """
-    A simple implementation of the null handler for Python 2.6.x (and older?)
+    """A simple implementation of the null handler for Python 2.6.x.
     Useful for compatibility with older versions of Python.
     """
 
@@ -32,9 +31,8 @@ class NullHandler(logging.Handler):
 
 # Helper functions.
 def identical(a, b):
-    """
-    Check that two arrays or lists are identical. Must be cautious because
-    of Numpy's strange behavior:
+    """Check that two arrays or lists are identical.
+    Must be cautious because of Numpy's strange behavior:
     >>> a = np.array([]) ; b = np.array([0])
     >>> np.all(a==b)
     True
@@ -45,19 +43,23 @@ def identical(a, b):
 
 
 def where(cond):
-    """Bypass Numpy's annoyances. Gee does someone need to write a proper Numpy!"""
+    """Bypass Numpy's annoyances.
+    Gee does someone need to write a proper Numpy!
+    """
     return np.where(cond)[0]
 
 
 def roots_quadratic(q2, q1, q0, tol=1.0e-8, nitref=1):
-    """
-    Find the real roots of the quadratic q(x) = q2 * x^2 + q1 * x + q0.
+    """Find the real roots of the quadratic q(x) = q2 * x^2 + q1 * x + q0.
+
     The numbers q0, q1 and q0 must be real.
 
     This function takes after the GALAHAD function of the same name.
     See http://galahad.rl.ac.uk.
     """
-    a2 = float(q2); a1 = float(q1); a0 = float(q0)
+    a2 = float(q2)
+    a1 = float(q1)
+    a0 = float(q0)
 
     # Case of a linear function.
     if a2 == 0.0:
