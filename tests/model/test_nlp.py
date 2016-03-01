@@ -1,4 +1,5 @@
-# Tests relative to pure Python models.
+"""Tests relative to pure Python models."""
+
 from numpy.testing import *
 from nlp.model.nlpmodel import QPModel, LPModel
 from pykrylov.linop.linop import LinearOperator, linop_from_ndarray

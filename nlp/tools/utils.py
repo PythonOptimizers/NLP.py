@@ -32,6 +32,7 @@ class NullHandler(logging.Handler):
 # Helper functions.
 def identical(a, b):
     """Check that two arrays or lists are identical.
+
     Must be cautious because of Numpy's strange behavior:
     >>> a = np.array([]) ; b = np.array([0])
     >>> np.all(a==b)
@@ -44,6 +45,7 @@ def identical(a, b):
 
 def where(cond):
     """Bypass Numpy's annoyances.
+
     Gee does someone need to write a proper Numpy!
     """
     return np.where(cond)[0]
