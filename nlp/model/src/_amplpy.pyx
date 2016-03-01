@@ -462,7 +462,7 @@ cdef class ampl:
         # Ensure contiguous input.
         if not PyArray_ISCARRAY(x): x = x.copy()
 
-        nnzj = self.nzc if self.n_con else 1
+        nnzj = self.nzc if self.n_con else 0
 
         # Allocate storage and evaluate Jacobian at x.
         J = np.empty(nnzj, dtype=np.double)
