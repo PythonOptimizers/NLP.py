@@ -13,8 +13,7 @@ import sys
 
 
 class NLPModel(object):
-    """
-    An abstract nonlinear optimization problem. It features methods to
+    """An abstract nonlinear optimization problem. It features methods to
     evaluate the objective and constraint functions, and their derivatives.
     Instances of the general class do not do anything interesting; they must
     be subclassed and specialized.
@@ -41,7 +40,7 @@ class NLPModel(object):
 
     _id = -1
 
-    def __init__(self, n=0, m=0, name='Generic', **kwargs):
+    def __init__(self, n, m=0, name='Generic', **kwargs):
 
         self._nvar = self._n = n   # Number of variables
         self._ncon = self._m = m   # Number of general constraints
@@ -144,8 +143,8 @@ class NLPModel(object):
         self.nbounds = self.n - self.nfreeB
 
         # Define permutations to order bound constraints / multipliers.
-        self.permB = self.fixedB + self.lowerB + self.upperB + \
-                     self.rangeB + self.freeB
+        self.permB = (self.fixedB + self.lowerB + self.upperB +
+                      self.rangeB + self.freeB)
 
         # Define default stopping tolerances
         self._stop_d = 1.0e-6    # Dual feasibility
@@ -153,9 +152,9 @@ class NLPModel(object):
         self._stop_p = 1.0e-6    # Primal feasibility
 
         # Define scaling attributes.
-        self.g_max = 1.0e2      # max gradient entry (constant)
-        self.scale_obj = None   # Objective scaling
-        self.scale_con = None   # Constraint scaling
+        self.g_max = 1.0e2       # max gradient entry (constant)
+        self.scale_obj = None    # Objective scaling
+        self.scale_con = None    # Constraint scaling
 
         # Problem-specific logger.
         self.__class__._id += 1
@@ -489,9 +488,9 @@ class NLPModel(object):
     def at_optimality(self, x, z, **kwargs):
         """Checks whether the KKT residuals meet the stopping conditions."""
         kkt = self.optimality_residuals(x, z, **kwargs)
-        return kkt.dFeas <= self.stop_d and \
-               kkt.comp <= self.stop_c and \
-               kkt.feas <= self.stop_p
+        return (kkt.dFeas <= self.stop_d and
+                kkt.comp <= self.stop_c and
+                kkt.feas <= self.stop_p)
 
     def bounds(self, x):
         """Return the vector with components x[i]-Lvar[i] or Uvar[i]-x[i].
