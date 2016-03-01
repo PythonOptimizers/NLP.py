@@ -326,6 +326,14 @@ class AmplModel(NLPModel):
                                    nargout=self.ncon,
                                    symmetric=False)
 
+    def jprod(self, x, p, **kwargs):
+        """Evaluate Jacobian-vector product at x with p."""
+        return self.jop(x, **kwargs) * p
+
+    def jtprod(self, x, p, **kwargs):
+        """Evaluate transposed-Jacobian-vector product at x with p."""
+        return self.jop(x, **kwargs).T * p
+
     def hess(self, x, z=None, obj_num=0, *args, **kwargs):
         """Evaluate Hessian.
 

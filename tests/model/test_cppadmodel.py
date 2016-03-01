@@ -1,4 +1,5 @@
-# Tests relative to algorithmic differentiation with CppAD.
+"""Tests relative to algorithmic differentiation with CppAD."""
+
 import sys
 from .helper import *
 from numpy.testing import *

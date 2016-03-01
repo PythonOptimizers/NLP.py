@@ -35,8 +35,8 @@ class Hs7Data(object):
         self.expected_c = np.array([29.0])
         self.expected_l = -25.3905620876   # uses cons_pos().
         self.expected_g = np.array([0.8, -1.])
-        self.expected_H = np.array([[-52.24,  0.],
-                                    [  0.  , -2.]])
+        self.expected_H = np.array([[-52.24, 0.],
+                                    [0., -2.]])
         v = np.arange(1, self.expected_H.shape[0] + 1, dtype=np.float)
         self.expected_Hv = np.dot(self.expected_H, v)
         self.expected_J = np.array([[40., 4.]])
@@ -44,49 +44,90 @@ class Hs7Data(object):
         w = 2 * np.ones(self.expected_J.shape[0])
         self.expected_JTw = np.dot(self.expected_J.T, w)
 
+class Hs7SlackData(Hs7Data):
 
-class Rosenbrock(object):
+    def __init__(self):
+        super(Hs7SlackData, self).__init__()
+        self.expected_c = np.array([25.0])
+
+
+class Hs10Data(object):
+
+    def __init__(self):
+        self.expected_f = -1.0
+        self.expected_c = np.array([-1.0])
+        self.expected_l = 0.0   # uses cons_pos().
+        self.expected_g = np.array([1., -1.])
+        self.expected_H = np.array([[6.,  -2.],
+                                    [-2., 2.]])
+        v = np.arange(1, self.expected_H.shape[0] + 1, dtype=np.float)
+        self.expected_Hv = np.dot(self.expected_H, v)
+        self.expected_J = np.array([[2., -2.]])
+        self.expected_Jv = np.dot(self.expected_J, v)
+        w = 2 * np.ones(self.expected_J.shape[0])
+        self.expected_JTw = np.dot(self.expected_J.T, w)
+
+
+class Hs10SlackData(object):
+
+    def __init__(self):
+        self.expected_f = -1.0
+        self.expected_c = np.array([-2.0])
+        self.expected_l = -1.0   # uses cons_pos().
+        self.expected_g = np.array([1., -1., 0.])
+        self.expected_H = np.array([[6., -2., 0.],
+                                    [-2., 2., 0.],
+                                    [0., 0., 0.]])
+        v = np.arange(1, self.expected_H.shape[0] + 1, dtype=np.float)
+        self.expected_Hv = np.dot(self.expected_H, v)
+        self.expected_J = np.array([[2., -2., -1]])
+        self.expected_Jv = np.dot(self.expected_J, v)
+        w = 2 * np.ones(self.expected_J.shape[0])
+        self.expected_JTw = np.dot(self.expected_J.T, w)
+
+
+class GenericTest(object):
+
+    def get_expected(self):
+        raise NotImplementedError('This method must be subclassed')
 
     def get_derivatives(self, model):
-        return get_derivatives_coord(model)
+        return NotImplementedError('This method must be subclassed')
+
+    def test_model(self):
+        data = self.get_expected()
+        if self.model.m > 0:
+            (f, c, l) = get_values(self.model)
+            assert_allclose(c, data.expected_c)
+            assert_almost_equal(l, data.expected_l)
+        else:
+            f = get_values(self.model)
+
+        assert_almost_equal(f, data.expected_f)
+
+        if self.model.m > 0:
+            (g, H, Hv, J, Jv, JTw) = self.get_derivatives(self.model)
+            assert(np.allclose(J, data.expected_J))
+            assert(np.allclose(Jv, data.expected_Jv))
+            assert(np.allclose(JTw, data.expected_JTw))
+        else:
+            (g, H, Hv) = self.get_derivatives(self.model)
+
+        assert(np.allclose(g, data.expected_g))
+        assert(np.allclose(H, data.expected_H))
+        assert(np.allclose(Hv, data.expected_Hv))
+
+
+class Rosenbrock(GenericTest):
 
     def get_expected(self):
         return RosenbrockData()
 
-    def test_rosenbrock(self):
-        rosenbrock_data = self.get_expected()
-        f = get_values(self.model)
-        assert_almost_equal(f, rosenbrock_data.expected_f)
 
-        (g, H, Hv) = self.get_derivatives(self.model)
-        assert(np.allclose(g, rosenbrock_data.expected_g))
-        assert(np.allclose(H, rosenbrock_data.expected_H))
-        assert(np.allclose(Hv, rosenbrock_data.expected_Hv))
-
-
-class Hs7(object):
+class Hs7(GenericTest):
 
     def get_expected(self):
         return Hs7Data()
-
-    def get_derivatives(self, model):
-        return get_derivatives_coord(model)
-
-    def test_hs7(self):
-        hs7_data = self.get_expected()
-        (f, c, l) = get_values(self.model)
-        assert_almost_equal(f, hs7_data.expected_f)
-        assert_allclose(c, hs7_data.expected_c)
-        assert_almost_equal(l, hs7_data.expected_l)
-
-        (g, H, Hv, J, Jv, JTw) = self.get_derivatives(self.model)
-
-        assert(np.allclose(g, hs7_data.expected_g))
-        assert(np.allclose(H, hs7_data.expected_H))
-        assert(np.allclose(Hv, hs7_data.expected_Hv))
-        assert(np.allclose(J, hs7_data.expected_J))
-        assert(np.allclose(Jv, hs7_data.expected_Jv))
-        assert(np.allclose(JTw, hs7_data.expected_JTw))
 
 
 def get_values(model):

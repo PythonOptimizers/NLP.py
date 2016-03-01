@@ -9,6 +9,7 @@ from nlp.model.snlp import SlackModel
 from nlp.model.qnmodel import QuasiNewtonModel
 from nlp.model.amplpy import AmplModel
 from pykrylov.linop import CysparseLinearOperator
+import numpy as np
 
 
 class CySparseNLPModel(NLPModel):
@@ -26,7 +27,7 @@ class CySparseNLPModel(NLPModel):
         """
         vals, rows, cols = super(CySparseNLPModel, self).hess(*args, **kwargs)
         H = LLSparseMatrix(size=self.nvar, size_hint=vals.size,
-                           is_symmetric=True, itype=types.INT64_T,
+                           store_symmetric=True, itype=types.INT64_T,
                            dtype=types.FLOAT64_T)
         H.put_triplet(rows, cols, vals)
         return H
@@ -35,7 +36,7 @@ class CySparseNLPModel(NLPModel):
         """Evaluate constraints Jacobian at x."""
         vals, rows, cols = super(CySparseNLPModel, self).jac(*args, **kwargs)
         J = LLSparseMatrix(nrow=self.ncon, ncol=self.nvar,
-                           size_hint=vals.size, is_symmetric=False,
+                           size_hint=vals.size, store_symmetric=False,
                            itype=types.INT64_T, dtype=types.FLOAT64_T)
         J.put_triplet(rows, cols, vals)
         return J
@@ -58,7 +59,7 @@ class CySparseAmplModel(CySparseNLPModel, AmplModel):
         """
         vals, rows, cols = super(CySparseAmplModel. self).A(*args, **kwargs)
         A = LLSparseMatrix(nrow=self.ncon, ncol=self.nvar,
-                           size_hint=vals.size, is_symmetric=False,
+                           size_hint=vals.size, store_symmetric=False,
                            type=types.INT64_T, dtype=types.FLOAT64_T)
         A.put_triplet(rows, cols, vals)
         return A
@@ -79,14 +80,12 @@ class CySparseSlackModel(SlackModel):
 
     """
 
-    def __init__(self, model, keep_variable_bounds=False, **kwargs):
+    def __init__(self, model, **kwargs):
 
-        if not isinstance(model, CySparseNLPModel):
+        if not isinstance(model, CySparseAmplModel):
             raise TypeError("The model in `model` should be a CySparseNLPModel"
                             "or a derived class of it.")
-        kvb = keep_variable_bounds
-        super(CySparseSlackModel, self).__init__(model,
-                                                 keep_variable_bounds=kvb)
+        super(CySparseSlackModel, self).__init__(model)
 
     def _jac(self, x, lp=False):
         """
@@ -102,17 +101,17 @@ class CySparseSlackModel(SlackModel):
         model = self.model
         on = self.original_n
 
-        lowerC = np.array(model.lowerC)
+        lowerC = np.array(model.lowerC, dtype=np.int64)
         nlowerC = model.nlowerC
-        upperC = np.array(model.upperC)
+        upperC = np.array(model.upperC, dtype=np.int64)
         nupperC = model.nupperC
-        rangeC = np.array(model.rangeC)
+        rangeC = np.array(model.rangeC, dtype=np.int64)
         nrangeC = model.nrangeC
 
         # Initialize sparse Jacobian
         nnzJ = self.model.nnzj + m
         J = LLSparseMatrix(nrow=self.ncon, ncol=self.nvar, size_hint=nnzJ,
-                           is_symmetric=False, itype=types.INT64_T,
+                           store_symmetric=False, itype=types.INT64_T,
                            dtype=types.FLOAT64_T)
 
         # Insert contribution of general constraints
@@ -122,14 +121,17 @@ class CySparseSlackModel(SlackModel):
             J[:on, :on] = self.model.jac(x[:on])
 
         # Create a few index lists
-        rlowerC = np.array(range(nlowerC))
-        rupperC = np.array(range(nupperC))
-        rrangeC = np.array(range(nrangeC))
+        rlowerC = np.array(range(nlowerC), dtype=np.int64)
+        rupperC = np.array(range(nupperC), dtype=np.int64)
+        rrangeC = np.array(range(nrangeC), dtype=np.int64)
 
         # Insert contribution of slacks on general constraints
-        J.put(-1.0, lowerC, on + rlowerC)
-        J.put(-1.0, upperC, on + nlowerC + rupperC)
-        J.put(-1.0, rangeC, on + nlowerC + nupperC + rrangeC)
+        J.put_triplet(lowerC, on + rlowerC,
+                      -1.0*np.ones(nlowerC, dtype=np.float64))
+        J.put_triplet(upperC, on + nlowerC + rupperC,
+                      -1.0*np.ones(nupperC, dtype=np.float64))
+        J.put_triplet(rangeC, on + nlowerC + nupperC + rrangeC,
+                      -1.0*np.ones(nrangeC, dtype=np.float64))
 
         return J
 
@@ -145,7 +147,7 @@ class CySparseSlackModel(SlackModel):
         on = model.n
 
         H = LLSparseMatrix(size=self.nvar, size_hint=self.model.nnzh,
-                           is_symmetric=True, itype=types.INT64_T,
+                           store_symmetric=True, itype=types.INT64_T,
                            dtype=types.FLOAT64_T)
         H[:on, :on] = self.model.hess(x[:on], z, *args, **kwargs)
         return H

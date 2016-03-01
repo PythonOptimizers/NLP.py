@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+"""Tests relative to AlgoPy."""
 
 import sys
 from .helper import *
@@ -7,6 +7,7 @@ from numpy.testing import *
 
 if not module_missing('algopy'):
     from nlp.model.algopymodel import AlgopyModel
+    import algopy
 
     class AlgopyRosenbrock(AlgopyModel):
         """The standard Rosenbrock function."""
@@ -23,7 +24,9 @@ if not module_missing('algopy'):
 
         def cons(self, x, **kwargs):
             c = algopy.zeros(1, dtype=x)
-            c[0] = (1 + x[0]**2)**2 + x[1]**2 - 4  # AlgoPy doesn't support cons_pos()
+
+            # AlgoPy doesn't support cons_pos()
+            c[0] = (1 + x[0]**2)**2 + x[1]**2 - 4
             return c
 
 
@@ -32,7 +35,8 @@ class Test_AlgopyRosenbrock(TestCase, Rosenbrock):  # Test def'd in Rosenbrock
     def get_derivatives(self, model):
         return get_derivatives_plain(model)
 
-    @dec.skipif(module_missing('algopy'), "Test skipped because algopy is not available.")
+    @dec.skipif(module_missing('algopy'),
+                "Test skipped because algopy is not available.")
     def setUp(self):
         self.model = AlgopyRosenbrock(n=5, m=0,
                                       name='Rosenbrock',
@@ -50,7 +54,8 @@ class Test_AlgopyHS7(TestCase, Hs7):  # Test def'd in Hs7
     def get_derivatives(self, model):
         return get_derivatives_plain(model)
 
-    @dec.skipif(module_missing('algopy'), "Test skipped because algopy is not available.")
+    @dec.skipif(module_missing('algopy'),
+                "Test skipped because algopy is not available.")
     def setUp(self):
         self.model = AlgopyHS7(n=2, m=1, name='HS7',
                                x0=2*np.ones(2), pi0=np.ones(1),

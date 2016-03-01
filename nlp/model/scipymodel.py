@@ -5,6 +5,8 @@ from scipy import sparse as sp
 
 from nlp.model.nlpmodel import NLPModel
 from nlp.model.amplpy import AmplModel
+from nlp.model.snlp import SlackModel
+from nlp.model.qnmodel import QuasiNewtonModel
 from pykrylov.linop.linop import linop_from_ndarray
 import numpy as np
 
@@ -98,7 +100,7 @@ class SciPySlackModel(SlackModel):
     """
 
     def __init__(self, model, **kwargs):
-        if not isinstance(model, SciPyNLPModel):
+        if not isinstance(model, NLPModel):
             raise TypeError("The model in `model` should be a SciPyNLPModel"
                             "or a derived class of it.")
         super(SciPySlackModel, self).__init__(model)
@@ -112,41 +114,38 @@ class SciPySlackModel(SlackModel):
         of the constraint matrix is cheaper and the argument `x` is ignored.
 
         """
-        n = self.n
-        m = self.m
-        model = self.model
-        on = self.original_n
-
-        lowerC = np.array(model.lowerC)
-        nlowerC = model.nlowerC
-        upperC = np.array(model.upperC)
-        nupperC = model.nupperC
-        rangeC = np.array(model.rangeC)
-        nrangeC = model.nrangeC
-
-        # Initialize sparse Jacobian
         if self.ncon == 0:  # SciPy cannot create sparse matrix of size 0.
             return linop_from_ndarray(np.empty((0, self.nvar), dtype=np.float))
 
-        J = sp.coo_matrix((self.ncon, self.nvar))
+        model = self.model
+        on = self.original_n
 
-        # Insert contribution of general constraints
-        if lp:
-            J[:on, :on] = self.model.A()
-        else:
-            J[:on, :on] = self.model.jac(x[:on])
+        # Get contribution of general constraints
+        J = model.jac(x, lp)
+        c_vals = J.data
+        c_rows = J.row
+        c_cols = J.col
 
         # Create a few index lists
+        lowerC = np.array(model.lowerC, dtype=np.int64)
+        nlowerC = model.nlowerC
+        upperC = np.array(model.upperC, dtype=np.int64)
+        nupperC = model.nupperC
+        rangeC = np.array(model.rangeC, dtype=np.int64)
+        nrangeC = model.nrangeC
         rlowerC = np.array(range(nlowerC))
         rupperC = np.array(range(nupperC))
         rrangeC = np.array(range(nrangeC))
 
         # Insert contribution of slacks on general constraints
-        J[lowerC, on + rlowerC] = -1.0
-        J[upperC, on + nlowerC + rupperC] = -1.0
-        J[rangeC, on + nlowerC + nupperC + rrangeC] = -1.0
+        rows = np.concatenate((c_rows, lowerC, upperC, rangeC))
+        cols = np.concatenate((c_cols, on + rlowerC, on + nlowerC + rupperC,
+                               on + nlowerC + nupperC + rrangeC))
+        vals = np.concatenate((c_vals,
+                               -1.0*np.ones(nlowerC + nupperC + nrangeC)))
 
-        return J
+        return sp.coo_matrix((vals, (rows, cols)),
+                             shape=(self.ncon, self.nvar))
 
     def hess(self, x, z=None, *args, **kwargs):
         """Evaluate Lagrangian Hessian at (x, z)."""
@@ -154,9 +153,14 @@ class SciPySlackModel(SlackModel):
         if isinstance(model, QuasiNewtonModel):
             return self.hop(x, z, *args, **kwargs)
 
+        if z is None:
+            z = np.zeros(self.m)
+
         on = model.n
 
-        pi = self.convert_multipliers(z)
-        H = sp.coo_matrix((self.n, self.n))
-        H[:on, :on] = self.model.hess(x[:on], pi, *args, **kwargs)
-        return H
+        H = model.hess(x, z, **kwargs)
+        vals = H.data
+        rows = H.row
+        cols = H.col
+        return sp.coo_matrix((vals, (rows, cols)),
+                             shape=(self.nvar, self.nvar))

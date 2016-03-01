@@ -1,4 +1,5 @@
-# Tests relative to algorithmic differentiation with AMPL.
+"""Tests relative to problems modeled with AMPL."""
+
 from nlp.model.amplpy import AmplModel
 from .helper import *
 import numpy as np
@@ -8,6 +9,8 @@ this_path = os.path.dirname(os.path.realpath(__file__))
 
 
 class Test_AmplRosenbrock(TestCase, Rosenbrock):  # Test def'd in Rosenbrock
+    def get_derivatives(self, model):
+        return get_derivatives_coord(model)
 
     def setUp(self):
         model = os.path.join(this_path, 'rosenbrock.nl')
@@ -15,6 +18,8 @@ class Test_AmplRosenbrock(TestCase, Rosenbrock):  # Test def'd in Rosenbrock
 
 
 class Test_AmplHS7(TestCase, Hs7):    # Test defined in Hs7
+    def get_derivatives(self, model):
+        return get_derivatives_coord(model)
 
     def setUp(self):
         model = os.path.join(this_path, 'hs007.nl')
