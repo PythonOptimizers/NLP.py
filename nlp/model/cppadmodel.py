@@ -18,7 +18,7 @@ class CppADModel(NLPModel):
     See the documentation of `NLPModel` for further information.
     """
 
-    def __init__(self, n, m, name='CppAD-Generic', **kwargs):
+    def __init__(self, n, m=0, name='CppAD-Generic', **kwargs):
         """Initialize a model with `n` variables and `m` constraints.
         :parameters:
 
@@ -26,7 +26,7 @@ class CppADModel(NLPModel):
             :m:       number of general (non bound) constraints (default: 0)
             :name:    model name (default: 'Generic')
         """
-        super(CppADModel, self).__init__(n, m, name, **kwargs)
+        super(CppADModel, self).__init__(n, m=0, name=name, **kwargs)
 
         self._cppad_adfun_obj = None
         self._cppad_adfun_cons = None

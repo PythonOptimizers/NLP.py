@@ -1,5 +1,4 @@
-"""Models where sparse matrices are returned in SciPy coordinate format."""
-
+"""Models with sparse matrices in SciPy coordinate (COO) format."""
 
 from scipy import sparse as sp
 
@@ -12,19 +11,21 @@ import numpy as np
 
 
 class SciPyNLPModel(NLPModel):
-    """
-    An `NLPModel` where sparse matrices are returned in SciPy
-    coordinate (COO) format. The `NLPModel`'s `jac` and `hess` methods
+    """`NLPModel` with sparse matrices in SciPy coordinate (COO) format.
+
+    The `NLPModel`'s :meth:`jac` and :meth:`hess` methods
     should return that sparse Jacobian and Hessian in coordinate format:
     (vals, rows, cols).
     """
 
     def hess(self, *args, **kwargs):
+        """Evaluate Lagrangian Hessian."""
         vals, rows, cols = super(SciPyNLPModel, self).hess(*args, **kwargs)
         return sp.coo_matrix((vals, (rows, cols)),
                              shape=(self.nvar, self.nvar))
 
     def jac(self, *args, **kwargs):
+        """Evaluate sparse constraints Jacobian."""
         if self.ncon == 0:  # SciPy cannot create sparse matrix of size 0.
             return linop_from_ndarray(np.empty((0, self.nvar), dtype=np.float))
         vals, rows, cols = super(SciPyNLPModel, self).jac(*args, **kwargs)
@@ -33,24 +34,29 @@ class SciPyNLPModel(NLPModel):
 
 
 class SciPyAmplModel(AmplModel):
+    """`AmplModel` with sparse matrices n SciPy coordinate (COO) format.
+
+    The `AmplModel`'s :meth:`jac` and :meth:`hess` methods
+    should return that sparse Jacobian and Hessian in coordinate format:
+    (vals, rows, cols).
+    """
+
     # MRO: 1. SciPyAmplModel
     #      2. AmplModel
     #      3. NLPModel
-    #
 
     def A(self, *args, **kwargs):
         """Evaluate sparse Jacobian of the linear part of the constraints.
 
         Useful to obtain constraint matrix when problem is a linear programming
         problem.
-
         """
         vals, rows, cols = super(SciPyAmplModel. self).A(*args, **kwargs)
         return sp.coo_matrix((vals, (rows, cols)),
                              shape=(self.ncon, self.nvar))
 
     def jac(self, *args, **kwargs):
-        """Evaluate constraints Jacobian at x."""
+        """Evaluate sparse constraints Jacobian."""
         if self.ncon == 0:  # SciPy cannot create sparse matrix of size 0.
             return linop_from_ndarray(np.empty((0, self.nvar), dtype=np.float))
 
@@ -64,7 +70,6 @@ class SciPyAmplModel(AmplModel):
         AMPL only returns lower triangular part of the Hessian and
         `scipy.coo_matrix` doesn't have a `symmetric` attributes, so we need to
         copy the upper part of the matrix
-
         """
         l_vals, l_rows, l_cols = super(SciPyAmplModel, self).hess(*args,
                                                                   **kwargs)
@@ -155,8 +160,6 @@ class SciPySlackModel(SlackModel):
 
         if z is None:
             z = np.zeros(self.m)
-
-        on = model.n
 
         H = model.hess(x, z, **kwargs)
         vals = H.data

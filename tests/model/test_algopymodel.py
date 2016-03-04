@@ -38,9 +38,8 @@ class Test_AlgopyRosenbrock(TestCase, Rosenbrock):  # Test def'd in Rosenbrock
     @dec.skipif(module_missing('algopy'),
                 "Test skipped because algopy is not available.")
     def setUp(self):
-        self.model = AlgopyRosenbrock(n=5, m=0,
-                                      name='Rosenbrock',
-                                      x0=-np.ones(5))
+        n = 5
+        self.model = AlgopyRosenbrock(n, name='Rosenbrock', x0=-np.ones(n))
 
 
 class Test_AlgopyHS7(TestCase, Hs7):  # Test def'd in Hs7
@@ -57,9 +56,11 @@ class Test_AlgopyHS7(TestCase, Hs7):  # Test def'd in Hs7
     @dec.skipif(module_missing('algopy'),
                 "Test skipped because algopy is not available.")
     def setUp(self):
-        self.model = AlgopyHS7(n=2, m=1, name='HS7',
-                               x0=2*np.ones(2), pi0=np.ones(1),
-                               Lcon=np.array([0.]), Ucon=np.array([0.]))
+        n = 2
+        m = 1
+        self.model = AlgopyHS7(n, m=m, name='HS7',
+                               x0=2 * np.ones(n), pi0=np.ones(m),
+                               Lcon=np.zeros(m), Ucon=np.zeros(m))
 
 if __name__ == '__main__':
 
