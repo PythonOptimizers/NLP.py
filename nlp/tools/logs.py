@@ -50,11 +50,12 @@ def config_logger(name, format='%(message)s', datefmt=None,
         if filelevel is None:
             filelevel = level
             hdlr.setLevel(filelevel)
-            logger.addHandler(hdlr)
 
     if stream:
         hdlr = logging.StreamHandler(stream)
         hdlr.setLevel(level)
-        logger.addHandler(hdlr)
+
+    hdlr.setFormatter(logging.Formatter(format))
+    logger.addHandler(hdlr)
 
     return logger
