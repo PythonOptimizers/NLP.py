@@ -20,16 +20,16 @@ def config_logger(name, format='%(message)s', datefmt=None,
 
     :parameters:
 
-    :name:      Logger name
-    :format:    handler format string (default=`%(message)s`
-    :datefmt:   handler date/time format specifier
-    :stream:    initialize the StreamHandler using `stream`
-                (None disables the stream, default=sys.stdout)
-    :level:     logger level (default=INFO).
-    :filename:  create FileHandler using `filename` (default=None)
-    :filemode:  open `filename` with specified filemode (`w` or `a`)
-    :filelevel: logger level for file logger (default=`level`)
-    :propagate: propagate message to parent (default=False)
+        :name:      Logger name
+        :format:    handler format string (default=``%(message)s``)
+        :datefmt:   handler date/time format specifier
+        :stream:    initialize the StreamHandler using ``stream``
+                    (None disables the stream, default=``sys.stdout``)
+        :level:     logger level (default=``INFO``).
+        :filename:  create FileHandler using ``filename`` (default=``None``)
+        :filemode:  open ``filename`` with specified filemode (``w`` or ``a``)
+        :filelevel: logger level for file logger (default=``level``)
+        :propagate: propagate message to parent (default=``False``)
     """
     # Get a logger for the specified name
     logger = logging.getLogger(name)
