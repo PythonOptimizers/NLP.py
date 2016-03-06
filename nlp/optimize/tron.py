@@ -20,7 +20,7 @@ class TRONTrustRegion(TrustRegion):
     """
 
     def __init__(self, **kwargs):
-        """ Initializes an object allowing management of a trust region.
+        """Initialize an object allowing management of a trust region.
 
         :keywords:
             :radius: Initial trust-region radius (default: 1.0)
@@ -67,7 +67,7 @@ class TRONFramework(object):
 
            min f(x)  subject to xl <= x <= xu
 
-     where the Hessian matrix is sparse.
+    where the Hessian matrix is sparse.
     """
 
     def __init__(self, model, **kwargs):
@@ -77,7 +77,7 @@ class TRONFramework(object):
             :model:     a :class:`NLPModel` instance.
 
         :keywords:
-            :x0:           starting point                     (``nlp.x0``)
+            :x0:           starting point                     (``model.x0``)
             :reltol:       relative stopping tolerance        (1.0e-12)
             :abstol:       absolute stopping tolerance        (1.0e-6)
             :maxiter:      maximum number of iterations       (max(1000,10n))
@@ -200,8 +200,8 @@ class TRONFramework(object):
         if nbrpt == 0:
             brptmin = brptmax = 0
 
-        self.log.debug('Nearest  breakpoint: %7.1e' % brptmin)
-        self.log.debug('Farthest breakpoint: %7.1e' % brptmax)
+        self.log.debug('Nearest  breakpoint: %7.1e', brptmin)
+        self.log.debug('Farthest breakpoint: %7.1e', brptmax)
         return (nbrpt, brptmin, brptmax)
 
     def cauchy(self, x, g, H, xl, xu, delta, alpha):
@@ -594,7 +594,6 @@ class TRONFramework(object):
         All other keyword arguments are passed directly to the constructor of
         the trust-region solver.
         """
-
         model = self.model
 
         # Project the initial point into [xl,xu].
@@ -635,9 +634,8 @@ class TRONFramework(object):
             self.log.info(self.hline)
             self.log.info(self.header)
             self.log.info(self.hline)
-            self.log.info(self.format0 % (self.iter, self.f,
-                                          self.gnorm, '', '', '',
-                                          self.TR.radius, ''))
+            self.log.info(self.format0, self.iter, self.f, self.gnorm,
+                          '', '', '', self.TR.radius, '')
 
         while not (exitUser or exitOptimal or exitIter or exitFunCall):
             self.iter += 1
@@ -691,7 +689,8 @@ class TRONFramework(object):
             if f_trial - self.f - slope <= 0:
                 alpha = self.TR.gamma3
             else:
-                alpha = max(self.TR.gamma1, -0.5 * (slope / (f_trial - self.f - slope)))
+                alpha = max(self.TR.gamma1,
+                            -0.5 * (slope / (f_trial - self.f - slope)))
 
             # Update the trust region bound according to the ratio
             # of actual to predicted reduction
@@ -728,15 +727,15 @@ class TRONFramework(object):
 
             if self.verbose:
                 pstatus = step_status if step_status != 'Acc' else ''
-                self.log.info(self.format % (self.iter, self.f,
-                                             self.gnorm, cg_iter, rho, snorm,
-                                             self.TR.radius, pstatus))
+                self.log.info(self.format, self.iter, self.f, self.gnorm,
+                              cg_iter, rho, snorm, self.TR.radius, pstatus)
 
             # Test for convergence. FATOL and FRTOL
             if abs(ared) <= self.abstol and -m <= self.abstol:
                 exitOptimal = True
                 status = 'fatol'
-            if abs(ared) <= self.reltol * abs(self.f) and -m <= self.reltol * abs(self.f):
+            if abs(ared) <= self.reltol * abs(self.f) and \
+               (-m <= self.reltol * abs(self.f)):
                 exitOptimal = True
                 status = 'frtol'
 
