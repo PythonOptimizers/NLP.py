@@ -30,7 +30,7 @@ if not module_missing('adolc'):
         pass
 
     if not module_missing('pysparse'):
-        from nlpy.model.adolcmodel import PySparseAdolcModel
+        from nlp.model.adolcmodel import PySparseAdolcModel
         class PySparseRosenbrock(PySparseAdolcModel, AdolcRosenbrock):
             pass
 
