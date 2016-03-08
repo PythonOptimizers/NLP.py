@@ -195,7 +195,7 @@ class SparseAdolcModel(BaseAdolcModel):
 
         # We've computed the Hessian with respect to (x,z).
         # Return only the Hessian with respect to x.
-        mask = np.where(rind < self.nvar and cind < self.nvar)
+        mask = np.where((rind < self.nvar) & (cind < self.nvar))
         return (values[mask], rind[mask], cind[mask])
 
     def jac(self, x, **kwargs):
