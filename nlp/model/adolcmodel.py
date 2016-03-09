@@ -1,8 +1,6 @@
 """Models where derivatives are computed by ADOL-C."""
 
 from nlp.model.nlpmodel import NLPModel
-from nlp.model.pysparsemodel import PySparseNLPModel
-from nlp.model.scipymodel import SciPyNLPModel
 import numpy as np
 
 try:
@@ -221,23 +219,55 @@ class SparseAdolcModel(BaseAdolcModel):
         return (values, rind, cind)
 
 
-class PySparseAdolcModel(PySparseNLPModel, SparseAdolcModel):
-    """`AdolcModel` with PySparse sparse matrices."""
+try:
+    from nlp.model.pysparsemodel import PySparseNLPModel
 
-    # MRO: 1. PySparseAdolcModel
-    #      2. PySparseNLPModel
-    #      3. SparseAdolcModel
-    #      4. BaseAdolcModel
-    #      5. NLPModel
+    class PySparseAdolcModel(PySparseNLPModel, SparseAdolcModel):
+        """`AdolcModel` with PySparse sparse matrices."""
+
+        # MRO: 1. PySparseAdolcModel
+        #      2. PySparseNLPModel
+        #      3. SparseAdolcModel
+        #      4. BaseAdolcModel
+        #      5. NLPModel
+        pass
+
+except:
     pass
 
 
-class SciPyAdolcModel(SciPyNLPModel, SparseAdolcModel):
-    """`AdolcModel` with SciPy COO sparse matrices."""
+try:
+    from nlp.model.scipymodel import SciPyNLPModel
+    import scipy as sp
 
-    # MRO: 1. SciPyAdolcModel
-    #      2. SciPyNLPModel
-    #      3. SparseAdolcModel
-    #      4. BaseAdolcModel
-    #      5. NLPModel
+    class SciPyAdolcModel(SciPyNLPModel, SparseAdolcModel):
+        """`AdolcModel` with SciPy COO sparse matrices."""
+
+        # MRO: 1. SciPyAdolcModel
+        #      2. SciPyNLPModel
+        #      3. SparseAdolcModel
+        #      4. BaseAdolcModel
+        #      5. NLPModel
+
+        def hess(self, *args, **kwargs):
+            """Evaluate Lagrangian Hessian at (x, z)."""
+            u_vals, u_rows, u_cols = super(SciPyAdolcModel,
+                                           self).hess(*args, **kwargs)
+
+            # ADOL-C only returns the upper triangular part of the Hessian and
+            # `scipy.coo_matrix` doesn't have a `symmetric` attribute, so we
+            # need to copy the upper part of the matrix
+            diag_idx = np.where(u_rows == u_cols)
+
+            l_rows = np.delete(u_cols, diag_idx)  # creates a copy
+            l_cols = np.delete(u_rows, diag_idx)
+            l_vals = np.delete(u_vals, diag_idx)
+
+            H = sp.coo_matrix((np.concatenate((l_vals, u_vals)),
+                              (np.concatenate((l_rows, u_rows)),
+                               np.concatenate((l_cols, u_cols)))),
+                              shape=(self.nvar, self.nvar))
+            return H
+
+except:
     pass
