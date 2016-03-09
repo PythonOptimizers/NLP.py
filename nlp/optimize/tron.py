@@ -1,9 +1,10 @@
-"""Trust-Region Method for Unconstrained Programming."""
+"""Trust-Region Method for Bound-Constrained Programming."""
 
 from pykrylov.linop import SymmetricallyReducedLinearOperator as ReducedHessian
 from pykrylov.linop import LinearOperator
 from nlp.tr.trustregion import TrustRegion
 from nlp.tools import norms
+from nlp.tools.utils import where
 from nlp.tools.timing import cputime
 from nlp.tools.exceptions import UserExitRequest
 import numpy as np
@@ -124,14 +125,6 @@ class TRONFramework(object):
         self.log.addHandler(logging.NullHandler())
         self.log.propagate = False
 
-    def hprod(self, v, **kwargs):
-        """Default hprod based on nlp's hprod.
-
-        User should overload to provide a custom routine, e.g., a quasi-Newton
-        approximation.
-        """
-        return self.model.hprod(self.x, self.model.pi0, v, **kwargs)
-
     def precon(self, v, **kwargs):
         """Generic preconditioning method---must be overridden."""
         return v
@@ -157,16 +150,7 @@ class TRONFramework(object):
 
                    s = P[x + d] - x
         """
-        s = np.zeros(len(x))
-        for i in range(0, len(x)):
-            if x[i] + d[i] < xl[i]:
-                s[i] = xl[i] - x[i]
-            elif x[i] + d[i] > xu[i]:
-                s[i] = xu[i] - x[i]
-            else:
-                s[i] = d[i]
-
-        return s
+        return self.project(x + d, xl, xu) - x
 
     def breakpoints(self, x, d, xl, xu):
         """Find the smallest and largest breakpoints on the half line x + t*d.
@@ -174,31 +158,26 @@ class TRONFramework(object):
         We assume that x is feasible. Return the smallest and largest t such
         that x + t*d lies on the boundary.
         """
-        nbrpt = 0
-        for i in range(0, len(x)):
-            if x[i] < xu[i] and d[i] > 0:
-                nbrpt += 1
-                brpt = (xu[i] - x[i]) / d[i]
-                if nbrpt == 1:
-                    brptmin = brpt
-                    brptmax = brpt
-                else:
-                    brptmin = min(brpt, brptmin)
-                    brptmax = max(brpt, brptmax)
+        pos = where((d > 0) & (x < xu))  # Hit the upper bound.
+        neg = where((d < 0) & (x > xl))  # Hit the lower bound.
+        npos = len(pos)
+        nneg = len(neg)
 
-            elif x[i] > xl[i] and d[i] < 0:
-                nbrpt = nbrpt + 1
-                brpt = (xl[i] - x[i]) / d[i]
-                if nbrpt == 1:
-                    brptmin = brpt
-                    brptmax = brpt
-                else:
-                    brptmin = min(brpt, brptmin)
-                    brptmax = max(brpt, brptmax)
-
+        nbrpt = npos + nneg
         # Handle the exceptional case.
         if nbrpt == 0:
-            brptmin = brptmax = 0
+            return (0, 0, 0)
+
+        brptmin = np.inf
+        brptmax = 0
+        if npos > 0:
+            steps = (xu[pos] - x[pos]) / d[pos]
+            brptmin = min(brptmin, np.min(steps))
+            brptmax = max(brptmax, np.max(steps))
+        if nneg > 0:
+            steps = (xl[neg] - x[neg]) / d[neg]
+            brptmin = min(brptmin, np.min(steps))
+            brptmax = max(brptmax, np.max(steps))
 
         self.log.debug('Nearest  breakpoint: %7.1e', brptmin)
         self.log.debug('Farthest breakpoint: %7.1e', brptmax)
@@ -623,10 +602,7 @@ class TRONFramework(object):
         status = ''
 
         # Wrap Hessian into an operator.
-        H = LinearOperator(model.n, model.n,
-                           lambda v: self.hprod(v),
-                           symmetric=True)
-
+        H = model.hop(self.x, self.model.pi0)
         t = cputime()
 
         # Print out header and initial log.
@@ -720,15 +696,14 @@ class TRONFramework(object):
                 status = 'usr'
 
             # Print out header, say, every 20 iterations
-            if self.iter % 20 == 0 and self.verbose:
+            if self.iter % 20 == 0:
                 self.log.info(self.hline)
                 self.log.info(self.header)
                 self.log.info(self.hline)
 
-            if self.verbose:
-                pstatus = step_status if step_status != 'Acc' else ''
-                self.log.info(self.format, self.iter, self.f, self.gnorm,
-                              cg_iter, rho, snorm, self.TR.radius, pstatus)
+            pstatus = step_status if step_status != 'Acc' else ''
+            self.log.info(self.format, self.iter, self.f, self.gnorm,
+                          cg_iter, rho, snorm, self.TR.radius, pstatus)
 
             # Test for convergence. FATOL and FRTOL
             if abs(ared) <= self.abstol and -m <= self.abstol:
