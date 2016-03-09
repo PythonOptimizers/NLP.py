@@ -1,6 +1,6 @@
 """Tests relative to CySparse."""
 
-from nlp.model.amplpy import AmplModel
+from unittest import TestCase
 from helper import *
 import numpy as np
 import os
