@@ -553,16 +553,15 @@ class TRONFramework(object):
 
     def projected_gradient_norm2(self, x, g, xl, xu):
         """Compute the Euclidean norm of the projected gradient at x."""
-        gpnrm2 = 0.
-        for i in range(0, len(x)):
-            if xl[i] != xu[i]:
-                if x[i] == xl[i]:
-                    gpnrm2 += min(g[i], 0)**2
-                elif x[i] == xu[i]:
-                    gpnrm2 += max(g[i], 0)**2
-                else:
-                    gpnrm2 += g[i]**2
-        return sqrt(gpnrm2)
+        lower = where(x == xl)
+        upper = where(x == xu)
+
+        pg = g.copy()
+        pg[lower] = np.minimum(g[lower], 0)
+        pg[upper] = np.maximum(g[upper], 0)
+
+        gpnorm2 = norms.norm2(pg[where(xl != xu)])
+        return norms.norm2(pg[where(xl != xu)])
 
     def solve(self):
         """Solve method.
