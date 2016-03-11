@@ -46,10 +46,11 @@ class DerivativeChecker(object):
 
         self.model = model
         self.x = x.copy()
-        self.grad_errs = []
-        self.jac_errs = []
-        self.hess_errs = []
-        self.chess_errs = []
+        self.grad_errs = {}
+        self.cheap_grad_errs = {}
+        self.jac_errs = {}
+        self.hess_errs = {}
+        self.chess_errs = {}
 
         headfmt = '%4s  %4s        %22s  %22s  %7s'
         self.head = headfmt % ('Fun', 'Var', 'Expected',
@@ -85,7 +86,7 @@ class DerivativeChecker(object):
 
         if grad:
             if cheap:
-                self.grad_errs = self.cheap_check_obj_gradient()
+                self.cheap_grad_errs = self.cheap_check_obj_gradient()
             else:
                 self.grad_errs = self.check_obj_gradient()
         if jac:
@@ -98,10 +99,16 @@ class DerivativeChecker(object):
         return
 
     def cheap_check_obj_gradient(self):
-        """Check objective derivative along a random direction."""
+        """Check objective derivative along a random direction.
+
+        Return a dictionary containing the scaled error between the directional
+        derivative of the objective in a random direction and the
+        finite-difference approximation.
+        """
         n = self.model.n
         fx = self.model.obj(self.x)
         gx = self.model.grad(self.x)
+        errs = {}
 
         dx = np.random.standard_normal(n)
         dx /= norm(dx)
@@ -117,18 +124,24 @@ class DerivativeChecker(object):
         line = self.d3fmt % ('', gtdx, dfdx, err)
         if err > self.tol:
             self.log.warn(line)
+            errs['dir'] = dx
+            errs['err'] = err
         else:
             self.log.debug(line)
 
-        return err
+        return errs
 
     def check_obj_gradient(self):
-        """Check objective gradient using centered finite differences."""
+        """Check objective gradient using centered finite differences.
+
+        Return a dictionary of gradient components for which the scaled error
+        with the finite-difference approximation exceeds ``self.tol``.
+        """
         model = self.model
         n = model.n
         model.obj(self.x)
         gx = model.grad(self.x)
-        err = np.empty(n)
+        errs = {}
 
         self.log.debug('Objective gradient')
         self.log.debug(self.head)
@@ -140,24 +153,29 @@ class DerivativeChecker(object):
             xph[i] += self.step
             xmh[i] -= self.step
             dfdxi = (model.obj(xph) - model.obj(xmh)) / (2 * self.step)
-            err[i] = abs(gx[i] - dfdxi)/max(1, abs(gx[i]))
+            err = abs(gx[i] - dfdxi)/max(1, abs(gx[i]))
             xph[i] = xmh[i] = self.x[i]
 
-            line = self.d1fmt % (0, i, gx[i], dfdxi, err[i])
+            line = self.d1fmt % (0, i, gx[i], dfdxi, err)
 
-            if err[i] > self.tol:
+            if err > self.tol:
                 self.log.warn(line)
+                errs[i] = err
             else:
                 self.log.debug(line)
 
-        return err
+        return errs
 
     def check_obj_hessian(self):
-        """Check objective Hessian using centered finite differences."""
+        """Check objective Hessian using centered finite differences.
+
+        Return a dictionary of Hessian components for which the scaled error
+        with the finite-difference approximation exceeds ``self.tol``.
+        """
         model = self.model
         n = model.n
         Hx = model.hess(self.x)
-        errs = []
+        errs = {}
 
         if not hasattr(Hx, "__getitem__"):
             # Extract Hessian values via dot products.
@@ -193,7 +211,7 @@ class DerivativeChecker(object):
                 line = self.d2fmt % (0, i, j, Hxij, dgjdxi, err)
                 if err > self.tol:
                     self.log.warn(line)
-                    errs.append(line)
+                    errs[(i, j)] = err
                 else:
                     self.log.debug(line)
 
@@ -209,10 +227,10 @@ class DerivativeChecker(object):
         n = model.n
         m = model.m
         if m == 0:
-            return []   # Problem is unconstrained.
+            return {}   # Problem is unconstrained.
 
         Jx = model.jac(self.x)
-        errs = []
+        errs = {}
 
         if not hasattr(Jx, "__getitem__"):
             # Extract Jacobian values via dot products.
@@ -248,7 +266,7 @@ class DerivativeChecker(object):
                 line = self.d1fmt % (j + 1, i, Jxji, dcjdxi, err)
                 if err > self.tol:
                     self.log.warn(line)
-                    errs.append(line)
+                    errs[(j, i)] = err
                 else:
                     self.log.debug(line)
 
@@ -259,10 +277,15 @@ class DerivativeChecker(object):
         return errs
 
     def check_con_hessians(self):
-        """Check constraints Hessians using centered finite differences."""
+        """Check constraints Hessians using centered finite differences.
+
+        Return a dictionary of dictionaries, the k-th of which contains the
+        k-th Hessian components for which the scaled error with the
+        finite-difference approximation exceeds ``self.tol``.
+        """
         n = self.model.n
         m = self.model.m
-        errs = []
+        errs = {}
 
         self.log.debug('Constraints Hessians')
 
@@ -274,6 +297,7 @@ class DerivativeChecker(object):
             y[k] = -1
             Hk = self.model.hess(self.x, y, obj_weight=0)
             y[k] = 0
+            errs[k] = {}
 
             if not hasattr(Hk, "__getitem__"):
                 # Extract Hessian values via dot products.
@@ -302,7 +326,7 @@ class DerivativeChecker(object):
                     line = self.d2fmt % (k + 1, i, j, Hkij, dgjdxi, err)
                     if err > self.tol:
                         self.log.warn(line)
-                        errs.append(line)
+                        errs[k][(i, j)] = err
                     else:
                         self.log.debug(line)
 
