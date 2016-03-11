@@ -19,13 +19,13 @@ class DerivativeChecker(object):
     implemented in an optimization model.
     """
 
-    def __init__(self, nlp, x, **kwargs):
+    def __init__(self, model, x, **kwargs):
         u"""Initialize a :class:`DerivativeChecker` instance.
 
         :parameters:
-            :nlp: a `NLPModel` instance
-            :x:   the point about which we are checking derivatives.
-                  See the documentation of :meth:`check` for options.
+            :model: a `NLPModel` instance
+            :x:     the point about which we are checking derivatives.
+                    See the documentation of :meth:`check` for options.
 
         :keywords:
             :tol:         tolerance under which derivatives are considered
@@ -39,12 +39,12 @@ class DerivativeChecker(object):
         self.h = self.step * (1 + norm(x, 1))
 
         # Setup the logger. Install a NullHandler if no output needed.
-        logger_name = kwargs.get('logger_name', 'nlpy.der')
+        logger_name = kwargs.get('logger_name', 'model.der')
         self.log = logging.getLogger(logger_name)
         self.log.addHandler(logging.NullHandler())
         self.log.propagate = False
 
-        self.nlp = nlp
+        self.model = model
         self.x = x.copy()
         self.grad_errs = []
         self.jac_errs = []
@@ -77,8 +77,8 @@ class DerivativeChecker(object):
         """
         grad = kwargs.get('grad', True)
         hess = kwargs.get('hess', True)
-        jac = kwargs.get('jac', True) if self.nlp.ncon > 0 else False
-        chess = kwargs.get('chess', True) if self.nlp.ncon > 0 else False
+        jac = kwargs.get('jac', True) if self.model.ncon > 0 else False
+        chess = kwargs.get('chess', True) if self.model.ncon > 0 else False
         cheap = kwargs.get('cheap_check', False)
 
         self.log.debug('Gradient checking')
@@ -99,15 +99,15 @@ class DerivativeChecker(object):
 
     def cheap_check_obj_gradient(self):
         """Check objective derivative along a random direction."""
-        n = self.nlp.n
-        fx = self.nlp.obj(self.x)
-        gx = self.nlp.grad(self.x)
+        n = self.model.n
+        fx = self.model.obj(self.x)
+        gx = self.model.grad(self.x)
 
         dx = np.random.standard_normal(n)
         dx /= norm(dx)
         xph = self.x.copy()
         xph += self.step * dx
-        dfdx = (self.nlp.obj(xph) - fx) / self.step  # estimate
+        dfdx = (self.model.obj(xph) - fx) / self.step  # estimate
         gtdx = np.dot(gx, dx)                        # expected
         err = max(abs(dfdx - gtdx)/(1 + abs(gtdx)),
                   abs(dfdx - gtdx)/(1 + abs(dfdx)))
@@ -124,9 +124,10 @@ class DerivativeChecker(object):
 
     def check_obj_gradient(self):
         """Check objective gradient using centered finite differences."""
-        n = self.nlp.n
-        self.nlp.obj(self.x)
-        gx = self.nlp.grad(self.x)
+        model = self.model
+        n = model.n
+        model.obj(self.x)
+        gx = model.grad(self.x)
         err = np.empty(n)
 
         self.log.debug('Objective gradient')
@@ -138,7 +139,7 @@ class DerivativeChecker(object):
         for i in xrange(n):
             xph[i] += self.step
             xmh[i] -= self.step
-            dfdxi = (self.nlp.obj(xph) - self.nlp.obj(xmh)) / (2 * self.step)
+            dfdxi = (model.obj(xph) - model.obj(xmh)) / (2 * self.step)
             err[i] = abs(gx[i] - dfdxi)/max(1, abs(gx[i]))
             xph[i] = xmh[i] = self.x[i]
 
@@ -153,8 +154,9 @@ class DerivativeChecker(object):
 
     def check_obj_hessian(self):
         """Check objective Hessian using centered finite differences."""
-        n = self.nlp.n
-        Hx = self.nlp.hess(self.x)
+        model = self.model
+        n = model.n
+        Hx = model.hess(self.x)
         errs = []
 
         self.log.debug('Objective Hessian')
@@ -165,7 +167,7 @@ class DerivativeChecker(object):
         for i in xrange(n):
             xph[i] += self.step
             xmh[i] -= self.step
-            dgdx = (self.nlp.grad(xph) - self.nlp.grad(xmh)) / (2 * self.step)
+            dgdx = (model.grad(xph) - model.grad(xmh)) / (2 * self.step)
             xph[i] = xmh[i] = self.x[i]
             for j in range(i + 1):
                 dgjdxi = dgdx[j]
@@ -182,12 +184,13 @@ class DerivativeChecker(object):
 
     def check_con_jacobian(self):
         """Check constraints Jacobian using centered finite differences."""
-        n = self.nlp.n
-        m = self.nlp.m
+        model = self.model
+        n = model.n
+        m = model.m
         if m == 0:
             return []   # Problem is unconstrained.
 
-        Jx = self.nlp.jac(self.x)
+        Jx = model.jac(self.x)
         errs = []
 
         self.log.debug('Constraints Jacobian')
@@ -198,7 +201,7 @@ class DerivativeChecker(object):
         for i in xrange(n):
             xph[i] += self.step
             xmh[i] -= self.step
-            dcdx = (self.nlp.cons(xph) - self.nlp.cons(xmh)) / (2 * self.step)
+            dcdx = (model.cons(xph) - model.cons(xmh)) / (2 * self.step)
             xph[i] = xmh[i] = self.x[i]
             for j in range(m):
                 dcjdxi = dcdx[j]
@@ -215,8 +218,8 @@ class DerivativeChecker(object):
 
     def check_con_hessians(self):
         """Check constraints Hessians using centered finite differences."""
-        n = self.nlp.n
-        m = self.nlp.m
+        n = self.model.n
+        m = self.model.m
         errs = []
 
         self.log.debug('Constraints Hessians')
@@ -227,15 +230,15 @@ class DerivativeChecker(object):
         xmh = self.x.copy()
         for k in range(m):
             y[k] = -1
-            Hk = self.nlp.hess(self.x, y, obj_weight=0)
+            Hk = self.model.hess(self.x, y, obj_weight=0)
             y[k] = 0
 
             # Check second partial derivatives in turn.
             for i in xrange(n):
                 xph[i] += self.step
                 xmh[i] -= self.step
-                dgdx = (self.nlp.igrad(k, xph) -
-                        self.nlp.igrad(k, xmh)) / (2 * self.step)
+                dgdx = (self.model.igrad(k, xph) -
+                        self.model.igrad(k, xmh)) / (2 * self.step)
                 xph[i] = xmh[i] = self.x[i]
                 for j in xrange(i + 1):
                     dgjdxi = dgdx[j]
