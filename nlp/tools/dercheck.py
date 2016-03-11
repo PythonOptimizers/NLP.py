@@ -39,7 +39,7 @@ class DerivativeChecker(object):
         self.h = self.step * (1 + norm(x, 1))
 
         # Setup the logger. Install a NullHandler if no output needed.
-        logger_name = kwargs.get('logger_name', 'model.der')
+        logger_name = kwargs.get('logger_name', 'nlp.der')
         self.log = logging.getLogger(logger_name)
         self.log.addHandler(logging.NullHandler())
         self.log.propagate = False
