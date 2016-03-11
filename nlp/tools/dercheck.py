@@ -159,6 +159,11 @@ class DerivativeChecker(object):
         Hx = model.hess(self.x)
         errs = []
 
+        if not hasattr(Hx, "__getitem__"):
+            # Extract Hessian values via dot products.
+            ei = np.zeros(n)
+            ej = np.zeros(n)
+
         self.log.debug('Objective Hessian')
 
         # Check second partial derivatives in turn.
@@ -169,16 +174,32 @@ class DerivativeChecker(object):
             xmh[i] -= self.step
             dgdx = (model.grad(xph) - model.grad(xmh)) / (2 * self.step)
             xph[i] = xmh[i] = self.x[i]
+
+            if not hasattr(Hx, "__getitem__"):
+                ei[i] = 1
+
             for j in range(i + 1):
                 dgjdxi = dgdx[j]
-                err = abs(Hx[i, j] - dgjdxi)/max(1, abs(Hx[i, j]))
 
-                line = self.d2fmt % (0, i, j, Hx[i, j], dgjdxi, err)
+                if hasattr(Hx, "__getitem__"):
+                    Hxij = Hx[i, j]
+                else:
+                    ej[j] = 1
+                    Hxij = np.dot(ei, Hx * ej)
+                    ej[j] = 0
+
+                err = abs(Hxij - dgjdxi)/max(1, abs(Hxij))
+
+                line = self.d2fmt % (0, i, j, Hxij, dgjdxi, err)
                 if err > self.tol:
                     self.log.warn(line)
                     errs.append(line)
                 else:
                     self.log.debug(line)
+
+            if not hasattr(Hx, "__getitem__"):
+                # Restore ei before the next iteration.
+                ei[i] = 0
 
         return errs
 
@@ -193,6 +214,11 @@ class DerivativeChecker(object):
         Jx = model.jac(self.x)
         errs = []
 
+        if not hasattr(Jx, "__getitem__"):
+            # Extract Jacobian values via dot products.
+            ei = np.zeros(n)
+            ej = np.zeros(m)
+
         self.log.debug('Constraints Jacobian')
 
         # Check partial derivatives of each constraint in turn.
@@ -203,16 +229,32 @@ class DerivativeChecker(object):
             xmh[i] -= self.step
             dcdx = (model.cons(xph) - model.cons(xmh)) / (2 * self.step)
             xph[i] = xmh[i] = self.x[i]
+
+            if not hasattr(Jx, "__getitem__"):
+                ei[i] = 1
+
             for j in range(m):
                 dcjdxi = dcdx[j]
-                err = abs(Jx[j, i] - dcjdxi) / max(1, abs(Jx[j, i]))
 
-                line = self.d1fmt % (j + 1, i, Jx[j, i], dcjdxi, err)
+                if hasattr(Jx, "__getitem__"):
+                    Jxji = Jx[j, i]
+                else:
+                    ej[j] = 1
+                    Jxji = np.dot(ej, Jx * ei)
+                    ej[j] = 0
+
+                err = abs(Jxji - dcjdxi) / max(1, abs(Jxji))
+
+                line = self.d1fmt % (j + 1, i, Jxji, dcjdxi, err)
                 if err > self.tol:
                     self.log.warn(line)
                     errs.append(line)
                 else:
                     self.log.debug(line)
+
+            if not hasattr(Jx, "__getitem__"):
+                # Restore ei before the next iteration.
+                ei[i] = 0
 
         return errs
 
@@ -233,6 +275,11 @@ class DerivativeChecker(object):
             Hk = self.model.hess(self.x, y, obj_weight=0)
             y[k] = 0
 
+            if not hasattr(Hk, "__getitem__"):
+                # Extract Hessian values via dot products.
+                ei = np.zeros(n)
+                ej = np.zeros(n)
+
             # Check second partial derivatives in turn.
             for i in xrange(n):
                 xph[i] += self.step
@@ -242,13 +289,25 @@ class DerivativeChecker(object):
                 xph[i] = xmh[i] = self.x[i]
                 for j in xrange(i + 1):
                     dgjdxi = dgdx[j]
-                    err = abs(Hk[i, j] - dgjdxi) / max(1, abs(Hk[i, j]))
 
-                    line = self.d2fmt % (k + 1, i, j, Hk[i, j], dgjdxi, err)
+                    if hasattr(Hk, "__getitem__"):
+                        Hkij = Hk[i, j]
+                    else:
+                        ej[j] = 1
+                        Hkij = np.dot(ei, Hk * ej)
+                        ej[j] = 0
+
+                    err = abs(Hkij - dgjdxi) / max(1, abs(Hkij))
+
+                    line = self.d2fmt % (k + 1, i, j, Hkij, dgjdxi, err)
                     if err > self.tol:
                         self.log.warn(line)
                         errs.append(line)
                     else:
                         self.log.debug(line)
+
+                if not hasattr(Hk, "__getitem__"):
+                    # Restore ei before the next iteration.
+                    ei[i] = 0
 
         return errs

@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Simple AMPL driver for the derivative checker."""
 
-from nlpy.model import PySparseAmplModel
-from nlpy.tools import DerivativeChecker
+from nlp.model.pysparsemodel import PySparseAmplModel
+from nlp.tools.dercheck import DerivativeChecker
 
 import logging
 import sys
@@ -11,8 +11,8 @@ if len(sys.argv) == 1:
     raise ValueError("Please supply problem name as argument")
 
 # Create root logger.
-log = logging.getLogger('nlpy.der')
-level = logging.INFO
+log = logging.getLogger('nlp.der')
+level = logging.DEBUG
 log.setLevel(level)
 fmt = logging.Formatter('%(name)-10s %(levelname)-8s %(message)s')
 hndlr = logging.StreamHandler(sys.stdout)
