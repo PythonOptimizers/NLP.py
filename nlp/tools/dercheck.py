@@ -245,14 +245,14 @@ class DerivativeChecker(object):
         for i in xrange(n):  # i = variable.
             xph[i] += self.step
             xmh[i] -= self.step
-            dcdx = (model.cons(xph) - model.cons(xmh)) / (2 * self.step)
+            dcdxi = (model.cons(xph) - model.cons(xmh)) / (2 * self.step)
             xph[i] = xmh[i] = self.x[i]
 
             if not hasattr(Jx, "__getitem__"):
                 ei[i] = 1
 
-                dcjdxi = dcdx[j]
             for j in xrange(m):  # j = constraint.
+                dcjdxi = dcdxi[j]
 
                 if hasattr(Jx, "__getitem__"):
                     Jxji = Jx[j, i]
