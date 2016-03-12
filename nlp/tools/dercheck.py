@@ -153,7 +153,7 @@ class DerivativeChecker(object):
             xph[i] += self.step
             xmh[i] -= self.step
             dfdxi = (model.obj(xph) - model.obj(xmh)) / (2 * self.step)
-            err = abs(gx[i] - dfdxi)/max(1, abs(gx[i]))
+            err = abs(gx[i] - dfdxi)/max(1, abs(dfdxi))
             xph[i] = xmh[i] = self.x[i]
 
             line = self.d1fmt % (0, i, gx[i], dfdxi, err)
@@ -206,7 +206,7 @@ class DerivativeChecker(object):
                     Hxij = np.dot(ei, Hx * ej)
                     ej[j] = 0
 
-                err = abs(Hxij - dgjdxi)/max(1, abs(Hxij))
+                err = abs(Hxij - dgjdxi)/max(1, abs(dgjdxi))
 
                 line = self.d2fmt % (0, i, j, Hxij, dgjdxi, err)
                 if err > self.tol:
@@ -261,7 +261,7 @@ class DerivativeChecker(object):
                     Jxji = np.dot(ej, Jx * ei)
                     ej[j] = 0
 
-                err = abs(Jxji - dcjdxi) / max(1, abs(Jxji))
+                err = abs(Jxji - dcjdxi) / max(1, abs(dcjdxi))
 
                 line = self.d1fmt % (j + 1, i, Jxji, dcjdxi, err)
                 if err > self.tol:
@@ -321,7 +321,7 @@ class DerivativeChecker(object):
                         Hkij = np.dot(ei, Hk * ej)
                         ej[j] = 0
 
-                    err = abs(Hkij - dgjdxi) / max(1, abs(Hkij))
+                    err = abs(Hkij - dgjdxi) / max(1, abs(dgjdxi))
 
                     line = self.d2fmt % (k + 1, i, j, Hkij, dgjdxi, err)
                     if err > self.tol:
