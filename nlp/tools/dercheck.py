@@ -177,6 +177,10 @@ class DerivativeChecker(object):
         Hx = model.hess(self.x)
         errs = {}
 
+        if isinstance(Hx, tuple):
+            self.log.warn("Hessian format not supported, using operator")
+            Hx = model.hop(self.x)
+
         if not hasattr(Hx, "__getitem__"):
             # Extract Hessian values via dot products.
             ei = np.zeros(n)
@@ -231,6 +235,10 @@ class DerivativeChecker(object):
 
         Jx = model.jac(self.x)
         errs = {}
+
+        if isinstance(Jx, tuple):
+            self.log.error("Jacobian format not supported, using operator")
+            Jx = model.jop(self.x)
 
         if not hasattr(Jx, "__getitem__"):
             # Extract Jacobian values via dot products.
@@ -298,6 +306,10 @@ class DerivativeChecker(object):
             Hk = self.model.hess(self.x, y, obj_weight=0)
             y[k] = 0
             errs[k] = {}
+
+            if isinstance(Hk, tuple):
+                self.log.error("Hessian format not supported, using operator")
+                Hk = self.model.hop(self.x, y, obj_weight=0)
 
             if not hasattr(Hk, "__getitem__"):
                 # Extract Hessian values via dot products.
