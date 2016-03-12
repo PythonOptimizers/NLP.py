@@ -196,7 +196,7 @@ class DerivativeChecker(object):
             if not hasattr(Hx, "__getitem__"):
                 ei[i] = 1
 
-            for j in range(i + 1):
+            for j in xrange(i + 1):
                 dgjdxi = dgdx[j]
 
                 if hasattr(Hx, "__getitem__"):
@@ -242,7 +242,7 @@ class DerivativeChecker(object):
         # Check partial derivatives of each constraint in turn.
         xph = self.x.copy()
         xmh = self.x.copy()
-        for i in xrange(n):
+        for i in xrange(n):  # i = variable.
             xph[i] += self.step
             xmh[i] -= self.step
             dcdx = (model.cons(xph) - model.cons(xmh)) / (2 * self.step)
@@ -251,8 +251,8 @@ class DerivativeChecker(object):
             if not hasattr(Jx, "__getitem__"):
                 ei[i] = 1
 
-            for j in range(m):
                 dcjdxi = dcdx[j]
+            for j in xrange(m):  # j = constraint.
 
                 if hasattr(Jx, "__getitem__"):
                     Jxji = Jx[j, i]
@@ -293,7 +293,7 @@ class DerivativeChecker(object):
         y = np.zeros(m)
         xph = self.x.copy()
         xmh = self.x.copy()
-        for k in range(m):
+        for k in xrange(m):
             y[k] = -1
             Hk = self.model.hess(self.x, y, obj_weight=0)
             y[k] = 0
