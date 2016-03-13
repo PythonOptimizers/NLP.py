@@ -74,6 +74,43 @@ class TrustRegion(object):
         self.radius = self.radius0
 
 
+class GeneralizedTrustRegion(TrustRegion):
+    """A more general trust-region management class."""
+
+    def __init__(self, **kwargs):
+        """Initialize an object allowing management of a trust region.
+
+        :keywords:
+            :radius: Initial trust-region radius (default: 1.0)
+        """
+        self.radius = self.radius0 = kwargs.get('radius', 1.0)
+        self.radius_max = 1.0e+10
+        self.eta0 = 1e-4
+        self.eta1 = 0.25
+        self.eta2 = 0.75
+        self.gamma1 = 0.25
+        self.gamma2 = 0.5
+        self.gamma3 = 4.0
+        self.eps = np.finfo(np.double).eps  # Machine epsilon.
+
+    def update_radius(self, ratio, step_norm, alpha):
+        """Update the trust-region radius."""
+        if ratio <= self.eta0:
+            self.radius = min(max(alpha, self.gamma1) * step_norm,
+                              self.gamma2 * self.radius)
+        elif ratio <= self.eta1:
+            self.radius = max(self.gamma1 * self.radius,
+                              min(alpha * step_norm,
+                                  self.gamma2 * self.radius))
+        elif ratio <= self.eta2:
+            self.radius = max(self.gamma1 * self.radius,
+                              min(alpha * step_norm,
+                                  self.gamma3 * self.radius))
+        else:
+            self.radius = max(self.radius, min(alpha * step_norm,
+                                               self.gamma3 * self.radius))
+
+
 class TrustRegionSolver(object):
     """A generic class for implementing solvers for the trust-region subproblem.
 

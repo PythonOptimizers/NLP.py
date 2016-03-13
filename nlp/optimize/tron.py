@@ -1,66 +1,15 @@
 """Trust-Region Method for Bound-Constrained Programming."""
 
 from pykrylov.linop import SymmetricallyReducedLinearOperator as ReducedHessian
-from pykrylov.linop import LinearOperator
-from nlp.tr.trustregion import TrustRegion
+from nlp.tr.trustregion import GeneralizedTrustRegion
 from nlp.tools import norms
 from nlp.tools.utils import where
 from nlp.tools.timing import cputime
 from nlp.tools.exceptions import UserExitRequest
 import numpy as np
 import logging
-from math import sqrt
 
 __docformat__ = 'restructuredtext'
-
-
-class TRONTrustRegion(TrustRegion):
-    """A trust-region management class specially taylored for TRON.
-
-    Subclassed from `TrustRegion`.
-    """
-
-    def __init__(self, **kwargs):
-        """Initialize an object allowing management of a trust region.
-
-        :keywords:
-            :radius: Initial trust-region radius (default: 1.0)
-        """
-        self.radius = self.radius0 = kwargs.get('radius', 1.0)
-        self.radius_max = 1.0e+10
-        self.eta0 = 1e-4
-        self.eta1 = 0.25
-        self.eta2 = 0.75
-        self.gamma1 = 0.25
-        self.gamma2 = 0.5
-        self.gamma3 = 4.0
-        self.eps = np.finfo(np.double).eps  # Machine epsilon.
-
-    def update_radius(self, ratio, step_norm, alpha):
-        """Update the trust-region radius.
-
-        The rule implemented by this method is:
-
-        radius = gamma1 * step_norm      if ared/pred <  eta1
-        radius = gamma2 * radius         if ared/pred >= eta2
-        radius unchanged otherwise,
-
-        where ared/pred is the quotient computed by :meth:`ratio`.
-        """
-        if ratio <= self.eta0:
-            self.radius = min(max(alpha, self.gamma1) * step_norm,
-                              self.gamma2 * self.radius)
-        elif ratio <= self.eta1:
-            self.radius = max(self.gamma1 * self.radius,
-                              min(alpha * step_norm,
-                                  self.gamma2 * self.radius))
-        elif ratio <= self.eta2:
-            self.radius = max(self.gamma1 * self.radius,
-                              min(alpha * step_norm,
-                                  self.gamma3 * self.radius))
-        else:
-            self.radius = max(self.radius, min(alpha * step_norm,
-                                               self.gamma3 * self.radius))
 
 
 class TRONFramework(object):
@@ -88,7 +37,7 @@ class TRONFramework(object):
                            iteration                          (``None``)
         """
         self.model = model
-        self.TR = TRONTrustRegion()
+        self.TR = GeneralizedTrustRegion()
         self.iter = 0         # Iteration counter
         self.total_cgiter = 0
         self.x = kwargs.get('x0', self.model.x0.copy())
@@ -141,8 +90,8 @@ class TRONFramework(object):
         """Project x into the bounds [xl, xu]."""
         return np.maximum(np.minimum(x, xu), xl)
 
-    def gradient_projection_step(self, x, d, xl, xu):
-        """Compute the projected gradient of f(x) into the feasible box.
+    def projected_step(self, x, d, xl, xu):
+        """Compute the projected step x + d into the feasible box.
 
         Feasible box is defined as
 
@@ -217,7 +166,7 @@ class TRONFramework(object):
 
         # Evaluate the initial alpha and decide if the algorithm
         # must interpolate or extrapolate.
-        s = self.gradient_projection_step(x, -alpha * g, xl, xu)
+        s = self.projected_step(x, -alpha * g, xl, xu)
         if norms.norm2(s) > delta:
             interp = True
         else:
@@ -231,7 +180,7 @@ class TRONFramework(object):
             search = True
             while search:
                 alpha = interpf * alpha
-                s = self.gradient_projection_step(x, -alpha * g, xl, xu)
+                s = self.projected_step(x, -alpha * g, xl, xu)
                 if norms.norm2(s) <= delta:
                     Hs = H * s
                     gts = np.dot(g, s)
@@ -242,7 +191,7 @@ class TRONFramework(object):
             alphas = alpha
             while search and alpha <= brptmax:
                 alpha = extrapf * alpha
-                s = self.gradient_projection_step(x, -alpha * g, xl, xu)
+                s = self.projected_step(x, -alpha * g, xl, xu)
                 if norms.norm2(s) <= delta:
                     Hs = H * s
                     gts = np.dot(g, s)
@@ -254,7 +203,7 @@ class TRONFramework(object):
 
             # Recover the last successful step.
             alpha = alphas
-            s = self.gradient_projection_step(x, -alpha * g, xl, xu)
+            s = self.projected_step(x, -alpha * g, xl, xu)
         return (s, alpha)
 
     def trqsol(self, x, p, delta):
@@ -284,7 +233,7 @@ class TRONFramework(object):
             sigma = 0
         return sigma
 
-    def truncatedcg(self, g, H, delta, tol, stol, itermax):
+    def truncated_cg(self, g, H, delta, tol, stol, itermax):
         """Preconditioned conjugate-gradient method.
 
         Given a sparse symmetric matrix H in compressed column storage,
@@ -423,13 +372,7 @@ class TRONFramework(object):
         iters = 0
         for i in range(0, len(x)):
             # Determine the free variables at the current minimizer.
-            nfree = 0
-            free_vars = []
-            for j in range(0, len(x)):
-                if xl[j] < x[j] and x[j] < xu[j]:
-                    nfree += 1
-                    free_vars.append(j)
-
+            free_vars = where((x > xl) & (x < xu))
             nfree = len(free_vars)
 
             # Exit if there are no free constraints.
@@ -450,8 +393,8 @@ class TRONFramework(object):
             tol = cgtol * gfnorm
             stol = 0
 
-            (w, trpcg_iters, infotr) = self.truncatedcg(gfree, ZHZ, delta,
-                                                        tol, stol, 1000)
+            (w, trpcg_iters, infotr) = self.truncated_cg(gfree, ZHZ, delta,
+                                                         tol, stol, 1000)
             iters += trpcg_iters
 
             # Use a projected search to obtain the next iterate
@@ -530,7 +473,7 @@ class TRONFramework(object):
             # decrease condition.
             nsteps += 1
 
-            s = self.gradient_projection_step(x, alpha * d, xl, xu)
+            s = self.projected_step(x, alpha * d, xl, xu)
             Hs = H * s
             gts = np.dot(g, s)
             q = .5 * np.dot(Hs, s) + gts
@@ -547,7 +490,7 @@ class TRONFramework(object):
             alpha = brptmin
 
         # Compute the final iterate and step.
-        s = self.gradient_projection_step(x, alpha * d, xl, xu)
+        s = self.projected_step(x, alpha * d, xl, xu)
         x = self.project(x + alpha * s, xl, xu)
         return (x, s)
 
@@ -560,7 +503,6 @@ class TRONFramework(object):
         pg[lower] = np.minimum(g[lower], 0)
         pg[upper] = np.maximum(g[upper], 0)
 
-        gpnorm2 = norms.norm2(pg[where(xl != xu)])
         return norms.norm2(pg[where(xl != xu)])
 
     def solve(self):
@@ -586,7 +528,7 @@ class TRONFramework(object):
         self.gnorm = norms.norm2(self.g)
         self.g0 = self.gnorm
         cgtol = self.cgtol
-        cgiter = 0
+        cg_iter = 0
         cgitermax = model.n
 
         # Initialize the trust region radius
@@ -643,7 +585,7 @@ class TRONFramework(object):
             # Compute the predicted reduction.
             m = np.dot(s, self.g) + .5 * np.dot(s, H * s)
 
-            # compute the function
+            # Compute the function
             x_trial = self.x + s
             f_trial = model.obj(x_trial)
             self.feval += 1
