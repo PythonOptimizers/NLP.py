@@ -313,6 +313,9 @@ class NLPModel(object):
             :g_max: Maximum allowed gradient. Default: :attr:`g_max = 1e2`.
             :reset: Set to `True` to unscale the problem.
         """
+        if self.m == 0:
+            return
+
         # Remove scaling if requested
         if reset:
             self.scale_con = None
@@ -358,6 +361,9 @@ class NLPModel(object):
 
         If `c` is given, it should conform to :meth:`cons_pos`.
         """
+        if self.m == 0:
+            return np.zeros(0)
+
         # Shortcuts.
         eC = self.equalC
         m = self.m
@@ -849,3 +855,35 @@ class LPModel(QPModel):
     def grad(self, x):
         """Evaluate the objective gradient at x."""
         return self.c
+
+
+class BoundConstrainedNLPModel(NLPModel):
+    """Generic class to represent a bound-constrained problem."""
+
+    def __init__(self, nvar, **kwargs):
+        """Initialize a bound-constrained problem with ``nvar`` variables.
+
+        The bounds may be specified via the keyword arguments ``Lvar``
+        and ``Uvar``. See the documentation of :class:`NLPModel` for more
+        information.
+        """
+        # Discard options related to constrained problems.
+        kwargs.pop('m', None)
+        kwargs.pop('ncon', None)
+        kwargs.pop('Lcon', None)
+        kwargs.pop('Ucon', None)
+        super(BoundConstrainedNLPModel, self).__init__(nvar, **kwargs)
+
+
+class UnconstrainedNLPModel(BoundConstrainedNLPModel):
+    """Generic class to represent an unconstrained problem."""
+
+    def __init__(self, nvar, **kwargs):
+        """Initialize an unconstrained problem with ``nvar`` variables.
+
+        See the documentation of :class:`NLPModel` for more information.
+        """
+        # Discard options related to bound-constrained problems.
+        kwargs.pop('Lvar', None)
+        kwargs.pop('Uvar', None)
+        super(UnconstrainedNLPModel, self).__init__(nvar, **kwargs)
