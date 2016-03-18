@@ -1,5 +1,5 @@
 # Helper for nlp.model tests
-from numpy.testing import *
+
 import numpy as np
 import importlib
 
@@ -101,12 +101,12 @@ class GenericTest(object):
         data = self.get_expected()
         if self.model.m > 0:
             (f, c, l) = get_values(self.model)
-            assert_allclose(c, data.expected_c)
-            assert_almost_equal(l, data.expected_l)
+            assert(np.allclose(c, data.expected_c))
+            assert(abs(l - data.expected_l) <= 1.0e-6 * abs(data.expected_l))
         else:
             f = get_values(self.model)
 
-        assert_almost_equal(f, data.expected_f)
+        assert(abs(f - data.expected_f) <= 1.0e-6 * abs(data.expected_f))
 
         if self.model.m > 0:
             (g, H, Hv, J, Jv, JTw) = self.get_derivatives(self.model)

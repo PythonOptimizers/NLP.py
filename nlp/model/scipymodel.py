@@ -34,12 +34,7 @@ class SciPyNLPModel(NLPModel):
 
 
 class SciPyAmplModel(AmplModel):
-    """`AmplModel` with sparse matrices n SciPy coordinate (COO) format.
-
-    The `AmplModel`'s :meth:`jac` and :meth:`hess` methods
-    should return that sparse Jacobian and Hessian in coordinate format:
-    (vals, rows, cols).
-    """
+    """`AmplModel` with sparse matrices n SciPy coordinate (COO) format."""
 
     # MRO: 1. SciPyAmplModel
     #      2. AmplModel
@@ -65,25 +60,20 @@ class SciPyAmplModel(AmplModel):
                              shape=(self.ncon, self.nvar))
 
     def hess(self, *args, **kwargs):
-        """Evaluate Lagrangian Hessian at (x, z).
-
-        AMPL only returns lower triangular part of the Hessian and
-        `scipy.coo_matrix` doesn't have a `symmetric` attributes, so we need to
-        copy the upper part of the matrix
-        """
+        """Evaluate Lagrangian Hessian at (x, z)."""
         l_vals, l_rows, l_cols = super(SciPyAmplModel, self).hess(*args,
                                                                   **kwargs)
 
-        indices = []
-        for i in xrange(len(l_rows)):
-            if l_rows[i] == l_cols[i]:
-                indices.append(i)
+        # AMPL only returns the upper triangular part of the Hessian and
+        # `scipy.coo_matrix` doesn't have a `symmetric` attribute, so we
+        # need to copy the upper part of the matrix
+        diag_idx = np.where(l_rows == l_cols)
 
-        # stricly upper triangular part of H is obtained by switching rows and
+        # strict upper triangle of H is obtained by switching rows and
         # cols indices and removing values on the diagonal.
-        u_rows = np.delete(l_cols, indices)  # a copy is done
-        u_cols = np.delete(l_rows, indices)
-        u_vals = np.delete(l_vals, indices)
+        u_rows = np.delete(l_cols, diag_idx)  # creates a copy
+        u_cols = np.delete(l_rows, diag_idx)
+        u_vals = np.delete(l_vals, diag_idx)
 
         H = sp.coo_matrix((np.concatenate((l_vals, u_vals)),
                           (np.concatenate((l_rows, u_rows)),
@@ -97,7 +87,7 @@ class SciPyAmplModel(AmplModel):
 
 
 class SciPySlackModel(SlackModel):
-    """SlackModel in wich matrices are SciPy matrices.
+    """`SlackModel` with sparse matrices n SciPy coordinate (COO) format.
 
     :keywords:
         :model:  Original model to be transformed into a slack form.
@@ -106,7 +96,7 @@ class SciPySlackModel(SlackModel):
 
     def __init__(self, model, **kwargs):
         if not isinstance(model, NLPModel):
-            raise TypeError("The model in `model` should be a SciPyNLPModel"
+            raise TypeError("The model in `model` should be a `SciPyNLPModel`"
                             "or a derived class of it.")
         super(SciPySlackModel, self).__init__(model)
 
