@@ -8,11 +8,11 @@ using PyMa27 or PyMa57.
 
 D. Orban, Montreal 2009-2011.
 """
-from nlp.model.snlp import SlackFramework
+from nlp.model.snlp import SlackModel
 try:                            # To solve augmented systems
-    from hsl.solver.pyma57 import PyMa57Solver as LBLContext
+    from hsl.solvers.pyma57 import PyMa57Solver as LBLContext
 except:
-    from hsl.solver.pyma27 import PyMa27Solver as LBLContext
+    from hsl.solvers.pyma27 import PyMa27Solver as LBLContext
 from hsl.scaling.mc29 import mc29ad
 from pykrylov.linop import PysparseLinearOperator
 from nlp.tools.norms import norm2, norm_infty, normest
@@ -35,7 +35,7 @@ class RegQPInteriorPointSolver(object):
     where Q is a symmetric positive semi-definite matrix, the variables
     x are the original problem variables and s are slack variables. Any
     quadratic program may be converted to the above form by instantiation
-    of the `SlackFramework` class. The conversion to the slack formulation
+    of the `SlackModel` class. The conversion to the slack formulation
     is mandatory in this implementation.
 
     The method is a variant of Mehrotra's predictor-corrector method where
@@ -83,8 +83,8 @@ class RegQPInteriorPointSolver(object):
 
             :verbose: Turn on verbose mode (default `False`).
         """
-        if not isinstance(qp, SlackFramework):
-            msg = 'Input problem must be an instance of SlackFramework'
+        if not isinstance(qp, SlackModel):
+            msg = 'Input problem must be an instance of SlackModel'
             raise ValueError(msg)
 
         # Grab logger if one was configured.
