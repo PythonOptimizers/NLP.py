@@ -31,11 +31,11 @@ class LineSearch(object):
         """
         self.__linemodel = linemodel
         self.__name = name
-        self.__value = kwargs.get("value", linemodel.obj(0))
-        self.__slope = kwargs.get("slope", linemodel.grad(0))
+        self._value = kwargs.get("value", linemodel.obj(0))
+        self._slope = kwargs.get("slope", linemodel.grad(0))
         self.check_slope(self.slope)
 
-        self._trial_value = self.__value
+        self._trial_value = self._value
         self._step = max(kwargs.get("step", 1.0), 0)
 
         eps = np.finfo(np.double).eps
@@ -59,7 +59,7 @@ class LineSearch(object):
     @property
     def value(self):
         """Return initial merit function value."""
-        return self.__value
+        return self._value
 
     @property
     def step(self):
@@ -84,7 +84,7 @@ class LineSearch(object):
     @property
     def slope(self):
         """Return initial merit function slope in search direction."""
-        return self.__slope
+        return self._slope
 
     def check_slope(self, slope):
         if slope >= 0.0:
