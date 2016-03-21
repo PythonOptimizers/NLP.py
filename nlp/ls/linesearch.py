@@ -142,7 +142,6 @@ class ArmijoLineSearch(LineSearch):
         return (self.trial_value <= self.value + self.step * self.ftol * self.slope)
 
     def next(self):
-        """Compute a steplength `t` satisfying the Armijo condition."""
         self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
         self._trial_value = self.linemodel.obj(self.step)
 
