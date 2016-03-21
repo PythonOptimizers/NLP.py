@@ -146,7 +146,7 @@ class ArmijoLineSearch(LineSearch):
         self._trial_value = self.linemodel.obj(self.step)
 
         if self._test():
-            raise StopIteration
+            raise StopIteration()
 
         self._step /= self.factor
         if self.step < self.stepmin:
