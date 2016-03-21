@@ -113,24 +113,25 @@ class ArmijoLineSearch(LineSearch):
 
         The search stops as soon as a step size t is found such that
 
-            ϕ(t) <= ϕ(0) + t * β * ϕ'(0)
+            ϕ(t) <= ϕ(0) + t * ftol * ϕ'(0)
 
-        where 0 < β < ½ and ϕ'(0) is the directional derivative of
+        where 0 < ftol < 1 and ϕ'(0) is the directional derivative of
         a merit function f in the descent direction d. true.
 
         :keywords:
-            :beta: Value of β (default: 1.0e-4)
+            :ftol: Value of ftol (default: 1.0e-4)
             :factor: Amount by which to reduce the steplength
                      during the backtracking (default: 1.5).
         """
         super(ArmijoLineSearch, self).__init__(*args, **kwargs)
-        self.__beta = max(min(kwargs.get("beta", 1.0e-4), 0.5), 1.0e-10)
+        sqeps = sqrt(np.finfo(np.double).eps)
+        self.__ftol = max(min(kwargs.get("ftol", 1.0e-4), 1 - sqeps), sqeps)
         self.__factor = max(min(kwargs.get("factor", 1.5), 100), 1.001)
         return
 
     @property
-    def beta(self):
-        return self.__beta
+    def ftol(self):
+        return self.__ftol
 
     @property
     def factor(self):
@@ -138,7 +139,7 @@ class ArmijoLineSearch(LineSearch):
 
     def _test(self):
         """Test Armijo condition."""
-        return (self.trial_value <= self.value + self.step * self.beta * self.slope)
+        return (self.trial_value <= self.value + self.step * self.ftol * self.slope)
 
     def next(self):
         """Compute a steplength `t` satisfying the Armijo condition."""
