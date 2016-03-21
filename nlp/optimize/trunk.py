@@ -282,9 +282,7 @@ class Trunk(object):
 
             # Print out header, say, every 20 iterations
             if self.iter % 20 == 0:
-                self.log.info(self.hline)
                 self.log.info(self.header)
-                self.log.info(self.hline)
 
             pstatus = step_status if step_status != "Acc" else ""
             self.log.info(self.format % (self.iter, self.f, self.gnorm, cgiter,
