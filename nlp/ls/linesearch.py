@@ -78,7 +78,11 @@ class LineSearch(object):
 
     @property
     def iterate(self):
-        """Return current iterate."""
+        """Return current full-space iterate.
+
+        While not normally needed by the linesearch procedure, it is here so it
+        can be recovered on exit and doesn't need to be recomputed.
+        """
         return self._trial_iterate
 
     @property
