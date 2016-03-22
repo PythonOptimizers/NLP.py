@@ -14,13 +14,14 @@ class StrongWolfeLineSearch(LineSearch):
 
     where 0 < ftol < gtol < 1.
     """
+
     def __init__(self, *args, **kwargs):
         """Instantiate a strong Wolfe linesearch procedure.
 
         :keywords:
             :ftol: constant used in the Armijo condition (1.0e-4)
             :gtol: constant used in the curvature condition (0.9)
-            :xtol: minimal relative step bracket length (1.0e-1)
+            :xtol: minimal relative step bracket length (1.0e-10)
             :lb: initial lower bound of the bracket
             :ub: initial upper bound of the bracket
         """
@@ -32,7 +33,7 @@ class StrongWolfeLineSearch(LineSearch):
         self.__gtol = min(max(kwargs.get("gtol", 0.9),
                               self.ftol + sqeps),
                           1 - sqeps)
-        self.__xtol = kwargs.get("xtol", 1.0e-1)
+        self.__xtol = kwargs.get("xtol", 1.0e-10)
         self._lb = kwargs.get("lb", 0.0)
         self._ub = kwargs.get("ub",
                               max(4 * min(self.step, 1.0),
