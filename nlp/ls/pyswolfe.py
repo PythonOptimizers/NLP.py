@@ -39,11 +39,12 @@ class StrongWolfeLineSearch(LineSearch):
                               max(4 * min(self.step, 1.0),
                                   -0.1 * self.value / self.slope / self.ftol))
 
+        self._trial_slope = self._slope
         self.__task = "START"
         self.__isave = np.empty(2, dtype=np.int32)
         self.__dsave = np.empty(13, dtype=np.double)
 
-        self._step, self._trial_value, self._slope, self.__task, isave, dsave = \
+        self._step, self.__task, self.__isave, self.__dsave = \
             dcsrch(self._step, self._trial_value, self._slope,
                    self.ftol, self.gtol, self.xtol,
                    self.__task, self.lb, self.ub,
@@ -69,14 +70,17 @@ class StrongWolfeLineSearch(LineSearch):
     def ub(self):
         return self._ub
 
+    @property
+    def trial_slope(self):
+        return self._trial_slope
+
     def next(self):
         self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
         self._trial_value = self.linemodel.obj(self.step)
+        self._trial_slope = self.linemodel.grad(self.step)
 
-        self._value = self.linemodel.obj(self.step)
-        self._slope = self.linemodel.grad(self.step)
-        self._step, self._trial_value, self._slope, self.__task, isave, dsave = \
-            dcsrch(self._step, self._trial_value, self._slope,
+        self._step, self.__task, self.__isave, self.__dsave = \
+            dcsrch(self._step, self._trial_value, self._trial_slope,
                    self.ftol, self.gtol, self.xtol,
                    self.__task, self.lb, self.ub,
                    self.__isave, self.__dsave)

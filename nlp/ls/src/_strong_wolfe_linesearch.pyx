@@ -352,7 +352,7 @@ def dcsrch(double stp, double f, double g, double ftol, double gtol, double xtol
 
         # Exit if there are errors on input.
         if task[0:5] == 'ERROR':
-            return stp, f, g, task, isave, dsave
+            return stp, task, isave, dsave
 
         # Initialize local variables.
         brackt = False
@@ -382,7 +382,8 @@ def dcsrch(double stp, double f, double g, double ftol, double gtol, double xtol
         # Save local variables.
         save_local_variables(brackt, <int *> cnp.PyArray_DATA(isave), <double *> cnp.PyArray_DATA(dsave), stage, ginit, gtest, gx, gy,
                              finit, fx, fy, stx, sty, stmin, stmax, width, width1)
-        return stp, f, g, task, isave, dsave
+        return stp, task, isave, dsave
+        # return stp, f, g, task, isave, dsave
 
     else:
 
@@ -431,7 +432,8 @@ def dcsrch(double stp, double f, double g, double ftol, double gtol, double xtol
         # Save local variables.
         save_local_variables(brackt, <int *> cnp.PyArray_DATA(isave), <double *> cnp.PyArray_DATA(dsave), stage, ginit, gtest, gx, gy,
                              finit, fx, fy, stx, sty, stmin, stmax, width, width1)
-        return stp, f, g, task, isave, dsave
+        return stp, task, isave, dsave
+        # return stp, f, g, task, isave, dsave
 
     # A modified function is used to predict the step during the
     # first stage if a lower function value has been obtained but
@@ -490,7 +492,8 @@ def dcsrch(double stp, double f, double g, double ftol, double gtol, double xtol
     # Save local variables.
     save_local_variables(brackt, <int *> cnp.PyArray_DATA(isave), <double *> cnp.PyArray_DATA(dsave), stage, ginit, gtest, gx, gy,
                          finit, fx, fy, stx, sty, stmin, stmax, width, width1)
-    return stp, f, g, task, isave, dsave
+    return stp, task, isave, dsave
+    # return stp, f, g, task, isave, dsave
 
 
 @cython.boundscheck(False)
