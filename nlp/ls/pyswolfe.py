@@ -39,8 +39,6 @@ class StrongWolfeLineSearch(LineSearch):
                               max(4 * min(self.step, 1.0),
                                   -0.1 * self.value / self.slope / self.ftol))
 
-        self.armijo = False
-        self.curvature = False
         self.__task = "START"
         self.__isave = np.empty(2, dtype=np.int32)
         self.__dsave = np.empty(13, dtype=np.double)
