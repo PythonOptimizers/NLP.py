@@ -1,4 +1,10 @@
-"""Trust-Region Method for Bound-Constrained Programming."""
+u"""Trust-Region Method for Bound-Constrained Programming.
+
+A pure Python/Numpy implementation of TRON as described in
+
+    Chih-Jen Lin and Jorge J. Moré, *Newton's Method for Large Bound-
+    Constrained Optimization Problems*, SIAM J. Optim., 9(4), 1100–1127, 1999.
+"""
 
 from pykrylov.linop import SymmetricallyReducedLinearOperator as ReducedHessian
 from nlp.tr.trustregion import GeneralizedTrustRegion
@@ -24,7 +30,7 @@ class TRONFramework(object):
         """Instantiate a trust-region solver for ``model``.
 
         :parameters:
-            :model:     a :class:`NLPModel` instance.
+            :model:        a :class:`NLPModel` instance.
 
         :keywords:
             :x0:           starting point                     (``model.x0``)
@@ -102,10 +108,10 @@ class TRONFramework(object):
         return self.project(x + d, xl, xu) - x
 
     def breakpoints(self, x, d, xl, xu):
-        """Find the smallest and largest breakpoints on the half line x + t*d.
+        """Find the smallest and largest breakpoints on the half line x + t d.
 
         We assume that x is feasible. Return the smallest and largest t such
-        that x + t*d lies on the boundary.
+        that x + t d lies on the boundary.
         """
         pos = where((d > 0) & (x < xu))  # Hit the upper bound.
         neg = where((d < 0) & (x > xl))  # Hit the lower bound.
@@ -133,27 +139,27 @@ class TRONFramework(object):
         return (nbrpt, brptmin, brptmax)
 
     def cauchy(self, x, g, H, xl, xu, delta, alpha):
-        """Compute a Cauchy step.
+        u"""Compute a Cauchy step.
 
         This step must satisfy a trust region constraint and a sufficient
         decrease condition.
 
         The Cauchy step is computed for the quadratic
 
-           q(s) = 0.5*s'*H*s + g'*s,
+           q(s) = 0.5 s'Hs + g's,
 
         where H is a symmetric matrix and g is a vector.
         Given a parameter alpha, the Cauchy step is
 
-           s[alpha] = P[x - alpha*g] - x,
+           s[α] = P[x - α g] - x,
 
         with P the projection onto the n-dimensional interval [xl,xu].
         The Cauchy step satisfies the trust region constraint and the
         sufficient decrease condition
 
-           || s || <= delta,      q(s) <= mu_0*(g'*s),
+           || s || <= Δ,      q(s) <= mu_0 (g's),
 
-        where mu_0 is a constant in (0,1).
+        where mu_0 is a constant in (0, 1).
         """
         # Constant that defines sufficient decrease.
         mu0 = 0.01
@@ -207,14 +213,14 @@ class TRONFramework(object):
         return (s, alpha)
 
     def trqsol(self, x, p, delta):
-        """Compute a solution of the quadratic trust region equation.
+        u"""Compute a solution of the quadratic trust region equation.
 
         It returns the largest (non-negative) solution of
-            ||x + sigma*p|| = delta.
+            ||x + σ p|| = Δ.
 
         The code is only guaranteed to produce a non-negative solution
-        if ||x|| <= delta, and p != 0.
-        If the trust region equation has no solution, sigma is set to 0.
+        if ||x|| <= Δ, and p != 0.
+        If the trust region equation has no solution, σ is set to 0.
         """
         ptx = np.dot(p, x)
         ptp = np.dot(p, p)
@@ -233,14 +239,13 @@ class TRONFramework(object):
             sigma = 0
         return sigma
 
-    def truncated_cg(self, g, H, delta, tol, stol, itermax):
-        """Preconditioned conjugate-gradient method.
+    def truncated_cg(self, g, H, delta, tol, itermax):
+        u"""Preconditioned conjugate-gradient method.
 
-        Given a sparse symmetric matrix H in compressed column storage,
-        this subroutine uses a preconditioned conjugate gradient method
+        This method uses a preconditioned conjugate gradient method
         to find an approximate minimizer of the trust region subproblem
 
-           min { q(s) : || s || <= delta }.
+           min { q(s) : || s || <= Δ }.
 
         where q is the quadratic
 
@@ -250,31 +255,29 @@ class TRONFramework(object):
 
         Termination occurs if the conjugate gradient iterates leave
         the trust region, a negative curvature direction is generated,
-        or one of the following two convergence tests is satisfied.
+        or the following convergence test is satisfied.
 
-        Convergence in the original variables:
+           || ∇ q(s) || <= tol
 
-           || grad q(s) || <= tol
+        Returned status is one of the following:
+            info = 1  Convergence.
 
-        Convergence in the scaled variables:
+            info = 2  Failure to converge within itermax iterations.
 
-           || grad Q(w) || <= stol
+            info = 3  Conjugate gradient iterates leave the trust region.
 
-        Note that if w = L'*s, then L*grad Q(w) = grad q(s).
+            info - 4  The trust region bound does not allow further progress.
         """
         # Initialize the iterate w and the residual r.
         w = np.zeros(len(g))
 
-        # Initialize the residual t of grad q to -g.
-        # Initialize the residual r of grad Q by solving L*r = -g.
-        # Note that t = L*r.
-        t = -g.copy()
-        r = t.copy()
+        # Initialize the residual r of grad q to -g.
+        r = -g.copy()
 
         # Initialize the direction p.
         p = r.copy()
 
-        # Initialize rho and the norms of r and t.
+        # Initialize rho and the norm of r.
         rho = np.dot(r, r)
         rnorm0 = np.sqrt(rho)
 
@@ -285,13 +288,8 @@ class TRONFramework(object):
             return (w, iters, info)
 
         for iters in range(0, itermax):
-            # Compute z by solving L'*z = p.
             z = p.copy()
-
-            # Compute q by solving L*q = A*z and save L*q for
-            # use in updating the residual t.
             q = H * z
-            z = q.copy()
 
             # Compute alpha and determine sigma such that the trust region
             # constraint || w + sigma*p || = delta is satisfied.
@@ -305,7 +303,6 @@ class TRONFramework(object):
 
             # Exit if there is negative curvature or if the
             # iterates exit the trust region.
-
             if ptq <= 0 or alpha >= sigma:
                 w = sigma * p + w
                 if ptq <= 0:
@@ -314,23 +311,15 @@ class TRONFramework(object):
                     info = 4
                 return (w, iters, info)
 
-            # Update w and the residuals r and t.
-            # Note that t = L*r.
+            # Update w and the residual r
             w = alpha * p + w
             r = -alpha * q + r
-            t = -alpha * z + t
 
             # Exit if the residual convergence test is satisfied.
             rtr = np.dot(r, r)
             rnorm = np.sqrt(rtr)
-            tnorm = np.sqrt(np.dot(t, t))
-
-            if tnorm <= tol:
+            if rnorm <= tol:
                 info = 1
-                return (w, iters, info)
-
-            if rnorm <= stol:
-                info = 2
                 return (w, iters, info)
 
             # Compute p = r + beta*p and update rho.
@@ -339,7 +328,7 @@ class TRONFramework(object):
             rho = rtr
 
         # iters = itmax
-        info = 5
+        info = 2
 
         return (w, iters, info)
 
@@ -352,7 +341,7 @@ class TRONFramework(object):
 
         Returned status is one of the following:
             info = 1  Convergence. The final step s satisfies
-                      || (g + H * s)[free] || <= rtol * || g[free] ||, and the
+                      || (g + H s)[free] || <= rtol || g[free] ||, and the
                       final x is an approximate minimizer in the face defined
                       by the free variables.
 
@@ -391,10 +380,8 @@ class TRONFramework(object):
             # to generate a direction p[k]
 
             tol = cgtol * gfnorm
-            stol = 0
-
             (w, trpcg_iters, infotr) = self.truncated_cg(gfree, ZHZ, delta,
-                                                         tol, stol, 1000)
+                                                         tol, 1000)
             iters += trpcg_iters
 
             # Use a projected search to obtain the next iterate
@@ -432,7 +419,7 @@ class TRONFramework(object):
         return (x, s, iters, info)
 
     def projected_linesearch(self, x, xl, xu, g, d, H, alpha=1.0):
-        """Use a projected search to compute a satisfactory step.
+        u"""Use a projected search to compute a satisfactory step.
 
         This step must satisfy a sufficient decrease condition for the
         quadratic
@@ -440,21 +427,21 @@ class TRONFramework(object):
             q(s) = 0.5 s'Hs + g's,
 
         where H is a symmetric matrix and g is a vector.
-        Given the parameter alpha, the step is
+        Given the parameter α, the step is
 
-           s[alpha] = P[x + alpha*d] - x,
+           s[α] = P[x + α d] - x,
 
         where d is the search direction and P the projection onto the
-        n-dimensional interval [xl,xu]. The final step s = s[alpha] satisfies
+        n-dimensional interval [xl,xu]. The final step s = s[α] satisfies
         the sufficient decrease condition
 
            q(s) <= mu_0*(g'*s),
 
-        where mu_0 is a constant in (0,1).
+        where mu_0 is a constant in (0, 1).
 
         The search direction d must be a descent direction for the quadratic q
-        at x such that the quadratic is decreasing in the ray  x + alpha*d
-        for 0 <= alpha <= 1.
+        at x such that the quadratic is decreasing in the ray  x + α d
+        for 0 <= α <= 1.
         """
         mu0 = 0.01
         interpf = 0.5
