@@ -1,4 +1,4 @@
-"""A General module that implements various linesearch schemes."""
+"""A general linesearch framework."""
 
 from math import sqrt
 import numpy as np

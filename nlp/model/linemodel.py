@@ -22,15 +22,16 @@ class C1LineModel(NLPModel):
 
     The functions f and c are only assumed to be C¹, i.e., only values and
     first derivatives of ϕ and γ are defined.
+    """
 
+    def __init__(self, model, x, d):
+        """Instantiate the restriction of a model to the line x + td.
 
         :parameters:
             :model: ```NLPModel``` whose objective is to be restricted
             :x: Numpy array
             :d: Numpy array assumed to be nonzero (no check is performed).
-    """
-
-    def __init__(self, model, x, d):
+        """
         name = "line-" + model.name
         super(C1LineModel, self).__init__(1,
                                           m=model.ncon,
@@ -96,11 +97,6 @@ class C2LineModel(C1LineModel):
 
     The function f is assumed to be C², i.e., values and first and second
     derivatives of ϕ are defined.
-
-        :parameters:
-            :model: ```NLPModel``` whose objective is to be restricted
-            :x: Numpy array
-            :d: Numpy array assumed to be nonzero (no check is performed).
     """
 
     def hess(self, t, z):
