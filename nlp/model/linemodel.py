@@ -61,29 +61,57 @@ class C1LineModel(NLPModel):
     def model(self):
         return self.__model
 
-    def obj(self, t):
-        u"""Evaluate ϕ(t) = f(x + td)."""
-        return self.model.obj(self.x + t * self.d)
+    def obj(self, t, x=None):
+        u"""Evaluate ϕ(t) = f(x + td).
 
-    def grad(self, t):
-        u"""Evaluate ϕ'(t) = ∇f(x + td)ᵀ d."""
-        return np.dot(self.model.grad(self.x + t * self.d), self.d)
+        :keywords:
+            :x: full-space x+td if that vector has already been formed.
+        """
+        xtd = (self.x + t * self.d) if x is None else x
+        return self.model.obj(xtd)
 
-    def cons(self, t):
-        u"""Evaluate γ(t) = c(x + td)."""
-        return self.model.cons(self.x + t * self.d)
+    def grad(self, t, x=None):
+        u"""Evaluate ϕ'(t) = ∇f(x + td)ᵀ d.
 
-    def jac(self, t):
-        u"""Evaluate γ'(t) = J(x + td) d."""
-        return self.model.jprod(self.x + t * self.d, self.d)
+        :keywords:
+            :x: full-space x+td if that vector has already been formed.
+        """
+        xtd = (self.x + t * self.d) if x is None else x
+        return np.dot(self.model.grad(xtd), self.d)
 
-    def jprod(self, t, v):
-        u"""Jacobian-vector product, which is just γ'(t)*v with v ∈ ℝ."""
-        return self.jac(t) * v
+    def cons(self, t, x=None):
+        u"""Evaluate γ(t) = c(x + td).
 
-    def jtprod(self, t, u):
-        u"""Transposed-Jacobian-vector product γ'(t)ᵀ u with u ∈ ℝᵐ."""
-        return np.dot(self.jac(t), u)
+        :keywords:
+            :x: full-space x+td if that vector has already been formed.
+        """
+        xtd = (self.x + t * self.d) if x is None else x
+        return self.model.cons(xtd)
+
+    def jac(self, t, x=None):
+        u"""Evaluate γ'(t) = J(x + td) d.
+
+        :keywords:
+            :x: full-space x+td if that vector has already been formed.
+        """
+        xtd = (self.x + t * self.d) if x is None else x
+        return self.model.jprod(xtd, self.d)
+
+    def jprod(self, t, v, x=None):
+        u"""Jacobian-vector product, which is just γ'(t)*v with v ∈ ℝ.
+
+        :keywords:
+            :x: full-space x+td if that vector has already been formed.
+        """
+        return self.jac(t, x=x) * v
+
+    def jtprod(self, t, u, x=None):
+        u"""Transposed-Jacobian-vector product γ'(t)ᵀ u with u ∈ ℝᵐ.
+
+        :keywords:
+            :x: full-space x+td if that vector has already been formed.
+        """
+        return np.dot(self.jac(t, x=x), u)
 
 
 class C2LineModel(C1LineModel):
@@ -99,10 +127,19 @@ class C2LineModel(C1LineModel):
     derivatives of ϕ are defined.
     """
 
-    def hess(self, t, z):
-        u"""Evaluate ϕ"(t) = dᵀ ∇²L(x + td, z) d."""
-        return np.dot(self.d, self.model.hprod(self.x + t * self.d, z, self.d))
+    def hess(self, t, z, x=None):
+        u"""Evaluate ϕ"(t) = dᵀ ∇²L(x + td, z) d.
 
-    def hprod(self, t, z, v):
-        u"""Hessian-vector product, which is just ϕ"(t)*v with v ∈ ℝ."""
-        return self.hess(t, z) * v
+        :keywords:
+            :x: full-space x+td if that vector has already been formed.
+        """
+        xtd = (self.x + t * self.d) if x is None else x
+        return np.dot(self.d, self.model.hprod(xtd, z, self.d))
+
+    def hprod(self, t, z, v, x=None):
+        u"""Hessian-vector product, which is just ϕ"(t)*v with v ∈ ℝ.
+
+        :keywords:
+            :x: full-space x+td if that vector has already been formed.
+        """
+        return self.hess(t, z, x=x) * v
