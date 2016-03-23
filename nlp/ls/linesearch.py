@@ -36,7 +36,8 @@ class LineSearch(object):
         self.check_slope(self.slope)
 
         self._trial_value = self._value
-        self._step = max(kwargs.get("step", 1.0), 0)
+        self._step0 = max(kwargs.get("step", 1.0), 0)
+        self._step = self._step0
 
         eps = np.finfo(np.double).eps
         self._stepmin = sqrt(eps) / 100
@@ -96,6 +97,7 @@ class LineSearch(object):
 
     def __iter__(self):
         # This method makes LineSearch objects iterable.
+        self._step = self._step0  # reinitialize search
         return self
 
     def __next__(self):
@@ -152,6 +154,9 @@ class ArmijoLineSearch(LineSearch):
         if self._test():
             raise StopIteration()
 
+        step = self.step
         self._step /= self.factor
         if self.step < self.stepmin:
             raise LineSearchFailure("linesearch step too small")
+
+        return step  # return value of step just tested
