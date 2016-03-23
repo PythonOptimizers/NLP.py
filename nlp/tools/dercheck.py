@@ -73,7 +73,7 @@ class DerivativeChecker(object):
         :keywords:
             :grad:      Check objective gradient  (default `True`)
             :hess:      Check objective Hessian   (default `True`)
-            :jac:       Check constraints Hessian (default `True` if m > 0)
+            :jac:       Check constraints Jacobian (default `True` if m > 0)
             :chess:     Check constraints Hessian (default `True` if m > 0)
         """
         grad = kwargs.get('grad', True)
