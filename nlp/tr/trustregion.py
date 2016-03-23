@@ -73,7 +73,13 @@ class TrustRegion(object):
 
 
 class GeneralizedTrustRegion(TrustRegion):
-    """A more general trust-region management class."""
+    """A more general trust-region management class.
+
+    Subclass of `TrustRegion` implementing a more flexible update of the
+    trust-region radius.
+
+    See :meth:`update_radius` for more details.
+    """
 
     def __init__(self, **kwargs):
         """Instantiate an object allowing management of a trust region.
