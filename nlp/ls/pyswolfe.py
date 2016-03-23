@@ -19,8 +19,8 @@ class StrongWolfeLineSearch(LineSearch):
         """Instantiate a strong Wolfe linesearch procedure.
 
         :keywords:
-            :ftol: constant used in the Armijo condition (1.0e-4)
-            :gtol: constant used in the curvature condition (0.9)
+            :ftol: constant used in Armijo condition (1.0e-4)
+            :gtol: constant used in curvature condition (0.9)
             :xtol: minimal relative step bracket length (1.0e-10)
             :lb: initial lower bound of the bracket
             :ub: initial upper bound of the bracket
