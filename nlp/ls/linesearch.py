@@ -129,7 +129,8 @@ class ArmijoLineSearch(LineSearch):
             :decr: factor by which to reduce the steplength
                    during the backtracking (default: 1.5).
         """
-        super(ArmijoLineSearch, self).__init__(*args, **kwargs)
+        name = kwargs.pop("name", "Armijo linesearch")
+        super(ArmijoLineSearch, self).__init__(*args, name=name, **kwargs)
         self.__ftol = max(min(kwargs.get("ftol", 1.0e-4), 1 - sqeps), sqeps)
         self.__bkmax = max(kwargs.get("bkmax", 20), 0)
         self.__decr = max(min(kwargs.get("decr", 1.5), 100), 1.001)

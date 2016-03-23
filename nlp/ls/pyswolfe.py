@@ -25,7 +25,8 @@ class StrongWolfeLineSearch(LineSearch):
             :lb: initial lower bound of the bracket
             :ub: initial upper bound of the bracket
         """
-        super(StrongWolfeLineSearch, self).__init__(*args, **kwargs)
+        name = kwargs.pop("name", "Strong Wolfe linesearch")
+        super(StrongWolfeLineSearch, self).__init__(*args, name=name, **kwargs)
         sqeps = sqrt(np.finfo(np.double).eps)
         self.__ftol = max(min(kwargs.get("ftol", 1.0e-4),
                               1 - sqeps),
