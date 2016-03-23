@@ -251,22 +251,17 @@ class TRONFramework(object):
 
            q(s) = 0.5 s'Hs + g's,
 
-        and H is a symmetric matrix.
-
-        Termination occurs if the conjugate gradient iterates leave
-        the trust region, a negative curvature direction is generated,
-        or the following convergence test is satisfied.
-
-           || ∇ q(s) || <= tol
+        and H is a symmetric matrix.           
 
         Returned status is one of the following:
-            info = 1  Convergence.
+            info = 1  Convergence test is satisfied.
+                      || ∇ q(s) || <= tol
 
             info = 2  Failure to converge within itermax iterations.
 
-            info = 3  Conjugate gradient iterates leave the trust region.
+            info = 3  Conjugate gradient iterates leave the trust-region.
 
-            info - 4  The trust region bound does not allow further progress.
+            info = 4  The trust-region bound does not allow further progress.
         """
         # Initialize the iterate w and the residual r.
         w = np.zeros(len(g))
