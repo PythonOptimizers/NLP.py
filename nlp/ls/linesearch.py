@@ -124,13 +124,16 @@ class ArmijoLineSearch(LineSearch):
         a merit function f in the descent direction d. true.
 
         :keywords:
-            :ftol: Value of ftol (default: 1.0e-4)
-            :factor: Amount by which to reduce the steplength
-                     during the backtracking (default: 1.5).
+            :ftol: constant used in Armijo condition (default: 1.0e-4)
+            :bkmax: maximum number of backtracking steps (default: 20)
+            :decr: factor by which to reduce the steplength
+                   during the backtracking (default: 1.5).
         """
         super(ArmijoLineSearch, self).__init__(*args, **kwargs)
         self.__ftol = max(min(kwargs.get("ftol", 1.0e-4), 1 - sqeps), sqeps)
-        self.__factor = max(min(kwargs.get("factor", 1.5), 100), 1.001)
+        self.__bkmax = max(kwargs.get("bkmax", 20), 0)
+        self.__decr = max(min(kwargs.get("decr", 1.5), 100), 1.001)
+        self._bk = 0
         return
 
     @property
@@ -138,16 +141,23 @@ class ArmijoLineSearch(LineSearch):
         return self.__ftol
 
     @property
-    def factor(self):
-        return self.__factor
+    def bkmax(self):
+        return self.__bkmax
 
+    @property
+    def decr(self):
+        return self.__decr
 
     def next(self):
         if self.trial_value <= self.value + self.step * self.ftol * self.slope:
             raise StopIteration()
 
+        self._bk += 1
+        if self._bk > self.__bkmax:
+            raise LineSearchFailure("backtracking limit exceeded")
+
         step = self.step
-        self._step /= self.factor
+        self._step /= self.decr
         if self.step < self.stepmin:
             raise LineSearchFailure("linesearch step too small")
 
