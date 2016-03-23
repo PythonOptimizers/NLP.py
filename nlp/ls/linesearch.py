@@ -5,6 +5,9 @@ import numpy as np
 
 __docformat__ = 'restructuredtext'
 
+eps = np.finfo(np.double).eps
+sqeps = sqrt(eps)
+
 
 class LineSearchFailure(Exception):
     """Exception raised when a linesearch fails."""
@@ -39,7 +42,6 @@ class LineSearch(object):
         self._step0 = max(kwargs.get("step", 1.0), 0)
         self._step = self._step0
 
-        eps = np.finfo(np.double).eps
         self._stepmin = sqrt(eps) / 100
         if self._step <= self.stepmin:
             raise LineSearchFailure("initial linesearch step too small")
@@ -131,7 +133,6 @@ class ArmijoLineSearch(LineSearch):
                      during the backtracking (default: 1.5).
         """
         super(ArmijoLineSearch, self).__init__(*args, **kwargs)
-        sqeps = sqrt(np.finfo(np.double).eps)
         self.__ftol = max(min(kwargs.get("ftol", 1.0e-4), 1 - sqeps), sqeps)
         self.__factor = max(min(kwargs.get("factor", 1.5), 100), 1.001)
         return
