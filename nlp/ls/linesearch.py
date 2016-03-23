@@ -44,7 +44,8 @@ class LineSearch(object):
         if self._step <= self.stepmin:
             raise LineSearchFailure("initial linesearch step too small")
 
-        self._trial_iterate = None
+        self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
+        self._trial_value = self.linemodel.obj(self.step)
         return
 
     @property
@@ -148,9 +149,6 @@ class ArmijoLineSearch(LineSearch):
         return (self.trial_value <= self.value + self.step * self.ftol * self.slope)
 
     def next(self):
-        self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
-        self._trial_value = self.linemodel.obj(self.step)
-
         if self._test():
             raise StopIteration()
 
@@ -158,5 +156,8 @@ class ArmijoLineSearch(LineSearch):
         self._step /= self.factor
         if self.step < self.stepmin:
             raise LineSearchFailure("linesearch step too small")
+
+        self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
+        self._trial_value = self.linemodel.obj(self.step)
 
         return step  # return value of step just tested
