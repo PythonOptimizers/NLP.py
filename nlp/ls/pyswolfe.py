@@ -50,6 +50,9 @@ class StrongWolfeLineSearch(LineSearch):
                    self.__task, self.lb, self.ub,
                    self.__isave, self.__dsave)
 
+        if self.__task[:2] != "FG":
+            raise LineSearchFailure(self.__task)
+
     @property
     def ftol(self):
         return self.__ftol
@@ -75,18 +78,21 @@ class StrongWolfeLineSearch(LineSearch):
         return self._trial_slope
 
     def next(self):
+        if self.__task[:4] == "CONV":  # strong Wolfe conditions satisfied
+            raise StopIteration()
+
+        if self.__task[:2] != "FG":
+            raise LineSearchFailure(self.__task)
+
         self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
         self._trial_value = self.linemodel.obj(self.step, x=self.iterate)
         self._trial_slope = self.linemodel.grad(self.step, x=self.iterate)
 
+        step = self.step
         self._step, self.__task, self.__isave, self.__dsave = \
             dcsrch(self._step, self._trial_value, self._trial_slope,
                    self.ftol, self.gtol, self.xtol,
                    self.__task, self.lb, self.ub,
                    self.__isave, self.__dsave)
 
-        if self.__task[:4] == "CONV":  # strong Wolfe conditions satisfied
-            raise StopIteration()
-
-        if self.__task[:2] != "FG":
-            raise LineSearchFailure(self.__task)
+        return step
