@@ -45,7 +45,7 @@ class StrongWolfeLineSearch(LineSearch):
         self.__dsave = np.empty(13, dtype=np.double)
 
         self._step, self.__task, self.__isave, self.__dsave = \
-            dcsrch(self._step, self._trial_value, self._slope,
+            dcsrch(self._step, self._value, self._slope,
                    self.ftol, self.gtol, self.xtol,
                    self.__task, self.lb, self.ub,
                    self.__isave, self.__dsave)
