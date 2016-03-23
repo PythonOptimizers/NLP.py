@@ -109,10 +109,6 @@ class LineSearch(object):
     def next(self):
         raise NotImplementedError("Please subclass")
 
-    def _test(self, *args, **kwargs):
-        """Linesearch satisfaction test."""
-        raise NotImplementedError("Please subclass")
-
 
 class ArmijoLineSearch(LineSearch):
     """Armijo backtracking linesearch."""
@@ -145,12 +141,9 @@ class ArmijoLineSearch(LineSearch):
     def factor(self):
         return self.__factor
 
-    def _test(self):
-        """Test Armijo condition."""
-        return (self.trial_value <= self.value + self.step * self.ftol * self.slope)
 
     def next(self):
-        if self._test():
+        if self.trial_value <= self.value + self.step * self.ftol * self.slope:
             raise StopIteration()
 
         step = self.step
