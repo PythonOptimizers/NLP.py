@@ -18,7 +18,7 @@ import logging
 __docformat__ = 'restructuredtext'
 
 
-class TRONFramework(object):
+class TRON(object):
     """Trust-region Newton method for bound-constrained optimization problems.
 
            min f(x)  subject to xl <= x <= xu
@@ -251,7 +251,7 @@ class TRONFramework(object):
 
            q(s) = 0.5 s'Hs + g's,
 
-        and H is a symmetric matrix.           
+        and H is a symmetric matrix.
 
         Returned status is one of the following:
             info = 1  Convergence test is satisfied.
