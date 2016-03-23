@@ -39,7 +39,7 @@ class StrongWolfeLineSearch(LineSearch):
                               max(4 * min(self.step, 1.0),
                                   -0.1 * self.value / self.slope / self.ftol))
 
-        self._trial_slope = self._slope
+        self._trial_slope = self.linemodel.grad(self.step, x=self.iterate)
         self.__task = "START"
         self.__isave = np.empty(2, dtype=np.int32)
         self.__dsave = np.empty(13, dtype=np.double)
@@ -76,8 +76,8 @@ class StrongWolfeLineSearch(LineSearch):
 
     def next(self):
         self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
-        self._trial_value = self.linemodel.obj(self.step)
-        self._trial_slope = self.linemodel.grad(self.step)
+        self._trial_value = self.linemodel.obj(self.step, x=self.iterate)
+        self._trial_slope = self.linemodel.grad(self.step, x=self.iterate)
 
         self._step, self.__task, self.__isave, self.__dsave = \
             dcsrch(self._step, self._trial_value, self._trial_slope,
