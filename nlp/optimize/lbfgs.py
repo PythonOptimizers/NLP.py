@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from pykrylov.linop.lbfgs import InverseLBFGSOperator as InverseLBFGS
 from nlp.ls.pymswolfe import StrongWolfeLineSearch
 from nlp.tools import norms
@@ -7,30 +8,17 @@ __docformat__ = 'restructuredtext'
 
 
 class LBFGSFramework(object):
-    """
-    Class LBFGSFramework provides a framework for solving unconstrained
-    optimization problems by means of the limited-memory BFGS method.
-
-    Instantiation is done by
-
-    lbfgs = LBFGSFramework(model)
-
-    where model is an instance of a nonlinear problem. A solution of the
-    problem is obtained by called the solve member function, as in
-
-    lbfgs.solve().
+    """Solve unconstrained problems with the limited-memory BFGS method.
 
     :keywords:
-
         :npairs:    the number of (s,y) pairs to store (default: 5)
-        :x0:        the starting point (default: model.x0)
-        :maxiter:   the maximum number of iterations (default: max(10n,1000))
-        :abstol:    absolute stopping tolerance (default: 1.0e-6)
-        :reltol:    relative stopping tolerance (default: `model.stop_d`)
+        :maxiter:   the maximum number of iterations (default: max(10n, 1000))
+        :atol:      absolute stopping tolerance (default: 1.0e-8)
+        :rtol:      relative stopping tolerance (default: 1.0e-6)
 
     Other keyword arguments will be passed to InverseLBFGS.
 
-    The linesearch used in this version is Jorge Nocedal's modified More and
+    The linesearch used in this version is Jorge Nocedal's modified Moré and
     Thuente linesearch, attempting to ensure satisfaction of the strong Wolfe
     conditions. The modifications attempt to limit the effects of rounding
     error inherent to the More and Thuente linesearch.
@@ -38,49 +26,50 @@ class LBFGSFramework(object):
     def __init__(self, model, **kwargs):
 
         self.model = model
-        self.npairs = kwargs.get('npairs', 5)
-        self.silent = kwargs.get('silent', False)
-        self.abstol = kwargs.get('abstol', 1.0e-6)
-        self.reltol = kwargs.get('reltol', self.model.stop_d)
+        self.npairs = kwargs.get("npairs", 5)
+        self.abstol = kwargs.get("atol", 1.0e-8)
+        self.reltol = kwargs.get("rtol", 1.0e-6)
         self.iter = 0
         self.nresets = 0
         self.converged = False
 
-        self.lbfgs = InverseLBFGS(self.model.n, **kwargs)
+        self.lbfgs = InverseLBFGS(model.nvar, **kwargs)
+        self.x = model.x0
 
-        self.x = kwargs.get('x0', self.model.x0)
-        self.f = self.model.obj(self.x)
-        self.g = self.model.grad(self.x)
-        self.gnorm = norms.norm2(self.g)
-        self.f0 = self.f
-        self.g0 = self.gnorm
+        self.f = None
+        self.g = None
+        self.gNorm = None
+        self.f0 = None
+        self.gNorm0 = None
 
-        # Optional arguments
-        self.maxiter = kwargs.get('maxiter', max(10 * self.model.n, 1000))
         self.tsolve = 0.0
 
-    def solve(self):
+    def solve(self, **kwargs):
+
+        model = self.model
+        self.maxiter = kwargs.get("maxiter", max(10 * model.nvar, 1000))
 
         tstart = cputime()
 
-        # Initial LBFGS matrix is the identity. In other words,
-        # the initial search direction is the steepest descent direction.
+        self.f = self.model.obj(self.x)
+        self.g = self.model.grad(self.x)
+        self.gNorm = norms.norm2(self.g)
+        self.f0 = self.f
+        self.gNorm0 = self.gNorm
 
-        # This is the original L-BFGS stopping condition.
-        # stoptol = self.model.stop_d * max(1.0, norms.norm2(self.x))
-        stoptol = max(self.abstol, self.reltol * self.g0)
+        stoptol = max(self.abstol, self.reltol * self.gNorm0)
 
-        while self.gnorm > stoptol and self.iter < self.maxiter:
+        while self.gNorm > stoptol and self.iter < self.maxiter:
 
             if not self.silent:
-                print '%-5d  %-12g  %-12g' % (self.iter, self.f, self.gnorm)
+                print '%-5d  %-12g  %-12g' % (self.iter, self.f, self.gNorm)
 
             # Obtain search direction
             d = self.lbfgs * (-self.g)
 
             # Prepare for modified More-Thuente linesearch
             if self.iter == 0:
-                stp0 = 1.0 / self.gnorm
+                stp0 = 1.0 / self.gNorm
             else:
                 stp0 = 1.0
             SWLS = StrongWolfeLineSearch(self.f,
@@ -100,7 +89,7 @@ class LBFGSFramework(object):
             self.x = SWLS.x
             y = SWLS.g - self.g
             self.g = SWLS.g
-            self.gnorm = norms.norm2(self.g)
+            self.gNorm = norms.norm2(self.g)
             self.f = SWLS.f
 
             # Update inverse Hessian approximation using the most recent pair
