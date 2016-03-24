@@ -8,7 +8,6 @@ using PyMa27 or PyMa57.
 
 D. Orban, Montreal 2009-2011.
 """
-from nlp.model.snlp import SlackModel
 try:                            # To solve augmented systems
     from hsl.solvers.pyma57 import PyMa57Solver as LBLContext
 except:
@@ -17,10 +16,473 @@ from hsl.scaling.mc29 import mc29ad
 from pykrylov.linop import PysparseLinearOperator
 from nlp.tools.norms import norm2, norm_infty, normest
 from nlp.tools.timing import cputime
+import logging
 
+# for slack model
+from nlp.model.nlpmodel import NLPModel
+from nlp.model.qnmodel import QuasiNewtonModel
 from pysparse.sparse.pysparseMatrix import PysparseMatrix
 import numpy as np
-import logging
+
+
+# CQP needs equality constraints and bounds on variables as s>=0
+class SlackModel(NLPModel):
+    """Framework for converting an optimization problem to a form using slacks.
+
+    In the latter problem, the only inequality constraints are bounds on
+    the slack variables. The other constraints are (typically) nonlinear
+    equalities.
+
+    The order of variables in the transformed problem is as follows:
+
+    1. x, the original problem variables.
+
+    2. sL = [ sLL | sLR ], sLL being the slack variables corresponding to
+       general constraints with a lower bound only, and sLR being the slack
+       variables corresponding to the 'lower' side of range constraints.
+
+    3. sU = [ sUU | sUR ], sUU being the slack variables corresponding to
+       general constraints with an upper bound only, and sUR being the slack
+       variables corresponding to the 'upper' side of range constraints.
+
+    4. tL = [ tLL | tLR ], tLL being the slack variables corresponding to
+       variables with a lower bound only, and tLR being the slack variables
+       corresponding to the 'lower' side of two-sided bounds.
+
+    5. tU = [ tUU | tUR ], tUU being the slack variables corresponding to
+       variables with an upper bound only, and tLR being the slack variables
+       corresponding to the 'upper' side of two-sided bounds.
+
+    This framework initializes the slack variables sL, sU, tL, and tU to
+    zero by default.
+
+    Note that the slack framework does not update all members of AmplModel,
+    such as the index set of constraints with an upper bound, etc., but
+    rather performs the evaluations of the constraints for the updated
+    model implicitly.
+    """
+
+    def __init__(self, model, keep_variable_bounds=False, **kwargs):
+        """Instantiate a model in its slack form.
+
+        :parameters:
+            :model:  Original NLP to transform to a slack form.
+
+        :keywords:
+            :keep_variable_bounds: set to `True` if you don't want to convert
+                                   bounds on variables to inequalities. In this
+                                   case bounds are kept as they were in the
+                                   original NLP.
+        """
+        self.model = model
+        self.keep_variable_bounds = keep_variable_bounds
+
+        n_con_low = model.nlowerC + model.nrangeC  # ineqs with lower bound.
+        n_con_upp = model.nupperC + model.nrangeC  # ineqs with upper bound.
+        n_var_low = model.nlowerB + model.nrangeB  # vars  with lower bound.
+        n_var_upp = model.nupperB + model.nrangeB  # vars  with upper bound.
+
+        bot = model.n
+        self.sLL = range(bot, bot + model.nlowerC)
+        bot += model.nlowerC
+        self.sLR = range(bot, bot + model.nrangeC)
+        bot += model.nrangeC
+        self.sUU = range(bot, bot + model.nupperC)
+        bot += model.nupperC
+        self.sUR = range(bot, bot + model.nrangeC)
+
+        # Update effective number of variables and constraints
+        if keep_variable_bounds:
+            n = model.n + n_con_low + n_con_upp
+            m = model.m + model.nrangeC
+
+            Lvar = np.zeros(n)
+            Lvar[:model.n] = model.Lvar
+            Uvar = np.inf * np.ones(n)
+            Uvar[:model.n] = model.Uvar
+
+        else:
+            bot += model.nrangeC
+            self.tLL = range(bot, bot + model.nlowerB)
+            bot += model.nlowerB
+            self.tLR = range(bot, bot + model.nrangeB)
+            bot += model.nrangeB
+            self.tUU = range(bot, bot + model.nupperB)
+            bot += model.nupperB
+            self.tUR = range(bot, bot + model.nrangeB)
+
+            n = model.n + n_con_low + n_con_upp + n_var_low + n_var_upp
+            m = model.m + model.nrangeC + n_var_low + n_var_upp
+            Lvar = np.zeros(n)
+            Lvar[:model.n] = -np.inf * np.ones(model.n)
+            Uvar = np.inf * np.ones(n)
+
+        NLPModel.__init__(self, n=n, m=m, name='slack-' + model.name,
+                          Lvar=Lvar, Uvar=Uvar, Lcon=np.zeros(m))
+
+        # Redefine primal and dual initial guesses
+        self.x0 = np.empty(self.n)
+        self.x0[:model.n] = model.x0[:]
+        self.x0[model.n:] = 0
+
+        self.pi0 = np.empty(self.m)
+        self.pi0[:model.m] = model.pi0[:]
+        self.pi0[model.m:] = 0
+        return
+
+    def obj(self, x):
+        """Evaluate the objective function at x."""
+        return self.model.obj(x[:self.model.n])
+
+    def grad(self, x):
+        """Evaluate the objective gradient at x."""
+        g = np.zeros(self.n)
+        g[:self.model.n] = self.model.grad(x[:self.model.n])
+        return g
+
+    def cons(self, x):
+        """Evaluate vector of constraints at x.
+
+        Evaluate the vector of general constraints for the modified problem.
+        Constraints are stored in the order in which they appear in the
+        original problem. If constraint i is a range constraint, c[i] will be
+        the constraint that has the slack on the lower bound on c[i]. The
+        constraint with the slack on the upper bound on c[i] will be stored in
+        position m + k, where k is the position of index i in rangeC, i.e., k=0
+        iff constraint i is the range constraint that appears first, k=1 iff it
+        appears second, etc.
+        """
+        model = self.model
+        on = model.n
+        m = self.m
+        om = model.m
+        lowerC = model.lowerC
+        upperC = model.upperC
+        rangeC = model.rangeC
+        nrangeC = model.nrangeC
+
+        c = np.empty(m)
+        c[:om + nrangeC] = model.cons_pos(x[:on])
+        c[lowerC] -= x[self.sLL]
+        c[upperC] -= x[self.sUU]
+        c[rangeC] -= x[self.sLR]
+        c[om:] -= x[self.sUR]
+        return c
+
+    def cons_pos(self, x):
+        """Convenience function to return constraints as non negative ones."""
+        return self.cons(x)
+
+    def jprod(self, x, p, **kwargs):
+        """Evaluate Jacobian-vector product at x with p.
+
+        Evaluate the Jacobian matrix-vector product of all equality
+        constraints of the transformed problem with a vector `p` (J(x).T p).
+        See the documentation of :meth:`jac` for more details on how the
+        constraints are ordered.
+        """
+        # Create some shortcuts for convenience
+        model = self.model
+        on = model.n
+        om = model.m
+        m = self.m
+
+        lowerC = model.lowerC
+        upperC = model.upperC
+        rangeC = model.rangeC
+        nrangeC = model.nrangeC
+
+        v = np.zeros(m)
+
+        J = model.jop(x[:on])
+        v[:om] = J * p[:on]
+        v[upperC] *= -1.0
+        v[om:om + nrangeC] = v[rangeC]
+        v[om:om + nrangeC] *= -1.0
+
+        # Insert contribution of slacks on general constraints
+        v[lowerC] -= p[self.sLL]
+        v[rangeC] -= p[self.sLR]
+        v[upperC] -= p[self.sUU]
+        v[om:om + nrangeC] -= p[self.sUR]
+
+        if self.keep_variable_bounds:
+            return v
+
+        # Create some more shortcuts
+        lowerB = model.lowerB
+        upperB = model.upperB
+        rangeB = model.rangeB
+        nlowerB = model.nlowerB
+        nupperB = model.nupperB
+        nrangeB = model.nrangeB
+
+        # Insert contribution of bound constraints on the original problem
+        bot = om + nrangeC
+        v[bot:bot + nlowerB] += p[lowerB]
+        bot += nlowerB
+        v[bot:bot + nrangeB] += p[rangeB]
+        bot += nrangeB
+        v[bot:bot + nupperB] -= p[upperB]
+        bot += nupperB
+        v[bot:bot + nrangeB] -= p[rangeB]
+
+        # Insert contribution of slacks on the bound constraints
+        bot = om + nrangeC
+        v[bot:bot + nlowerB] -= p[self.tLL]
+        bot += nlowerB
+        v[bot:bot + nrangeB] -= p[self.tLR]
+        bot += nrangeB
+        v[bot:bot + nupperB] -= p[self.tUU]
+        bot += nupperB
+        v[bot:bot + nrangeB] -= p[self.tUR]
+        return v
+
+    def jtprod(self, x, p, **kwargs):
+        """Evaluate transposed-Jacobian-vector product at x with p.
+
+        Evaluate the Jacobian-transpose matrix-vector product of all equality
+        constraints of the transformed problem with a vector `p` (J(x).T p).
+        See the documentation of :meth:`jac` for more details on how the
+        constraints are ordered.
+        """
+        # Create some shortcuts for convenience
+        model = self.model
+        on = model.n
+        om = model.m
+        n = self.n
+
+        lowerC = model.lowerC
+        upperC = model.upperC
+        rangeC = model.rangeC
+        nrangeC = model.nrangeC
+
+        v = np.zeros(n)
+        pmv = p[:om].copy()
+        pmv[upperC] *= -1.0
+        pmv[rangeC] -= p[om:om + nrangeC]
+
+        J = model.jop(x[:on])
+        v[:on] = J.T * pmv
+
+        # Insert contribution of slacks on general constraints
+        v[self.sLL] = -p[lowerC]
+        v[self.sLR] = -p[rangeC]
+        v[self.sUU] = -p[upperC]
+        v[self.sUR] = -p[om:om + nrangeC]
+
+        if self.keep_variable_bounds:
+            return v
+
+        # Create some more shortcuts
+        lowerB = model.lowerB
+        upperB = model.upperB
+        rangeB = model.rangeB
+        nlowerB = model.nlowerB
+        nupperB = model.nupperB
+        nrangeB = model.nrangeB
+
+        # Insert contribution of bound constraints on the original problem
+        bot = om + nrangeC
+        v[lowerB] += p[bot:bot + nlowerB]
+        bot += nlowerB
+        v[rangeB] += p[bot:bot + nrangeB]
+        bot += nrangeB
+        v[upperB] -= p[bot:bot + nupperB]
+        bot += nupperB
+        v[rangeB] -= p[bot:bot + nrangeB]
+
+        # Insert contribution of slacks on the bound constraints
+        bot = om + nrangeC
+        v[self.tLL] -= p[bot:bot + nlowerB]
+        bot += nlowerB
+        v[self.tLR] -= p[bot:bot + nrangeB]
+        bot += nrangeB
+        v[self.tUU] -= p[bot:bot + nupperB]
+        bot += nupperB
+        v[self.tUR] -= p[bot:bot + nrangeB]
+        return v
+
+    def jac(self, x):
+        """Evaluate constraints Jacobian at x.
+
+        Evaluate the Jacobian matrix of all equality constraints of the
+        transformed problem. The gradients of the general constraints appear in
+        'natural' order, i.e., in the order in which they appear in the
+        problem. The gradients of range constraints appear in two places: first
+        in the 'natural' location and again after all other general
+        constraints, with a flipped sign to account for the upper bound on
+        those constraints.
+
+        The gradients of the linear equalities corresponding to bounds on the
+        original variables appear in the following order:
+
+        1. variables with a lower bound only
+        2. lower bound on variables with two-sided bounds
+        3. variables with an upper bound only
+        4. upper bound on variables with two-sided bounds
+
+        The overall Jacobian of the new constraints thus has the form::
+
+            [ J    -I         ]
+            [-JR      -I      ]
+            [ I          -I   ]
+            [-I             -I]
+
+        where the columns correspond, in order, to the variables `x`, `s`,
+        `sU`, `t`, and `tU`, the rows correspond, in order, to
+
+        1. general constraints (in natural order)
+        2. 'upper' side of range constraints
+        3. bounds, ordered as explained above
+        4. 'upper' side of two-sided bounds,
+
+        and where the signs corresponding to 'upper' constraints and upper
+        bounds are flipped in the (1,1) and (3,1) blocks.
+        """
+        return self._jac(x, lp=False)
+
+    def A(self):
+        """Evaluate the constraints Jacobian of linear constraints at x.
+
+        Return the constraint matrix if the problem is a linear program.
+        See the documentation of :meth:`jac` for more information.
+        """
+        return self._jac(0, lp=True)
+
+    def _jac(self, x, lp=False):
+        raise NotImplementedError("Please subclass")
+
+    def convert_multipliers(self, z):
+        """Convert multipliers from slack problem to orginal NLP."""
+        if z is None:
+            return np.zeros(self.m)
+        om = self.model.m
+        upperC = self.model.upperC
+        rangeC = self.model.rangeC
+        nrangeC = self.model.nrangeC
+        pi = z[:om].copy()
+        pi[upperC] *= -1.
+        pi[rangeC] -= z[om:om + nrangeC]
+        return pi
+
+    def hprod(self, x, y, v, **kwargs):
+        """Hessian-vector product.
+
+        Evaluate the Hessian vector product of the Hessian of the Lagrangian
+        at (x,y) with the vector v.
+        """
+        model = self.model
+        on = model.n
+
+        Hv = np.zeros(self.n)
+        pi = self.convert_multipliers(y)
+        Hv[:on] = model.hprod(x[:on], pi, v[:on], **kwargs)
+        return Hv
+
+    def hess(self, x, z=None, *args, **kwargs):
+        """Evaluate Lagrangian Hessian at (x, z)."""
+        raise NotImplementedError("Please subclass")
+
+
+class PySparseSlackModel(SlackModel):
+    """Slack model in which matrices are represented as PySparse matrices."""
+
+    def _jac(self, x, lp=False):
+        """Helper method to assemble the Jacobian matrix of the constraints.
+
+        See the documentation of :meth:`jac` for more information.
+
+        The positional argument `lp` should be set to `True` only if the
+        problem is known to be a linear program. In this case, the evaluation
+        of the constraint matrix is cheaper and the argument `x` is ignored.
+        """
+        n = self.n
+        m = self.m
+        model = self.model
+        on = self.model.n
+        om = self.model.m
+
+        lowerC = np.array(model.lowerC)
+        nlowerC = model.nlowerC
+        upperC = np.array(model.upperC)
+        nupperC = model.nupperC
+        rangeC = np.array(model.rangeC)
+        nrangeC = model.nrangeC
+        lowerB = np.array(model.lowerB)
+        nlowerB = model.nlowerB
+        upperB = np.array(model.upperB)
+        nupperB = model.nupperB
+        rangeB = np.array(model.rangeB)
+        nrangeB = model.nrangeB
+        nbnds = nlowerB + nupperB + 2 * nrangeB
+        nSlacks = nlowerC + nupperC + 2 * nrangeC
+
+        # Initialize sparse Jacobian
+        # Overestimate of the number of non zero elements
+        nnzJ = 2 * self.model.nnzj + m + nrangeC + nbnds + nrangeB
+        J = PysparseMatrix(nrow=m, ncol=n, sizeHint=nnzJ)
+
+        # Insert contribution of general constraints.
+        if lp:
+            J[:om, :on] = self.model.A()
+        else:
+            J[:om, :on] = self.model.jac(x[:on])
+        J[upperC, :on] *= -1.0
+        J[om:om + nrangeC, :on] = J[rangeC, :on]  # upper side of range const.
+        J[om:om + nrangeC, :on] *= -1.0
+
+        # Create a few index lists
+        rlowerC = np.array(range(nlowerC))
+        rlowerB = np.array(range(nlowerB))
+        rupperC = np.array(range(nupperC))
+        rupperB = np.array(range(nupperB))
+        rrangeC = np.array(range(nrangeC))
+        rrangeB = np.array(range(nrangeB))
+
+        # Insert contribution of slacks on general constraints
+        J.put(-1.0,      lowerC,  on + rlowerC)
+        J.put(-1.0,      upperC,  on + nlowerC + rupperC)
+        J.put(-1.0,      rangeC,  on + nlowerC + nupperC + rrangeC)
+        J.put(-1.0, om + rrangeC, on + nlowerC + nupperC + nrangeC + rrangeC)
+
+        if self.keep_variable_bounds:
+            return J
+
+        # Insert contribution of bound constraints on the original problem
+        bot = om + nrangeC
+        J.put(1.0, bot + rlowerB, lowerB)
+        bot += nlowerB
+        J.put(1.0, bot + rrangeB, rangeB)
+        bot += nrangeB
+        J.put(-1.0, bot + rupperB, upperB)
+        bot += nupperB
+        J.put(-1.0, bot + rrangeB, rangeB)
+
+        # Insert contribution of slacks on the bound constraints
+        bot = om + nrangeC
+        J.put(-1.0, bot + rlowerB, on + nSlacks + rlowerB)
+        bot += nlowerB
+        J.put(-1.0, bot + rrangeB, on + nSlacks + nlowerB + rrangeB)
+        bot += nrangeB
+        J.put(-1.0, bot + rupperB, on + nSlacks + nlowerB + nrangeB + rupperB)
+        bot += nupperB
+        J.put(-1.0, bot + rrangeB, on + nSlacks + nlowerB + nrangeB +
+              nupperB + rrangeB)
+        return J
+
+    def hess(self, x, z=None, *args, **kwargs):
+        """Evaluate Lagrangian Hessian at (x, z)."""
+        model = self.model
+        if isinstance(model, QuasiNewtonModel):
+            return self.hop(x, z, *args, **kwargs)
+
+        on = model.n
+        pi = self.convert_multipliers(z)
+        H = PysparseMatrix(nrow=self.n, ncol=self.n, symmetric=True,
+                           sizeHint=self.model.nnzh)
+        H[:on, :on] = self.model.hess(x[:on], pi, *args, **kwargs)
+        return H
 
 
 class RegQPInteriorPointSolver(object):
@@ -410,7 +872,6 @@ class RegQPInteriorPointSolver(object):
         b = self.b
         c = self.c
         Q = self.Q
-        diagQ = self.diagQ
         H = self.H
 
         regpr = self.regpr
@@ -649,10 +1110,6 @@ class RegQPInteriorPointSolver(object):
             # Recover step.
             dx, ds, dy, dz = self.get_dxsyz(step, x, s, y, z, comp)
 
-            normds = norm2(ds)
-            normdy = norm2(dy)
-            normdx = norm2(dx)
-
             # Compute largest allowed primal and dual stepsizes.
             (alpha_p, ip) = self.max_step_length(s, ds)
             (alpha_d, id) = self.max_step_length(z, dz)
@@ -779,8 +1236,6 @@ class RegQPInteriorPointSolver(object):
         """
         qp = self.qp
         n = qp.n
-        m = qp.m
-        ns = self.nSlacks
         on = qp.original_n
 
         self.log.debug('Computing initial guess')
@@ -1186,7 +1641,6 @@ class RegQPInteriorPointSolver3x3(RegQPInteriorPointSolver):
     def set_affine_scaling_rhs(self, rhs, pFeas, dFeas, s, z):
         """Set rhs for affine-scaling step."""
         m, n = self.A.shape
-        on = self.qp.original_n
         rhs[:n] = -dFeas
         rhs[n:n + m] = -pFeas
         rhs[n + m:] = -s * np.sqrt(z)
@@ -1209,9 +1663,7 @@ class RegQPInteriorPointSolver3x3(RegQPInteriorPointSolver):
     def update_long_step_rhs(self, rhs, pFeas, dFeas, comp, s):
         """Update right-hand side when using long step."""
         m, n = self.A.shape
-        on = self.qp.original_n
         rhs[:n] = -dFeas
-        # rhs[on:n] -=  z
         rhs[n:n + m] = -pFeas
         rhs[n + m:] = -comp
         return
