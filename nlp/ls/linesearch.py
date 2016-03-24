@@ -149,6 +149,10 @@ class ArmijoLineSearch(LineSearch):
     def decr(self):
         return self.__decr
 
+    @property
+    def bk(self):
+        return self._bk
+
     def next(self):
         if self.trial_value <= self.value + self.step * self.ftol * self.slope:
             raise StopIteration()
