@@ -62,9 +62,7 @@ class SlackModel(NLPModel):
         """Initialize a slack form of an :class:`NLPModel`.
 
         :parameters:
-
             :model:  Original model to be transformed into a slack form.
-
         """
         self.model = model
 
