@@ -170,3 +170,91 @@ class ArmijoLineSearch(LineSearch):
         self._trial_value = self.linemodel.obj(self.step, x=self.iterate)
 
         return step  # return value of step just tested
+
+
+class ArmijoWolfeLineSearch(ArmijoLineSearch):
+    """Improved Armijo backtracking linesearch."""
+
+    def __init__(self, *args, **kwargs):
+        """Instantiate an improved Armijo backtracking linesearch.
+
+        The search stops as soon as a step size t is found such that
+
+            ϕ(t) <= ϕ(0) + t * ftol * ϕ'(0)
+
+        where 0 < ftol < 1 and ϕ'(0) is the directional derivative of
+        a merit function f in the descent direction d. true.
+
+        :keywords:
+            :ftol: constant used in Armijo condition (default: 1.0e-4)
+            :gtol:constant used in curvature condition (default: 0.9999)
+            :bkmax: maximum number of Armijo backtracking steps (default: 20)
+            :wmax: maximum number of expansion steps (default: 5)
+            :incr: factor by which to increase the steplength during the
+                   loose Wolfe search (default: 5.0)
+            :decr: factor by which to reduce the steplength
+                   during the backtracking (default: 1.5).
+        """
+        name = kwargs.pop("name", "Armijo-Wolfe linesearch")
+        super(ArmijoWolfeLineSearch, self).__init__(*args, name=name, **kwargs)
+        self.__gtol = min(max(kwargs.get("gtol", 0.9999),
+                              self.ftol + sqeps),
+                          1 - sqeps)
+        self.__wmax = max(kwargs.get("wmax", 5), 0)
+        self.__incr = max(min(kwargs.get("incr", 5.0), 100), 1.001)
+        self._nw = 0
+
+        self._trial_slope = self.linemodel.grad(self.step, x=self.iterate)
+        return
+
+    @property
+    def gtol(self):
+        return self.__gtol
+
+    @property
+    def wmax(self):
+        return self.__wmax
+
+    @property
+    def incr(self):
+        return self.__incr
+
+    @property
+    def trial_slope(self):
+        return self._trial_slope
+
+    def next(self):
+        goal = self.value + self.step * self.ftol * self.slope
+        armijo = self.trial_value <= goal
+
+        # Increase step to try and satisfy loose Wolfe condition.
+        wolfe = self.trial_slope >= self.gtol * self.slope
+        if self._nw < self.wmax and armijo and not wolfe:
+            step = self.step
+            self._nw += 1
+            self._step *= self.incr
+            self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
+            self._trial_value = self.linemodel.obj(self.step)
+            self._trial_slope = self.linemodel.grad(self.step)
+            return step
+
+        if self._bk > self.bkmax:
+            raise LineSearchFailure("backtracking limit exceeded")
+
+        if armijo:
+            raise StopIteration()
+
+        hz = self.trial_value <= self.value + 1.0e-10 * abs(self.value)
+        if self.trial_slope <= -0.8 * self.slope and hz:
+            raise StopIteration()
+
+        step = self.step
+        self._bk += 1
+        self._step /= self.decr
+        if self.step < self.stepmin:
+            raise LineSearchFailure("linesearch step too small")
+
+        self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
+        self._trial_value = self.linemodel.obj(self.step)
+        self._trial_slope = self.linemodel.grad(self.step)
+        return step  # return value of step just tested
