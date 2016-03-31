@@ -85,7 +85,7 @@ class LBFGSFramework(object):
             # Prepare new pair {s,y} to be inserted into L-BFGS operator.
             self.s = ls.step * d
             x = ls.iterate
-            g_next = model.grad(x)
+            g_next = line_model.gradval
             self.y = g_next - g
             self.post_iteration()
 
