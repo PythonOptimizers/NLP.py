@@ -237,17 +237,11 @@ except:
 
 
 try:
-    from nlp.model.scipymodel import SciPyNLPModel
-    import scipy as sp
+    from scipy import sparse as sp
+    from pykrylov.linop.linop import linop_from_ndarray
 
-    class SciPyAdolcModel(SciPyNLPModel, SparseAdolcModel):
+    class SciPyAdolcModel(SparseAdolcModel):
         """`AdolcModel` with SciPy COO sparse matrices."""
-
-        # MRO: 1. SciPyAdolcModel
-        #      2. SciPyNLPModel
-        #      3. SparseAdolcModel
-        #      4. BaseAdolcModel
-        #      5. NLPModel
 
         def hess(self, *args, **kwargs):
             """Evaluate Lagrangian Hessian at (x, z)."""
@@ -264,10 +258,20 @@ try:
             l_vals = np.delete(u_vals, diag_idx)
 
             H = sp.coo_matrix((np.concatenate((l_vals, u_vals)),
-                              (np.concatenate((l_rows, u_rows)),
-                               np.concatenate((l_cols, u_cols)))),
+                               (np.concatenate((l_rows, u_rows)),
+                                np.concatenate((l_cols, u_cols)))),
                               shape=(self.nvar, self.nvar))
             return H
+
+        def jac(self, *args, **kwargs):
+            """Evaluate sparse constraints Jacobian."""
+            if self.ncon == 0:  # SciPy cannot create sparse matrix of size 0.
+                return linop_from_ndarray(np.empty((0, self.nvar),
+                                                   dtype=np.float))
+            vals, rows, cols = super(SciPyAdolcModel, self).jac(*args,
+                                                                **kwargs)
+            return sp.coo_matrix((vals, (rows, cols)),
+                                 shape=(self.ncon, self.nvar))
 
 except:
     pass
