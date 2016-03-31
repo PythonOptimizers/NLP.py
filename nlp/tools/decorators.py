@@ -31,8 +31,10 @@ def counter(func):
     @functools.wraps(func)
     def _counted(*args, **kwargs):
         _counted.ncalls += 1
-        func(*args, **kwargs)
+        return func(*args, **kwargs)
     _counted.ncalls = 0
+    _counted.__name__ = func.__name__
+    _counted.__doc__ = func.__doc__
     return _counted
 
 
