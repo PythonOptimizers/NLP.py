@@ -40,8 +40,9 @@ References
            Systems*, Cahiers du GERAD G-2008-46, GERAD, Montreal, Canada, 2008.
 
 """
-from pysparse.sparse import spmatrix   # To assemble the projection matrix
-from pysparse.sparse.pysparseMatrix import PysparseMatrix
+
+from cysparse.sparse.ll_mat import LLSparseMatrix
+import cysparse.common_types.cysparse_types as types
 
 try:                            # To compute projections
     from hsl.solvers.pyma57 import PyMa57Solver as LBLContext
@@ -50,41 +51,44 @@ except:
 
 from nlp.tools import norms
 from nlp.tools.timing import cputime
+import numpy as np
 import logging
 
 __docformat__ = 'restructuredtext'
 
 
 class ProjectedKrylov(object):
-    """Generic class for projected Krylov method.
-
-    :keywords:
-        :A:  the `constraint` matrix. Must be given as an explicit matrix.
-        :H:  the operator in the leading block. Only matrix-vector products
-             with ``H`` are required in projected Krylov methods. ``H`` can be
-             given as a linear operator.
-        :c:  the first part of the right-hand side vector.
-        :b:  the second part of the right-hand side vector (default: ``None``,
-             meaning the vector of zeros).
-        :abstol:  absolute stopping tolerance (default: 1.0e-8).
-        :reltol:  relative stopping tolerance (default: 1.0e-6).
-        :maxiter:  maximum number of iterations of the Krylov method.
-        :max_itref:  maximum number of iterative refinement steps after a
-                     projection (default: 3).
-        :itref_tol:  acceptable residual tolerance during iterative refinement
-                     (default: 1.0e-6).
-        :factorize: if set to ``True``, the projector will be factorized (this
-                    is the default). If set to ``False``, an existing
-                    factorization should be given in ``Proj``.
-        :Proj:    an existing factorization of the projector. If not ``None``,
-                  ``factorize`` will be set to ``False``.
-        :precon:  preconditioner. Normally this is a cheap approximation to
-                  ``H``. It must be specified as an explicit matrix.
-        :logger_name:  Name of a logger (Default: `None`).
-    """
+    """Generic class for projected Krylov method."""
 
     def __init__(self, c, H, **kwargs):
+        """Instantiate a projected Krylov method.
 
+        :parameters:
+            :H:  the operator in the leading block. Only matrix-vector products
+                 with ``H`` are required in projected Krylov methods. ``H``
+                 can be given as a linear operator.
+            :c:  the first part of the right-hand side vector.
+
+        :keywords:
+            :A:  the `constraint` matrix. Must be given as an explicit matrix.
+            :b:  the second part of the right-hand side vector
+                 (default: ``None``, meaning the vector of zeros).
+            :abstol:  absolute stopping tolerance (default: 1.0e-8).
+            :reltol:  relative stopping tolerance (default: 1.0e-6).
+            :maxiter:  maximum number of iterations of the Krylov method.
+            :max_itref:  maximum number of iterative refinement steps after a
+                         projection (default: 3).
+            :itref_tol:  acceptable residual tolerance during iterative
+                         refinement (default: 1.0e-6).
+            :factorize: if set to ``True``, the projector will be factorized
+                        (this is the default). If set to ``False``, an existing
+                        factorization should be given in ``proj``.
+            :proj: an existing factorization of the projector. If not ``None``,
+                      ``factorize`` will be set to ``False``.
+            :precon:  preconditioner. Normally this is a cheap approximation to
+                      ``H``. It must be specified as an explicit matrix.
+            :logger_name:  Name of a logger (Default: `None`).
+        """
         self.prefix = 'Generic PK: '   # Should be overridden in subclass
         self.name = 'Generic Projected Krylov Method (should be subclassed)'
 
@@ -105,8 +109,6 @@ class ProjectedKrylov(object):
         if self.A is not None:
             self.log.debug('Constraint matrix has shape (%d,%d)' %
                            (self.A.shape[0], self.A.shape[1]))
-            if isinstance(self.A, PysparseMatrix):
-                self.A = self.A.matrix
         else:
             self.log.debug('No constraint matrix specified')
         self.b = kwargs.get('rhs', None)
@@ -122,10 +124,10 @@ class ProjectedKrylov(object):
         self.H = H
         self.maxiter = kwargs.get('maxiter', 2 * self.n)
 
-        self.Proj = kwargs.get('Proj', None)
+        self.proj = kwargs.get('proj', None)
 
         # Factorization already performed
-        self.factorized = (self.Proj is not None)
+        self.factorized = (self.proj is not None)
 
         self.dreg = kwargs.get('dreg', 0.0)   # Dual regularization.
 
@@ -136,7 +138,7 @@ class ProjectedKrylov(object):
         self.x_feasible = None
         self.converged = False
 
-    def factorize(self):
+    def perform_factorization(self):
         """Assemble projection matrix and factorize it.
 
            P = [ G   A^T ]
@@ -149,38 +151,40 @@ class ProjectedKrylov(object):
             raise ValueError('No linear equality constraints were specified')
 
         # Form projection matrix
-        P = spmatrix.ll_mat_sym(self.n + self.m, self.nnzA + self.n)
+        P = LLSparseMatrix(size=self.n + self.m, size_hint=self.nnzA + self.n,
+                           store_symmetric=True, itype=types.INT64_T,
+                           dtype=types.FLOAT64_T)
         if self.precon is not None:
             P[:self.n, :self.n] = self.precon
         else:
-            r = range(self.n)
-            P.put(1, r, r)
+            r = np.arange(self.n)
+            P.put_triplet(r, r, np.ones(self.n))
         P[self.n:, :self.n] = self.A
 
         # Add regularization if requested.
         if self.dreg > 0.0:
-            r = range(self.n, self.n + self.m)
-            P.put(-self.dreg, r, r)
+            r = np.arange(self.n, self.n + self.m)
+            P.put_triplet(r, r, -self.dreg)
 
         msg = 'Factorizing projection matrix '
         msg += '(size %-d, nnz = %-d)...' % (P.shape[0], P.nnz)
         self.log.debug(msg)
         self.t_fact = cputime()
-        self.Proj = LBLContext(P)
+        self.proj = LBLContext(P)
         self.t_fact = cputime() - self.t_fact
         self.log.debug('... done (%-5.2fs)' % self.t_fact)
         self.factorized = True
         return
 
     def check_accurate(self):
-        """Make sure constraints are consistent and residual is satisfactory."""
-        scale_factor = norms.norm_infty(self.Proj.x[:self.n])
+        """Verify constraints consistency and residual accuracy."""
+        scale_factor = norms.norm_infty(self.proj.x[:self.n])
         if self.b is not None:
             scale_factor = max(scale_factor, norms.norm_infty(self.b))
         max_res = max(1.0e-6 * scale_factor, self.abstol)
-        res = norms.norm_infty(self.Proj.residual)
+        res = norms.norm_infty(self.proj.residual)
         if res > max_res:
-            if self.Proj.isFullRank:
+            if self.proj.isFullRank:
                 self.log.info(' Large residual. ' +
                               'Factorization likely inaccurate...')
             else:
@@ -198,10 +202,10 @@ class ProjectedKrylov(object):
         self.log.debug('Obtaining feasible solution...')
         self.t_feasible = cputime()
         self.rhs[n:] = self.b
-        self.Proj.solve(self.rhs)
-        self.x_feasible = self.Proj.x[:n].copy()
+        self.proj.solve(self.rhs)
+        self.x_feasible = self.proj.x[:n].copy()
         self.t_feasible = cputime() - self.t_feasible
-        self.CheckAccurate()
+        self.check_accurate()
         self.log.debug('... done (%-5.2fs)' % self.t_feasible)
         return
 
