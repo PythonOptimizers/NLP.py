@@ -1,4 +1,17 @@
-"""Strong Wolfe linesearch."""
+# -*- coding: utf8 -*-
+u"""Strong Wolfe linesearch.
+
+A translation of the original Fortran implementation of the Moré and Thuente
+linesearch ensuring satisfaction of the strong Wolfe conditions.
+
+The method is described in
+
+J. J. Moré and D. J. Thuente
+Line search algorithms with guaranteed sufficient decrease
+ACM Transactions on Mathematical Software (TOMS)
+Volume 20 Issue 3, pp 286-0307, 1994
+DOI http://dx.doi.org/10.1145/192115.192132
+"""
 
 from math import sqrt
 import numpy as np
