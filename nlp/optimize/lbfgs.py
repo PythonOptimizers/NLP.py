@@ -58,14 +58,14 @@ class LBFGSFramework(object):
         x = self.x
         hdr = "%4s  %8s  %7s  %8s  %4s" % ("iter", "f", u"‖∇f‖", u"∇f'd", "bk")
         self.logger.info(hdr)
-        fmt = "%4d  %8.1e  %7.1e"
+        fmt_short = "%4d  %8.1e  %7.1e"
+        fmt = fmt_short + "  %8.1e  %4d"
+        ls_fmt = "%7.1e  %8.1e"
         tstart = cputime()
 
         self.f0 = f = model.obj(x)
         g = model.grad(x)
         self.gNorm0 = gNorm = norms.norm2(g)
-
-        info = fmt % (self.iter, f, gNorm)
         stoptol = max(self.abstol, self.reltol * self.gNorm0)
 
         while gNorm > stoptol and self.iter < self.maxiter:
@@ -79,10 +79,9 @@ class LBFGSFramework(object):
             line_model = C1LineModel(self.model, x, d)
             ls = ArmijoWolfeLineSearch(line_model, step=step0)
             for step in ls:
-                self.logger.debug("%7.1e  %8.1e" % (step, ls.trial_value))
+                self.logger.debug(ls_fmt, step, ls.trial_value)
 
-            info += "  %8.1e  %4d" % (ls.slope, ls.bk)
-            self.logger.info(info)
+            self.logger.info(fmt, self.iter, f, gNorm, ls.slope, ls.bk)
 
             # Prepare new pair {s,y} to be inserted into L-BFGS operator.
             self.s = ls.step * d
@@ -96,10 +95,9 @@ class LBFGSFramework(object):
             gNorm = norms.norm2(g)
             f = ls.trial_value
             self.iter += 1
-            info = fmt % (self.iter, f, gNorm)
 
         self.tsolve = cputime() - tstart
-        self.logger.info(info)
+        self.logger.info(fmt_short, self.iter, f, gNorm)
         self.x = x
         self.f = f
         self.g = g
