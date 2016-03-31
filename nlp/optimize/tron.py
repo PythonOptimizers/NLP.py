@@ -5,15 +5,16 @@ A pure Python/Numpy implementation of TRON as described in
     Chih-Jen Lin and Jorge J. Moré, *Newton's Method for Large Bound-
     Constrained Optimization Problems*, SIAM J. Optim., 9(4), 1100–1127, 1999.
 """
-
+import numpy as np
+import logging
 from pykrylov.linop import SymmetricallyReducedLinearOperator as ReducedHessian
+from nlp.model.nlpmodel import NLPModel
 from nlp.tr.trustregion import GeneralizedTrustRegion
 from nlp.tools import norms
 from nlp.tools.utils import where
 from nlp.tools.timing import cputime
 from nlp.tools.exceptions import UserExitRequest
-import numpy as np
-import logging
+
 
 __docformat__ = 'restructuredtext'
 
@@ -42,7 +43,10 @@ class TRON(object):
             :logger_name:  name of a logger object that can be used in the post
                            iteration                          (``None``)
         """
-        self.model = model
+        if isinstance(model, NLPModel):
+            self.model = model
+        else:
+            raise TypeError("Model supplied is not a subclass of `NLPModel`.")
         self.TR = GeneralizedTrustRegion()
         self.iter = 0         # Iteration counter
         self.total_cgiter = 0
