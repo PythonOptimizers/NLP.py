@@ -96,7 +96,7 @@ class ProjectedCG(ProjectedKrylov):
 
         :keywords:
             :precon: a preconditioner G (given explicitly) (Identity)
-            :Proj: an existing factorization of the projection matrix
+            :proj: an existing factorization of the projection matrix
                    conforming to the LBLContext (None)
             :abstol: the absolute stopping tolerance (1.0e-8)
             :reltol: the relative stopping tolerance (1.0e-6)
@@ -133,15 +133,15 @@ class ProjectedCG(ProjectedKrylov):
         * A point was found where the residual is sufficiently small (whether
           no trust region was present, or its boundary was not encountered).
           This can only happen when `H` is second-order sufficient.
-          In this case `onBoundary` is set to `False` and `infDescent` is set
+          In this case `on_boundary` is set to `False` and `inf_descent` is set
           to `False`.
         * No trust region is present but the problem is not second-order
           sufficient. In this case, an infinite descent direction has been
-          identified: `infDescent` is set to `True` and `dir` contains the
-          infinite descent direction. `onBoundary` is set to `False`.
+          identified: `inf_descent` is set to `True` and `dir` contains the
+          infinite descent direction. `on_boundary` is set to `False`.
         * A trust-region is present and its boundary was hit. If no infinite
-          descent direction has been discovered, `infDescent` is set to
-          `False`. Otherwise, it is set to `True`. In both cases, `onBoundary`
+          descent direction has been discovered, `inf_descent` is set to
+          `False`. Otherwise, it is set to `True`. In both cases, `on_boundary`
           is set to `True`.
 
         Reference
@@ -171,16 +171,15 @@ class ProjectedCG(ProjectedKrylov):
         self.x = np.zeros(self.n, 'd')
         self.step = self.x  # Shortcut for consistency with TruncatedCG
         self.v = None
-        self.residNorm = None
-        self.residNorm0 = None
+        self.resid_norm = None
+        self.resid_norm0 = None
         self.rhs = np.zeros(self.n + self.m, 'd')
-        self.iter = self.nMatvec = 0
-        self.infiniteDescentDir = None
-        self.xNorm2 = 0.0        # Square norm of step, not counting x_feasible
-        self.stepNorm = 0.0      # Shortcut for consistency with TruncatedCG
-        self.dir = None          # Direction of infinity descent
-        self.onBoundary = False
-        self.infDescent = False
+        self.iter = self.n_matvec = 0
+        self.inf_descent_dir = None
+        self.inf_descent = False  # Direction of infinity descent
+        self.x_norm2 = 0.0        # Square norm of step, not counting x_feasible
+        self.step_norm = 0.0      # Shortcut for consistency with TruncatedCG
+        self.on_boundary = False
 
         # Formats for display
         self.hd_fmt = ' %-5s  %9s  %8s'
@@ -230,12 +229,12 @@ class ProjectedCG(ProjectedKrylov):
         """Solve."""
         if self.qp.A is not None:
             if self.factorize and not self.factorized:
-                self.Factorize()
+                self.perform_factorization()
             if self.b is not None:
                 self.FindFeasible()
 
         n = self.n
-        xNorm2 = 0.0   # Squared norm of current iterate x, not counting x_feas
+        x_norm2 = 0.0   # Squared norm of current iterate x, not counting x_feas
 
         # Obtain initial projected residual
         self.t_solve = cputime()
@@ -245,9 +244,9 @@ class ProjectedCG(ProjectedKrylov):
                 self.rhs[n:] = 0.0
             else:
                 self.rhs[:n] = self.qp.c
-            self.Proj.solve(self.rhs)
-            r = g = self.Proj.x[:n]
-            self.v = self.Proj.x[n:]
+            self.proj.solve(self.rhs)
+            r = g = self.proj.x[:n]
+            self.v = self.proj.x[n:]
 
             # self.CheckAccurate()
 
@@ -259,17 +258,17 @@ class ProjectedCG(ProjectedKrylov):
         p = -g
         pHp = None
 
-        self.residNorm0 = np.dot(r, g)
-        rg = self.residNorm0
-        threshold = max(self.abstol, self.reltol * sqrt(self.residNorm0))
+        self.resid_norm0 = np.dot(r, g)
+        rg = self.resid_norm0
+        threshold = max(self.abstol, self.reltol * sqrt(self.resid_norm0))
         iter = 0
-        onBoundary = False
+        on_boundary = False
 
         self.log.info(self.header)
         self.log.info('-' * len(self.header))
         self.log.info(self.fmt1 % (iter, rg))
 
-        while sqrt(rg) > threshold and iter < self.maxiter and not onBoundary:
+        while sqrt(rg) > threshold and iter < self.maxiter and not on_boundary:
 
             Hp = self.qp.H * p
             pHp = np.dot(p, Hp)
@@ -279,12 +278,12 @@ class ProjectedCG(ProjectedKrylov):
 
             if self.radius is not None:
                 # Compute steplength to the boundary
-                sigma = self.to_boundary(self.x, p, self.radius, ss=xNorm2)
+                sigma = self.to_boundary(self.x, p, self.radius, ss=x_norm2)
             elif pHp <= 0.0:
                 self.log.error('Problem is not second-order sufficient')
                 status = 'problem not SOS'
-                self.infDescent = True
-                self.dir = p
+                self.inf_descent = True
+                self.inf_descent_dir = p
                 continue
 
             alpha = rg / pHp if pHp != 0.0 else np.inf
@@ -294,19 +293,19 @@ class ProjectedCG(ProjectedKrylov):
                 # next iterate will lie past the boundary of the trust region
                 # Move to boundary of trust-region
                 self.x += sigma * p
-                xNorm2 = self.radius * self.radius
+                x_norm2 = self.radius * self.radius
                 status = 'on boundary (sigma = %g)' % sigma
-                self.infDescent = (pHp <= 0.0)
-                onBoundary = True
+                self.inf_descent = (pHp <= 0.0)
+                on_boundary = True
                 continue
 
             # Make sure nonnegativity bounds remain enforced, if requested
             if (self.btol is not None) and (self.cur_iter is not None):
-                stepBnd = self.ftb(self.x, p)
-                if stepBnd < alpha:
-                    self.x += stepBnd * p
+                step_bnd = self.ftb(self.x, p)
+                if step_bnd < alpha:
+                    self.x += step_bnd * p
                     status = 'on boundary'
-                    onBoundary = True
+                    on_boundary = True
                     continue
 
             # Move on
@@ -316,17 +315,17 @@ class ProjectedCG(ProjectedKrylov):
             if self.qp.A is not None:
                 # Project current residual
                 self.rhs[:n] = r
-                self.Proj.solve(self.rhs)
+                self.proj.solve(self.rhs)
 
                 # Perform actual iterative refinement, if necessary
-                # self.Proj.refine(self.rhs, nitref=self.max_itref,
+                # self.proj.refine(self.rhs, nitref=self.max_itref,
                 #                  tol=self.itref_tol)
 
                 # Obtain new projected gradient
-                g = self.Proj.x[:n]
+                g = self.proj.x[:n]
                 if self.precon is not None:
                     # Prepare for iterative semi-refinement
-                    self.qp.jtprod(self.Proj.x[n:], self.v)
+                    self.qp.jtprod(self.proj.x[n:], self.v)
             else:
                 g = r
 
@@ -341,7 +340,7 @@ class ProjectedCG(ProjectedKrylov):
             rg = rg_next
 
             if self.radius is not None:
-                xNorm2 = np.dot(self.x, self.x)
+                x_norm2 = np.dot(self.x, self.x)
             iter += 1
 
         # Output info about the last iteration
@@ -349,8 +348,8 @@ class ProjectedCG(ProjectedKrylov):
             self.log.info(self.fmt % (iter, rg, pHp))
 
         # Obtain final solution x
-        self.xNorm2 = xNorm2
-        self.stepNorm = sqrt(xNorm2)
+        self.x_norm2 = x_norm2
+        self.step_norm = sqrt(x_norm2)
         if self.x_feasible is not None:
             self.x += self.x_feasible
 
@@ -358,21 +357,21 @@ class ProjectedCG(ProjectedKrylov):
             # Find (weighted) least-squares Lagrange multipliers
             self.rhs[:n] = - self.qp.grad(self.x)
             self.rhs[n:] = 0.0
-            self.Proj.solve(self.rhs)
-            self.v = self.Proj.x[n:].copy()
+            self.proj.solve(self.rhs)
+            self.v = self.proj.x[n:].copy()
 
         self.t_solve = cputime() - self.t_solve
 
         self.step = self.x  # Alias for consistency with TruncatedCG.
-        self.onBoundary = onBoundary
+        self.on_boundary = on_boundary
         self.converged = (iter < self.maxiter)
-        if iter < self.maxiter and not onBoundary:
+        if iter < self.maxiter and not on_boundary:
             status = 'residual small'
         elif iter >= self.maxiter:
             status = 'max iter'
         self.iter = iter
-        self.nMatvec = iter
-        self.residNorm = sqrt(rg)
+        self.n_matvec = iter
+        self.resid_norm = sqrt(rg)
         self.status = status
 
         return
