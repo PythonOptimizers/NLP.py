@@ -43,6 +43,9 @@ class C1LineModel(NLPModel):
                                           Ucon=model.Ucon)
         self.__x = x
         self.__d = d
+        self.__f = None  # most recent objective value of `model`
+        self.__g = None  # most recent objective gradient of `model`
+        self.__c = None  # most recent constraint values of `model`
         self.__model = model
 
     @property
@@ -58,6 +61,18 @@ class C1LineModel(NLPModel):
         return self.__d
 
     @property
+    def objval(self):
+        return self.__f
+
+    @property
+    def gradval(self):
+        return self.__g
+
+    @property
+    def conval(self):
+        return self.__c
+
+    @property
     def model(self):
         return self.__model
 
@@ -68,7 +83,8 @@ class C1LineModel(NLPModel):
             :x: full-space x+td if that vector has already been formed.
         """
         xtd = (self.x + t * self.d) if x is None else x
-        return self.model.obj(xtd)
+        self.__f = self.model.obj(xtd)
+        return self.objval
 
     def grad(self, t, x=None):
         u"""Evaluate ϕ'(t) = ∇f(x + td)ᵀ d.
@@ -77,7 +93,8 @@ class C1LineModel(NLPModel):
             :x: full-space x+td if that vector has already been formed.
         """
         xtd = (self.x + t * self.d) if x is None else x
-        return np.dot(self.model.grad(xtd), self.d)
+        self.__g = self.model.grad(xtd)
+        return np.dot(self.gradval, self.d)
 
     def cons(self, t, x=None):
         u"""Evaluate γ(t) = c(x + td).
@@ -86,7 +103,8 @@ class C1LineModel(NLPModel):
             :x: full-space x+td if that vector has already been formed.
         """
         xtd = (self.x + t * self.d) if x is None else x
-        return self.model.cons(xtd)
+        self.__c = self.model.cons(xtd)
+        return self.conval
 
     def jac(self, t, x=None):
         u"""Evaluate γ'(t) = J(x + td) d.
