@@ -49,9 +49,11 @@ class LBFGSFramework(object):
         self.tsolve = 0.0
 
     def post_iteration(self):
+        """Bookkeeping at the end of a general iteration."""
         self.model.H.store(self.s, self.y)
 
     def solve(self):
+        """Solve model with the L-BFGS method."""
         model = self.model
         x = self.x
         hdr = "%4s  %8s  %7s  %8s  %4s" % ("iter", "f", u"‖∇f‖", u"∇f'd", "bk")
