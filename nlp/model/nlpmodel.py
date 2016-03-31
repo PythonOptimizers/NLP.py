@@ -1,14 +1,14 @@
 """Abstract base classes to represent continuous optimization models."""
 
+import logging
+import sys
+import numpy as np
 from nlp.model.kkt import KKTresidual
 from pykrylov.linop.linop import LinearOperator, DiagonalOperator, \
                                  ReducedLinearOperator
 from pykrylov.linop.blkop import BlockLinearOperator
 from nlp.tools.decorators import deprecated
 from nlp.tools.utils import where
-import logging
-import numpy as np
-import sys
 
 
 class NLPModel(object):
