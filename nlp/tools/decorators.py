@@ -1,3 +1,5 @@
+"""Decorators useful in the context of NLPy.py."""
+
 import warnings
 import functools
 import hashlib
@@ -7,7 +9,8 @@ import numpy as np
 def deprecated(func):
     """Mark functions as deprecated.
 
-    It will emit a warning when the function is called.
+    Using this decorator on a function or methos will emit a warning when the
+    function is called.
 
     From http://wiki.python.org/moin/PythonDecoratorLibrary
     """
@@ -46,10 +49,10 @@ def get_signature(x):
 
 
 def memoize_full(fcn):
-    """Cache the all values of a function or method.
+    """Cache all values of a function or method.
 
-    It is based on the sha1 signature of its arguments. If any single argument
-    changes, the function or method is evaluated afresh.
+    The cache is based on the sha1 signature of the function arguments.
+    If any single argument changes, the function or method is evaluated afresh.
     """
     _cache = {}
 
@@ -68,8 +71,8 @@ def memoize_full(fcn):
 def memoize_cheap(fcn):
     """Cache the most recent value of a function or method.
 
-    It is based on the sha1 signature of its arguments. If any single argument
-    changes, the function or method is evaluated afresh.
+    The cache is based on the sha1 signature of its arguments. If any single
+    argument changes, the function or method is evaluated afresh.
     """
     _cached_signature = [None]  # Must be mutable.
     _cached_value = [None]
