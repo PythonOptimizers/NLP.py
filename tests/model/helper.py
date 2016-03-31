@@ -1,7 +1,7 @@
-# Helper for nlp.model tests
+"""Helper module for nlp.model tests."""
 
-import numpy as np
 import importlib
+import numpy as np
 
 
 def module_missing(module):
@@ -231,10 +231,8 @@ def ndarray_from_ll_mat(spA):
 
 def ndarray_from_coord(nrow, ncol, vals, rows, cols, symmetric=False):
     A = np.zeros((nrow, ncol), dtype=np.float)
-    for k in range(len(vals)):
-        row = rows[k]
-        col = cols[k]
-        A[row, col] += vals[k]
+    for (row, col, val) in zip(rows, cols, vals):
+        A[row, col] += val
         if symmetric and row != col:
-            A[col, row] = vals[k]
+            A[col, row] = val
     return A
