@@ -36,7 +36,7 @@ def rosenbrock_checker(request):
     model = Rosenbrock(request.param)
     x = np.ones(model.nvar)
     x[1::2] = -1
-    dcheck = DerivativeChecker(model, x, tol=1.0e-5)
+    dcheck = DerivativeChecker(model, x, tol=1.0e-4)
     dcheck.check()
     dcheck.check(cheap_check=True, hess=False)
     return dcheck
