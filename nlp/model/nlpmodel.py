@@ -7,8 +7,7 @@ from nlp.model.kkt import KKTresidual
 from pykrylov.linop.linop import LinearOperator, DiagonalOperator, \
                                  ReducedLinearOperator
 from pykrylov.linop.blkop import BlockLinearOperator
-from nlp.tools.decorators import deprecated
-from nlp.tools.meta import CountCalls
+from nlp.tools.decorators import deprecated, counter
 from nlp.tools.utils import where
 
 
@@ -20,7 +19,6 @@ class NLPModel(object):
     interesting; they must be subclassed and specialized.
     """
 
-    __metaclass__ = CountCalls
     _id = -1
 
     def __init__(self, n, m=0, name='Generic', **kwargs):
@@ -168,6 +166,13 @@ class NLPModel(object):
         hndlr = logging.StreamHandler(sys.stdout)
         hndlr.setFormatter(fmt)
         self.logger.addHandler(hndlr)
+        self._setup_counters()
+
+    def _setup_counters(self):
+        meths = ["obj", "grad", "hess", "cons", "icons", "igrad", "sigrad",
+                 "jac", "jprod", "jtprod", "hprod", "hiprod", "ghivprod"]
+        for meth in meths:
+            setattr(self, meth, counter(getattr(self, meth)))
 
     @property
     def nvar(self):
