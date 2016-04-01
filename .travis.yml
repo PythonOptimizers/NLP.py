@@ -14,19 +14,20 @@ before_install:
   - brew uninstall -f adol-c boost cppad asl metis
   - brew install adol-c
   - brew install boost-python
-  - brew install -v cppad --with-adol-c
+  - brew install cppad --with-adol-c
   - brew install asl
   - brew install metis
-  - pip install virtualenv
+  - pip install -q virtualenv
   - virtualenv ~/.venv
   - source ~/.venv/bin/activate
-  - pip install numpy scipy
-  - pip install git+https://github.com/PythonOptimizers/pykrylov.git@develop
-  - pip install algopy
-  - pip install git+https://github.com/b45ch1/pycppad.git
+  - pip install -q numpy scipy
+  - pip install -q git+https://github.com/optimizers/pysparse.git
+  - pip install -q git+https://github.com/PythonOptimizers/pykrylov.git@develop
+  - pip install -q algopy
+  - pip install -q git+https://github.com/b45ch1/pycppad.git
   - cd $HOME && git clone https://github.com/b45ch1/pyadolc.git
   - cd pyadolc && { echo '\n' | python setup.py install; } && cd $TRAVIS_BUILD_DIR
-  - pip install pytest-cov
+  - pip install -q pytest-cov
 
 install:
   - echo "[ASL]" > site.cfg
