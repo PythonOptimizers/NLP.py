@@ -1,9 +1,10 @@
 """Tests relative to CySparse."""
 
+import os
+import pytest
 from unittest import TestCase
 from helper import *
 import numpy as np
-import os
 from nlp.model.cysparsemodel import CySparseAmplModel, CySparseSlackModel
 
 
@@ -15,17 +16,23 @@ class Test_CySparseAmplRosenbrock(TestCase, Rosenbrock):
         return get_derivatives_llmat(model)
 
     def setUp(self):
+        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("cysparse")
         model = os.path.join(this_path, 'rosenbrock.nl')
         self.model = CySparseAmplModel(model)  # x0 = (-1, ..., -1)
+
 
 class Test_CySparseAmplHS7(TestCase, Hs7):
     def get_derivatives(self, model):
         return get_derivatives_llmat(model)
 
     def setUp(self):
+        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("cysparse")
         model = os.path.join(this_path, 'hs007.nl')
         self.model = CySparseAmplModel(model)
         self.model.pi0 = np.ones(1)
+
 
 class Test_CySparseSlackHS7(TestCase, GenericTest):
     def get_expected(self):
@@ -35,9 +42,12 @@ class Test_CySparseSlackHS7(TestCase, GenericTest):
         return get_derivatives_llmat(model)
 
     def setUp(self):
+        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("cysparse")
         model = os.path.join(this_path, 'hs007.nl')
         self.model = CySparseSlackModel(CySparseAmplModel(model))
         self.model.pi0 = np.ones(1)
+
 
 class Test_CySparseSlackHS10(TestCase, GenericTest):
     def get_expected(self):
@@ -47,6 +57,8 @@ class Test_CySparseSlackHS10(TestCase, GenericTest):
         return get_derivatives_llmat(model)
 
     def setUp(self):
+        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("cysparse")
         model = os.path.join(this_path, 'hs010.nl')
         self.model = CySparseSlackModel(CySparseAmplModel(model))
         self.model.pi0 = np.ones(2)
