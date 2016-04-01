@@ -1,24 +1,31 @@
-language: python
+language: objective-c  # force osx for now.
 
 os:
   - osx
-  # - linux
+#   # - linux
 
-python:
-  - 2.7
+notifications:
+    email: never
 
 before_install:
   - brew update
+  - brew install python
   - brew tap homebrew/science
+  - brew uninstall -f adol-c boost cppad asl metis
   - brew install adol-c
-  - brew install boost --with-mpi --without-single
-  - brew install cppad --with-adol-c --with-boost --with-openmp
+  - brew install boost-python
+  - brew install -v cppad --with-adol-c
   - brew install asl
   - brew install metis
+  - pip install virtualenv
+  - virtualenv ~/.venv
+  - source ~/.venv/bin/activate
   - pip install numpy scipy
+  - pip install git+https://github.com/PythonOptimizers/pykrylov.git@develop
   - pip install algopy
   - pip install git+https://github.com/b45ch1/pycppad.git
-  - pip install git+https://github.com/b45ch1/pyadolc.git
+  - cd $HOME && git clone https://github.com/b45ch1/pyadolc.git
+  - cd pyadolc && { echo '\n' | python setup.py install; } && cd $TRAVIS_BUILD_DIR
   - pip install pytest-cov
 
 install:
@@ -27,7 +34,9 @@ install:
   - python setup.py install
 
 script:
-  - py.test -v --cov-report= --cov=nlp tests/
+  # - py.test -v --cov-report= --cov=nlp tests/  # when repository goes public
+  - py.test -v --cov=nlp tests/
 
-after_success:
-  coveralls
+# Uncomment when repository goes public
+# after_success:
+#   coveralls
