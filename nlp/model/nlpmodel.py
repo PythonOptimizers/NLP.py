@@ -1,14 +1,15 @@
 """Abstract base classes to represent continuous optimization models."""
 
+import logging
+import sys
+import numpy as np
 from nlp.model.kkt import KKTresidual
 from pykrylov.linop.linop import LinearOperator, DiagonalOperator, \
                                  ReducedLinearOperator
 from pykrylov.linop.blkop import BlockLinearOperator
 from nlp.tools.decorators import deprecated
+from nlp.tools.meta import CountCalls
 from nlp.tools.utils import where
-import logging
-import numpy as np
-import sys
 
 
 class NLPModel(object):
@@ -19,6 +20,7 @@ class NLPModel(object):
     interesting; they must be subclassed and specialized.
     """
 
+    __metaclass__ = CountCalls
     _id = -1
 
     def __init__(self, n, m=0, name='Generic', **kwargs):
