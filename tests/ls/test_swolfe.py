@@ -1,6 +1,6 @@
 from nlp.model.nlpmodel import UnconstrainedNLPModel
 from nlp.model.linemodel import C1LineModel
-from nlp.ls.pyswolfe import StrongWolfeLineSearch
+from nlp.ls.wolfe import StrongWolfeLineSearch
 
 import numpy as np
 import pytest
