@@ -94,7 +94,6 @@ packages_list = ['nlp',
                  'tests',
                  'tests.model']
 
-
 scripts_list = [os.path.join('nlp', 'tools', 'nlpy_pprof.py')]
 
 setup(

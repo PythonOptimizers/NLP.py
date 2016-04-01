@@ -1,7 +1,7 @@
-# Helper for nlp.model tests
-from numpy.testing import *
-import numpy as np
+"""Helper module for nlp.model tests."""
+
 import importlib
+import numpy as np
 
 
 def module_missing(module):
@@ -101,12 +101,12 @@ class GenericTest(object):
         data = self.get_expected()
         if self.model.m > 0:
             (f, c, l) = get_values(self.model)
-            assert_allclose(c, data.expected_c)
-            assert_almost_equal(l, data.expected_l)
+            assert(np.allclose(c, data.expected_c))
+            assert(abs(l - data.expected_l) <= 1.0e-6 * abs(data.expected_l))
         else:
             f = get_values(self.model)
 
-        assert_almost_equal(f, data.expected_f)
+        assert(abs(f - data.expected_f) <= 1.0e-6 * abs(data.expected_f))
 
         if self.model.m > 0:
             (g, H, Hv, J, Jv, JTw) = self.get_derivatives(self.model)
@@ -231,10 +231,8 @@ def ndarray_from_ll_mat(spA):
 
 def ndarray_from_coord(nrow, ncol, vals, rows, cols, symmetric=False):
     A = np.zeros((nrow, ncol), dtype=np.float)
-    for k in range(len(vals)):
-        row = rows[k]
-        col = cols[k]
-        A[row, col] += vals[k]
+    for (row, col, val) in zip(rows, cols, vals):
+        A[row, col] += val
         if symmetric and row != col:
-            A[col, row] = vals[k]
+            A[col, row] = val
     return A
