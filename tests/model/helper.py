@@ -1,17 +1,44 @@
 """Helper module for nlp.model tests."""
 
-import importlib
 import numpy as np
 
+try:
+    import adolc
+    from adolc_helper import *
+except:
+    pass
 
-def module_missing(module):
-    missing = False
-    try:
-        importlib.import_module(module)
-    except ImportError:
-        missing = True
+try:
+    import algopy
+    from algopy_helper import *
+except:
+    pass
 
-    return missing
+try:
+    from nlp.model.amplpy import AmplModel
+except:
+    pass
+
+try:
+    from nlp.model.pysparsemodel import PySparseAmplModel, PySparseSlackModel
+except:
+    pass
+
+try:
+    from nlp.model.cysparsemodel import CySparseAmplModel, CySparseSlackModel
+except:
+    pass
+
+try:
+    from nlp.model.scipymodel import SciPyAmplModel, SciPySlackModel
+except:
+    pass
+
+try:
+    import pycppad
+    from cppad_helper import *
+except:
+    pass
 
 
 class RosenbrockData(object):

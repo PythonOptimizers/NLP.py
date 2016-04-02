@@ -22,11 +22,11 @@ class CppADModel(NLPModel):
         """Initialize a model with `n` variables and `m` constraints.
         :parameters:
 
-            :n:       number of variables (default: 0)
+            :n:       number of variables
             :m:       number of general (non bound) constraints (default: 0)
             :name:    model name (default: 'Generic')
         """
-        super(CppADModel, self).__init__(n, m=0, name=name, **kwargs)
+        super(CppADModel, self).__init__(n, m=m, name=name, **kwargs)
 
         self._cppad_adfun_obj = None
         self._cppad_adfun_cons = None

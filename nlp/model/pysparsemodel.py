@@ -9,7 +9,6 @@ except:
 from nlp.model.nlpmodel import NLPModel
 from nlp.model.snlp import SlackModel
 from nlp.model.qnmodel import QuasiNewtonModel
-from nlp.model.amplpy import AmplModel
 from pykrylov.linop.linop import PysparseLinearOperator
 
 import numpy as np
@@ -39,35 +38,40 @@ class PySparseNLPModel(NLPModel):
         return J
 
 
-class PySparseAmplModel(PySparseNLPModel, AmplModel):
-    # MRO: 1. PySparseAmplModel
-    #      2. PySparseNLPModel
-    #      3. AmplModel
-    #      4. NLPModel
-    #
-    # Here, `jac` and `hess` are inherited directly from PySparseNPLModel.
-    #
+try:
+    from nlp.model.amplpy import AmplModel
 
-    def __init__(self, *args, **kwargs):
-        super(PySparseAmplModel, self).__init__(*args, **kwargs)
+    class PySparseAmplModel(PySparseNLPModel, AmplModel):
+        # MRO: 1. PySparseAmplModel
+        #      2. PySparseNLPModel
+        #      3. AmplModel
+        #      4. NLPModel
+        #
+        # Here, `jac` and `hess` are inherited directly from PySparseNPLModel.
+        #
 
-    def A(self, *args, **kwargs):
-        """Evaluate sparse Jacobian of the linear part of the constraints.
+        def __init__(self, *args, **kwargs):
+            super(PySparseAmplModel, self).__init__(*args, **kwargs)
 
-        Useful to obtain constraint matrix when problem is a linear programming
-        problem.
-        """
-        vals, rows, cols = super(PySparseNLPModel,
-                                 self).A(*args, **kwargs)
-        A = psp(nrow=self.ncon, ncol=self.nvar,
-                sizeHint=vals.size, symmetric=False)
-        A.put(vals, rows, cols)
-        return A
+        def A(self, *args, **kwargs):
+            """Evaluate sparse Jacobian of the linear part of the constraints.
 
-    def jop(self, *args, **kwargs):
-        """Obtain Jacobian at x as a linear operator."""
-        return PysparseLinearOperator(self.jac(*args, **kwargs))
+            Useful to obtain constraint matrix when problem is a linear programming
+            problem.
+            """
+            vals, rows, cols = super(PySparseNLPModel,
+                                    self).A(*args, **kwargs)
+            A = psp(nrow=self.ncon, ncol=self.nvar,
+                    sizeHint=vals.size, symmetric=False)
+            A.put(vals, rows, cols)
+            return A
 
+        def jop(self, *args, **kwargs):
+            """Obtain Jacobian at x as a linear operator."""
+            return PysparseLinearOperator(self.jac(*args, **kwargs))
+
+except:
+    pass
 
 class PySparseSlackModel(SlackModel):
     """SlackModel in wich matrices are PySparse matrices.
