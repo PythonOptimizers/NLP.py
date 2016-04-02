@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """The limited-memory BFGS linesearch method for unconstrained optimization."""
 
+import logging
 from nlp.model.linemodel import C1LineModel
 from nlp.ls.linesearch import ArmijoWolfeLineSearch
 from nlp.tools import norms
+from nlp.tools.exceptions import UserExitRequest
 from nlp.tools.timing import cputime
-import logging
 
 __docformat__ = 'restructuredtext'
 
@@ -34,7 +35,7 @@ class LBFGSFramework(object):
         self.logger = logging.getLogger(logger_name)
 
         self.iter = 0
-        self.converged = False
+        self.status = ""
 
         self.x = model.x0.copy()
         self.f = None
@@ -61,6 +62,7 @@ class LBFGSFramework(object):
         fmt_short = "%4d  %8.1e  %7.1e"
         fmt = fmt_short + "  %8.1e  %4d"
         ls_fmt = "%7.1e  %8.1e"
+
         tstart = cputime()
 
         self.f0 = f = model.obj(x)
@@ -68,7 +70,12 @@ class LBFGSFramework(object):
         self.gNorm0 = gNorm = norms.norm2(g)
         stoptol = max(self.abstol, self.reltol * self.gNorm0)
 
-        while gNorm > stoptol and self.iter < self.maxiter:
+        exitUser = False
+        exitOptimal = gNorm <= stoptol
+        exitIter = self.iter >= self.maxiter
+        status = ""
+
+        while not (exitUser or exitOptimal or exitIter):
 
             # Obtain search direction
             H = model.hop(x)
@@ -88,7 +95,11 @@ class LBFGSFramework(object):
             x = ls.iterate
             g_next = line_model.gradval
             self.y = g_next - g
-            self.post_iteration()
+            status = ""
+            try:
+                self.post_iteration()
+            except UserExitRequest:
+                status = "usr"
 
             # Prepare for next round.
             g = g_next
@@ -96,10 +107,23 @@ class LBFGSFramework(object):
             f = ls.trial_value
             self.iter += 1
 
+            exitOptimal = gNorm <= stoptol
+            exitIter = self.iter > self.maxiter
+            exitUser = status == "usr"
+
         self.tsolve = cputime() - tstart
         self.logger.info(fmt_short, self.iter, f, gNorm)
+
         self.x = x
         self.f = f
         self.g = g
         self.gNorm = gNorm
-        self.converged = (self.iter < self.maxiter)
+
+        # Set final solver status.
+        if status == "usr":
+            pass
+        elif self.gNorm <= stoptol:
+            status = "opt"
+        else:  # self.iter > self.maxiter:
+            status = "itr"
+        self.status = status
