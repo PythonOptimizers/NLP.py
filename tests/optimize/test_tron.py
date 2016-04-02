@@ -1,9 +1,14 @@
 """Tests relative to pure Python models."""
 
 from unittest import TestCase
-from nlp.model.amplpy import AmplModel
 from nlp.optimize.tron import TRON
+try:
+    from nlp.model.amplpy import AmplModel
+except:
+    pass
+
 import numpy as np
+import pytest
 import os
 
 
@@ -13,6 +18,7 @@ this_path = os.path.dirname(os.path.realpath(__file__))
 class Test_TRON(TestCase):
 
     def setUp(self):
+        pytest.importorskip("nlp.model.amplpy")
         model = os.path.join(this_path, '..', 'model', 'rosenbrock.nl')
         self.tron = TRON(AmplModel(model))
 
