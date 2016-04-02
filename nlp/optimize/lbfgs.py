@@ -11,7 +11,7 @@ from nlp.tools.timing import cputime
 __docformat__ = 'restructuredtext'
 
 
-class LBFGSFramework(object):
+class LBFGS(object):
     """Solve unconstrained problems with the limited-memory BFGS method."""
 
     def __init__(self, model, **kwargs):

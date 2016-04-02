@@ -6,7 +6,7 @@ for several values of the limited-memory parameter.
 """
 
 from nlp.model.amplpy import QNAmplModel
-from nlp.optimize.lbfgs import LBFGSFramework
+from nlp.optimize.lbfgs import LBFGS
 from pykrylov.linop import InverseLBFGSOperator
 from os.path import basename, splitext
 import sys
@@ -21,7 +21,7 @@ for problem_name in sys.argv[1:]:
         model = QNAmplModel(problem_name,
                             H=InverseLBFGSOperator, scaling=True, npairs=m)
 
-        lbfgs = LBFGSFramework(model)
+        lbfgs = LBFGS(model)
         lbfgs.solve()
 
         # Output final statistics
