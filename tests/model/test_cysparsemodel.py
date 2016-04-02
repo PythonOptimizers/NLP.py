@@ -5,7 +5,6 @@ import pytest
 from unittest import TestCase
 from helper import *
 import numpy as np
-from nlp.model.cysparsemodel import CySparseAmplModel, CySparseSlackModel
 
 
 this_path = os.path.dirname(os.path.realpath(__file__))

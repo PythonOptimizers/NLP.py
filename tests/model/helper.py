@@ -25,6 +25,11 @@ except:
     pass
 
 try:
+    from nlp.model.cysparsemodel import CySparseAmplModel, CySparseSlackModel
+except:
+    pass
+
+try:
     from nlp.model.scipymodel import SciPyAmplModel, SciPySlackModel
 except:
     pass
