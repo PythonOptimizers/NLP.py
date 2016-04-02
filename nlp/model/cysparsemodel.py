@@ -7,7 +7,6 @@ except:
 from nlp.model.nlpmodel import NLPModel
 from nlp.model.snlp import SlackModel
 from nlp.model.qnmodel import QuasiNewtonModel
-from nlp.model.amplpy import AmplModel
 from pykrylov.linop import CysparseLinearOperator
 import numpy as np
 
@@ -41,32 +40,37 @@ class CySparseNLPModel(NLPModel):
         J.put_triplet(rows, cols, vals)
         return J
 
+try:
+    from nlp.model.amplpy import AmplModel
 
-class CySparseAmplModel(CySparseNLPModel, AmplModel):
-    # MRO: 1. CySparseAmplModel
-    #      2. CySparseNLPModel
-    #      3. AmplModel
-    #      4. NLPModel
-    #
-    # Here, `jac` and `hess` are inherited directly from CySparseNPLModel.
-    #
+    class CySparseAmplModel(CySparseNLPModel, AmplModel):
+        # MRO: 1. CySparseAmplModel
+        #      2. CySparseNLPModel
+        #      3. AmplModel
+        #      4. NLPModel
+        #
+        # Here, `jac` and `hess` are inherited directly from CySparseNPLModel.
+        #
 
-    def A(self, *args, **kwargs):
-        """
-        Evaluate sparse Jacobian of the linear part of the
-        constraints. Useful to obtain constraint matrix
-        when problem is a linear programming problem.
-        """
-        vals, rows, cols = super(CySparseAmplModel. self).A(*args, **kwargs)
-        A = LLSparseMatrix(nrow=self.ncon, ncol=self.nvar,
-                           size_hint=vals.size, store_symmetric=False,
-                           type=types.INT64_T, dtype=types.FLOAT64_T)
-        A.put_triplet(rows, cols, vals)
-        return A
+        def A(self, *args, **kwargs):
+            """
+            Evaluate sparse Jacobian of the linear part of the
+            constraints. Useful to obtain constraint matrix
+            when problem is a linear programming problem.
+            """
+            vals, rows, cols = super(CySparseAmplModel. self).A(*args, **kwargs)
+            A = LLSparseMatrix(nrow=self.ncon, ncol=self.nvar,
+                            size_hint=vals.size, store_symmetric=False,
+                            type=types.INT64_T, dtype=types.FLOAT64_T)
+            A.put_triplet(rows, cols, vals)
+            return A
 
-    def jop(self, *args, **kwargs):
-        """Obtain Jacobian at x as a linear operator."""
-        return CysparseLinearOperator(self.jac(*args, **kwargs))
+        def jop(self, *args, **kwargs):
+            """Obtain Jacobian at x as a linear operator."""
+            return CysparseLinearOperator(self.jac(*args, **kwargs))
+
+except:
+    pass
 
 
 class CySparseSlackModel(SlackModel):

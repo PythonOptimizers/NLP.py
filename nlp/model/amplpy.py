@@ -3,10 +3,13 @@
 .. moduleauthor:: M. P. Friedlander <mpf@cs.ubc.ca>
 .. moduleauthor:: D. Orban <dominique.orban@gerad.ca>
 """
+try:
+    from nlp.model import _amplpy
+except:
+    raise
 
 import numpy as np
 from nlp.model.nlpmodel import NLPModel
-from nlp.model import _amplpy
 from pykrylov.linop import CoordLinearOperator
 from nlp.tools import sparse_vector_class as sv
 import warnings
