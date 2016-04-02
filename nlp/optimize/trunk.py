@@ -84,6 +84,7 @@ class Trunk(object):
         self.step_accepted = False
         self.dvars = None
         self.dgrad = None
+        self.status = ""
 
         self.reltol = kwargs.get("reltol", self.nlp.stop_d)
         self.abstol = kwargs.get("abstol", 1.0e-6)
