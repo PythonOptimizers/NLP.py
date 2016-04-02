@@ -82,7 +82,7 @@ class CySparseSlackModel(SlackModel):
 
     def __init__(self, model, **kwargs):
 
-        if not isinstance(model, CySparseAmplModel):
+        if not isinstance(model, CySparseNLPModel):
             raise TypeError("The model in `model` should be a CySparseNLPModel"
                             "or a derived class of it.")
         super(CySparseSlackModel, self).__init__(model)
