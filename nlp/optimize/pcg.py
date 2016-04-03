@@ -120,7 +120,6 @@ class TruncatedCG(object):
         :keywords:
 
           :s0:         initial guess (default: [0,0,...,0]),
-          :p0:         initial search direction (default -r),
           :radius:     the trust-region radius (default: None),
           :abstol:     absolute stopping tolerance (default: 1.0e-8),
           :reltol:     relative stopping tolerance (default: 1.0e-6),
@@ -166,7 +165,7 @@ class TruncatedCG(object):
         exitIter = k > maxiter
         exitUser = False
 
-        p = kwargs.get('p0', -y)
+        p = -y
 
         onBoundary = False
         infDescent = False
