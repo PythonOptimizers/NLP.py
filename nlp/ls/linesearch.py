@@ -19,14 +19,14 @@ class LineSearch(object):
     def __init__(self, linemodel, name="Generic Linesearch", **kwargs):
         """Initialize a linesearch method.
 
-            :parameters:
-                :linemodel: ``C1LineModel`` or ``C2LineModel`` instance
+        :parameters:
+            :linemodel: ``C1LineModel`` or ``C2LineModel`` instance
 
-            :keywords:
-                :step: initial step size (default: 1.0)
-                :value: initial function value (computed if not supplied)
-                :slope: initial slope (computed if not supplied)
-                :name: linesearch procedure name.
+        :keywords:
+            :step: initial step size (default: 1.0)
+            :value: initial function value (computed if not supplied)
+            :slope: initial slope (computed if not supplied)
+            :name: linesearch procedure name.
         """
         self.__linemodel = linemodel
         self.__name = name
