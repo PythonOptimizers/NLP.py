@@ -5,7 +5,7 @@ import logging
 from nlp.model.linemodel import C1LineModel
 from nlp.ls.linesearch import ArmijoWolfeLineSearch
 from nlp.tools import norms
-from nlp.tools.exceptions import UserExitRequest
+from nlp.tools.exceptions import UserExitRequest, LineSearchFailure
 from nlp.tools.timing import cputime
 
 __docformat__ = 'restructuredtext'
@@ -71,11 +71,12 @@ class LBFGS(object):
         stoptol = max(self.abstol, self.reltol * self.gNorm0)
 
         exitUser = False
+        exitLS = False
         exitOptimal = gNorm <= stoptol
         exitIter = self.iter >= self.maxiter
         status = ""
 
-        while not (exitUser or exitOptimal or exitIter):
+        while not (exitUser or exitOptimal or exitIter or exitLS):
 
             # Obtain search direction
             H = model.hop(x)
@@ -85,8 +86,12 @@ class LBFGS(object):
             step0 = (1.0 / gNorm) if self.iter == 0 else 1.0
             line_model = C1LineModel(self.model, x, d)
             ls = ArmijoWolfeLineSearch(line_model, step=step0)
-            for step in ls:
-                self.logger.debug(ls_fmt, step, ls.trial_value)
+            try:
+                for step in ls:
+                    self.logger.debug(ls_fmt, step, ls.trial_value)
+            except LineSearchFailure:
+                exitLS = True
+                continue
 
             self.logger.info(fmt, self.iter, f, gNorm, ls.slope, ls.bk)
 
@@ -108,7 +113,7 @@ class LBFGS(object):
             self.iter += 1
 
             exitOptimal = gNorm <= stoptol
-            exitIter = self.iter > self.maxiter
+            exitIter = self.iter >= self.maxiter
             exitUser = status == "usr"
 
         self.tsolve = cputime() - tstart
@@ -124,6 +129,8 @@ class LBFGS(object):
             pass
         elif self.gNorm <= stoptol:
             status = "opt"
+        elif exitLS:
+            status = "lsf"
         else:  # self.iter > self.maxiter:
             status = "itr"
         self.status = status
