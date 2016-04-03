@@ -83,7 +83,7 @@ class LBFGS(object):
             d = -(H * g)
 
             # Prepare for modified linesearch
-            step0 = (1.0 / gNorm) if self.iter == 0 else 1.0
+            step0 = max(1.0e-3, 1.0 / gNorm) if self.iter == 0 else 1.0
             line_model = C1LineModel(self.model, x, d)
             ls = ArmijoWolfeLineSearch(line_model, step=step0)
             try:
