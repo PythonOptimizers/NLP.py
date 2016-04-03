@@ -2,16 +2,12 @@
 
 from math import sqrt
 import numpy as np
+from nlp.tools.exceptions import LineSearchFailure
 
 __docformat__ = 'restructuredtext'
 
 eps = np.finfo(np.double).eps
 sqeps = sqrt(eps)
-
-
-class LineSearchFailure(Exception):
-    """Exception raised when a linesearch fails."""
-    pass
 
 
 class LineSearch(object):
