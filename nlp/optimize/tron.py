@@ -8,7 +8,6 @@ A pure Python/Numpy implementation of TRON as described in
 import numpy as np
 import logging
 from pykrylov.linop import SymmetricallyReducedLinearOperator as ReducedHessian
-from nlp.model.nlpmodel import NLPModel
 from nlp.tr.trustregion import GeneralizedTrustRegion
 from nlp.tools import norms
 from nlp.tools.utils import where
@@ -22,9 +21,7 @@ __docformat__ = 'restructuredtext'
 class TRON(object):
     """Trust-region Newton method for bound-constrained optimization problems.
 
-           min f(x)  subject to xl <= x <= xu
-
-    where the Hessian matrix is sparse.
+            min f(x)  subject to xl <= x <= xu.
     """
 
     def __init__(self, model, **kwargs):
@@ -35,18 +32,15 @@ class TRON(object):
 
         :keywords:
             :x0:           starting point                     (``model.x0``)
-            :reltol:       relative stopping tolerance        (1.0e-12)
-            :abstol:       absolute stopping tolerance        (1.0e-6)
+            :reltol:       relative stopping tolerance        (1.0e-5)
+            :abstol:       absolute stopping tolerance        (1.0e-12)
             :maxiter:      maximum number of iterations       (max(1000,10n))
             :maxfuncall:   maximum number of objective function evaluations
                                                               (1000)
             :logger_name:  name of a logger object that can be used in the post
                            iteration                          (``None``)
         """
-        if isinstance(model, NLPModel):
-            self.model = model
-        else:
-            raise TypeError("Model supplied is not a subclass of `NLPModel`.")
+        self.model = model
         self.TR = GeneralizedTrustRegion()
         self.iter = 0         # Iteration counter
         self.total_cgiter = 0
@@ -56,8 +50,8 @@ class TRON(object):
         self.g = None
         self.g_old = None
         self.save_g = False
-        self.gnorm = None
-        self.g0 = None
+        self.pgnorm = None
+        self.pg0 = None
         self.tsolve = 0.0
 
         self.reltol = kwargs.get('reltol', 1e-12)
@@ -65,21 +59,19 @@ class TRON(object):
         self.maxiter = kwargs.get('maxiter', 100 * self.model.n)
         self.maxfuncall = kwargs.get('maxfuncall', 1000)
         self.cgtol = 0.1
-        self.gtol = 1.0e-5
         self.alphac = 1
-        self.feval = 0
 
         self.hformat = '%-5s  %8s  %7s  %5s  %8s  %8s  %8s  %4s'
         self.header = self.hformat % ('Iter', 'f(x)', '|g(x)|', 'cg',
                                       'rho', 'Step', 'Radius', 'Stat')
         self.hlen = len(self.header)
         self.hline = '-' * self.hlen
-        self.format = '%-5d  %8.2e  %7.1e  %5d  %8.1e  %8.1e  %8.1e  %4s'
-        self.format0 = '%-5d  %8.2e  %7.1e  %5s  %8s  %8s  %8.1e  %4s'
+        self.format = '%-5d  %8.1e  %7.1e  %5d  %8.1e  %8.1e  %8.1e  %4s'
+        self.format0 = '%-5d  %8.1e  %7.1e  %5s  %8s  %8s  %8.1e  %4s'
         self.radii = [self.TR.radius]
 
         # Setup the logger. Install a NullHandler if no output needed.
-        logger_name = kwargs.get('logger_name', 'nlp.tron')
+        logger_name = kwargs.get('logger_name', 'tron')
         self.log = logging.getLogger(logger_name)
         self.log.addHandler(logging.NullHandler())
         self.log.propagate = False
@@ -189,7 +181,7 @@ class TRON(object):
             # Reduce alpha until a successful step is found.
             search = True
             while search:
-                alpha = interpf * alpha
+                alpha *= interpf
                 s = self.projected_step(x, -alpha * g, xl, xu)
                 if norms.norm2(s) <= delta:
                     Hs = H * s
@@ -200,7 +192,7 @@ class TRON(object):
             search = True
             alphas = alpha
             while search and alpha <= brptmax:
-                alpha = extrapf * alpha
+                alpha *= extrapf
                 s = self.projected_step(x, -alpha * g, xl, xu)
                 if norms.norm2(s) <= delta:
                     Hs = H * s
@@ -267,6 +259,9 @@ class TRON(object):
 
             info = 4  The trust-region bound does not allow further progress.
         """
+        exitOptimal = False
+        exitIter = False
+
         # Initialize the iterate w and the residual r.
         w = np.zeros(len(g))
 
@@ -279,14 +274,14 @@ class TRON(object):
         # Initialize rho and the norm of r.
         rho = np.dot(r, r)
         rnorm0 = np.sqrt(rho)
+        iters = 0
 
         # Exit if g = 0.
         if rnorm0 == 0:
-            iters = 0
             info = 1
             return (w, iters, info)
 
-        for iters in range(0, itermax):
+        while not (exitOptimal or exitIter):
             z = p.copy()
             q = H * z
 
@@ -303,7 +298,7 @@ class TRON(object):
             # Exit if there is negative curvature or if the
             # iterates exit the trust region.
             if ptq <= 0 or alpha >= sigma:
-                w = sigma * p + w
+                w += sigma * p
                 if ptq <= 0:
                     info = 3
                 else:
@@ -311,23 +306,29 @@ class TRON(object):
                 return (w, iters, info)
 
             # Update w and the residual r
-            w = alpha * p + w
-            r = -alpha * q + r
+            w += alpha * p
+            r += -alpha * q
 
             # Exit if the residual convergence test is satisfied.
             rtr = np.dot(r, r)
             rnorm = np.sqrt(rtr)
             if rnorm <= tol:
+                exitOptimal = True
                 info = 1
-                return (w, iters, info)
+                continue
+
+            if iters >= itermax:
+                exitIter = True
+                info = 2
+                continue
 
             # Compute p = r + beta*p and update rho.
             beta = rtr / rho
-            p = r + p * beta
+            p *= beta
+            p += r
             rho = rtr
 
-        # iters = itmax
-        info = 2
+            iters += 1
 
         return (w, iters, info)
 
@@ -365,6 +366,10 @@ class TRON(object):
 
             info = 3  Failure to converge within itermax iterations.
         """
+        exitOptimal = False
+        exitPCG = False
+        exitIter = False
+
         w = H * s
 
         # Compute the Cauchy point.
@@ -374,15 +379,16 @@ class TRON(object):
         # There are at most n iterations because at each iteration
         # at least one variable becomes active.
         iters = 0
-        for i in range(0, len(x)):
+        while not (exitOptimal or exitPCG or exitIter):
             # Determine the free variables at the current minimizer.
             free_vars = where((x > xl) & (x < xu))
             nfree = len(free_vars)
 
             # Exit if there are no free constraints.
             if nfree == 0:
+                exitOptimal = True
                 info = 1
-                return (x, s, iters, info)
+                continue
 
             # Obtain the submatrix of H for the free variables.
             ZHZ = ReducedHessian(H, free_vars)
@@ -409,7 +415,7 @@ class TRON(object):
             # Update the minimizer and the step.
             # Note that s now contains x[k+1] - x[0]
             x[free_vars] = xfree
-            s[free_vars] = s[free_vars] + w
+            s[free_vars] += w
 
             # Compute the gradient grad q(x[k+1]) = g + H*(x[k+1] - x[0])
             # of q at x[k+1] for the free variables.
@@ -422,14 +428,17 @@ class TRON(object):
             # encounters a direction of negative curvature, or
             # if the step is at the trust region bound.
             if gfnormf <= cgtol * gfnorm:
+                exitOptimal = True
                 info = 1
-                return (x, s, iters, info)
+                continue
             elif infotr == 3 or infotr == 4:
+                exitPCG = True
                 info = 2
-                return (x, s, iters, info)
+                continue
             elif iters >= itermax:
+                exitIter = True
                 info = 3
-                return (x, s, iters, info)
+                continue
 
         return (x, s, iters, info)
 
@@ -482,7 +491,7 @@ class TRON(object):
             if q <= mu0 * gts:
                 search = False
             else:
-                alpha = interpf * alpha
+                alpha *= interpf
 
         # Force at least one more constraint to be added to the active
         # set if alpha < brptmin and the full step is not successful.
@@ -520,25 +529,26 @@ class TRON(object):
 
         # Gather initial information.
         self.f = model.obj(self.x)
-        self.feval += 1
         self.f0 = self.f
         self.g = model.grad(self.x)  # Current  gradient
         self.g_old = self.g.copy()
-        self.gnorm = norms.norm2(self.g)
-        self.g0 = self.gnorm
+        pgnorm = self.projected_gradient_norm2(self.x, self.g,
+                                               model.Lvar, model.Uvar)
+        self.pg0 = pgnorm
         cgtol = self.cgtol
         cg_iter = 0
         cgitermax = model.n
 
         # Initialize the trust region radius
-        self.TR.radius = self.g0
+        self.TR.radius = self.pg0
 
         # Test for convergence or termination
-        stoptol = self.gtol * self.g0
+        # stoptol = max(self.abstol, self.reltol * self.pgnorm)
+        stoptol = 1e-6 * pgnorm
         exitUser = False
-        exitOptimal = False
+        exitOptimal = pgnorm <= stoptol
         exitIter = self.iter >= self.maxiter
-        exitFunCall = self.feval >= self.maxfuncall
+        exitFunCall = model.obj.ncalls >= self.maxfuncall
         status = ''
 
         # Wrap Hessian into an operator.
@@ -550,7 +560,7 @@ class TRON(object):
             self.log.info(self.hline)
             self.log.info(self.header)
             self.log.info(self.hline)
-            self.log.info(self.format0, self.iter, self.f, self.gnorm,
+            self.log.info(self.format0, self.iter, self.f, pgnorm,
                           '', '', '', self.TR.radius, '')
 
         while not (exitUser or exitOptimal or exitIter or exitFunCall):
@@ -587,7 +597,6 @@ class TRON(object):
             # Compute the function
             x_trial = self.x + s
             f_trial = model.obj(x_trial)
-            self.feval += 1
 
             # Evaluate the step and determine if the step is successful.
 
@@ -619,7 +628,6 @@ class TRON(object):
                 self.x = x_trial
                 self.f = f_trial
                 self.g = model.grad(self.x)
-                self.gnorm = norms.norm2(self.g)
                 step_status = 'Acc'
 
             else:
@@ -637,13 +645,9 @@ class TRON(object):
 
             # Print out header, say, every 20 iterations
             if self.iter % 20 == 0:
-                self.log.info(self.hline)
                 self.log.info(self.header)
-                self.log.info(self.hline)
 
             pstatus = step_status if step_status != 'Acc' else ''
-            self.log.info(self.format, self.iter, self.f, self.gnorm,
-                          cg_iter, rho, snorm, self.TR.radius, pstatus)
 
             # Test for convergence. FATOL and FRTOL
             if abs(ared) <= self.abstol and -m <= self.abstol:
@@ -654,20 +658,24 @@ class TRON(object):
                 exitOptimal = True
                 status = 'frtol'
 
+            pgnorm = self.projected_gradient_norm2(self.x, self.g,
+                                                   model.Lvar, model.Uvar)
             if pstatus == '':
-                pgnorm2 = self.projected_gradient_norm2(self.x, self.g,
-                                                        model.Lvar, model.Uvar)
-                if pgnorm2 <= stoptol:
+                if pgnorm <= stoptol:
                     exitOptimal = True
                     status = 'gtol'
             else:
                 self.iter -= 1  # to match TRON iteration number
 
             exitIter = self.iter > self.maxiter
-            exitFunCall = self.feval >= self.maxfuncall
+            exitFunCall = model.obj.ncalls >= self.maxfuncall
             exitUser = status == 'usr'
 
+            self.log.info(self.format, self.iter, self.f, pgnorm,
+                          cg_iter, rho, snorm, self.TR.radius, pstatus)
+
         self.tsolve = cputime() - t    # Solve time
+        self.pgnorm = pgnorm
         # Set final solver status.
         if status == 'usr':
             pass
