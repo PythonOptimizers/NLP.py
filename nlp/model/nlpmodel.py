@@ -1,6 +1,7 @@
 """Abstract base classes to represent continuous optimization models."""
 
 import logging
+import os
 import sys
 import numpy as np
 from nlp.model.kkt import KKTresidual
@@ -45,7 +46,7 @@ class NLPModel(object):
         """
         self._nvar = self._n = n   # Number of variables
         self._ncon = self._m = m   # Number of general constraints
-        self._name = name          # Problem name
+        self._name = os.path.splitext(os.path.basename(name))[0]
 
         # Set initial point
         if 'x0' in kwargs.keys():
