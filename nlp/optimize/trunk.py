@@ -16,19 +16,16 @@ __docformat__ = "restructuredtext"
 
 
 class Trunk(object):
-    ur"""Abstract trust-region method for unconstrained optimization.
+    u"""Abstract trust-region method for unconstrained optimization.
 
     A stationary point of the unconstrained problem
 
-    .. math::
-        \min_x \ f(x)
+        minimize f(x)
 
     is identified by solving a sequence of trust-region constrained quadratic
-    subproblems:
+    subproblems
 
-    .. math::
-        \min_s \ g^T s + \tfrac{1}{2} s^T H s  \quad
-        \text{subject to} \ \|s\| \ leq \Delta.
+        min  gᵀs + ½ s'Hs  subject to  ‖s‖ ≤ Δ.
     """
 
     def __init__(self, nlp, tr, tr_solver, **kwargs):
@@ -76,7 +73,7 @@ class Trunk(object):
         self.g = None
         self.g_old = None
         self.save_g = False
-        self.gnorm = None
+        self.gNorm = None
         self.g0 = None
         self.alpha = 1.0  # For Nocedal-Yuan backtracking linesearch
         self.tsolve = 0.0
@@ -87,6 +84,7 @@ class Trunk(object):
 
         self.reltol = kwargs.get("reltol", self.nlp.stop_d)
         self.abstol = kwargs.get("abstol", 1.0e-6)
+        self.maxiter = kwargs.get("maxiter", max(1000, 10 * self.nlp.n))
 
         self.ny = kwargs.get("ny", False)
         self.nbk = kwargs.get("nbk", 5)
@@ -104,7 +102,7 @@ class Trunk(object):
         self.radii = [tr.radius]
 
         # Setup the logger. Install a NullHandler if no output needed.
-        logger_name = kwargs.get("logger_name", "nlpy.trunk")
+        logger_name = kwargs.get("logger_name", "nlp.trunk")
         self.log = logging.getLogger(logger_name)
         self.log.addHandler(logging.NullHandler())
         self.log.propagate = False
@@ -130,10 +128,6 @@ class Trunk(object):
         All other keyword arguments are passed directly to the constructor of
         the trust-region solver.
         """
-        self.maxiter = kwargs.get("maxiter", max(1000, 10 * self.nlp.n))
-        if "maxiter" in kwargs:
-            kwargs.pop("maxiter")
-
         nlp = self.nlp
 
         # Gather initial information.
@@ -141,14 +135,15 @@ class Trunk(object):
         self.f0 = self.f
         self.g = self.nlp.grad(self.x)
         self.g_old = self.g
-        self.gnorm = norms.norm2(self.g)
-        self.g0 = self.gnorm
+        self.gNorm = norms.norm2(self.g)
+        self.g0 = self.gNorm
 
+        self.tr.radius = min(max(0.1 * self.gNorm, 1.0), 100)
         cgtol = 1.0 if self.inexact else -1.0
         stoptol = max(self.abstol, self.reltol * self.g0)
         step_status = None
         exitUser = False
-        exitOptimal = self.gnorm <= stoptol
+        exitOptimal = self.gNorm <= stoptol
         exitIter = self.iter >= self.maxiter
         status = ""
 
@@ -163,8 +158,9 @@ class Trunk(object):
         # Print out header and initial log.
         if self.iter % 20 == 0:
             self.log.info(self.header)
-            self.log.info(self.format0 % (self.iter, self.f, self.gnorm, "",
-                                          "", "", self.tr.radius, ""))
+            self.log.info(self.format0,
+                          self.iter, self.f, self.gNorm, "",
+                          "", "", self.tr.radius, "")
 
         while not (exitUser or exitOptimal or exitIter):
 
@@ -179,7 +175,7 @@ class Trunk(object):
             # Note that m(s) does not include f(x): m(0) = 0.
 
             if self.inexact:
-                cgtol = max(1.0e-6, min(0.5 * cgtol, sqrt(self.gnorm)))
+                cgtol = max(stoptol, min(0.7 * cgtol, 0.01 * self.gNorm))
 
             qp = QPModel(self.g, self.nlp.hop(self.x, self.nlp.pi0))
             self.solver = TrustRegionSolver(qp, self.tr_solver)
@@ -217,7 +213,7 @@ class Trunk(object):
                 self.x = x_trial
                 self.f = f_trial
                 self.g = nlp.grad(self.x)
-                self.gnorm = norms.norm2(self.g)
+                self.gNorm = norms.norm2(self.g)
                 self.dvars = step
                 if self.save_g:
                     self.dgrad = self.g - self.g_old
@@ -260,7 +256,7 @@ class Trunk(object):
                     self.x = x_trial
                     self.f = f_trial
                     self.g = nlp.grad(self.x)
-                    self.gnorm = norms.norm2(self.g)
+                    self.gNorm = norms.norm2(self.g)
                     self.tr.radius = self.alpha * snorm
                     snorm /= self.alpha
                     step_status = "N-Y"
@@ -285,10 +281,10 @@ class Trunk(object):
                 self.log.info(self.header)
 
             pstatus = step_status if step_status != "Acc" else ""
-            self.log.info(self.format % (self.iter, self.f, self.gnorm, cgiter,
+            self.log.info(self.format % (self.iter, self.f, self.gNorm, cgiter,
                                          rho, snorm, self.tr.radius, pstatus))
 
-            exitOptimal = self.gnorm <= stoptol
+            exitOptimal = self.gNorm <= stoptol
             exitIter = self.iter > self.maxiter
             exitUser = status == "usr"
 
@@ -297,7 +293,7 @@ class Trunk(object):
         # Set final solver status.
         if status == "usr":
             pass
-        elif self.gnorm <= stoptol:
+        elif self.gNorm <= stoptol:
             status = "opt"
         else:  # self.iter > self.maxiter:
             status = "itr"
