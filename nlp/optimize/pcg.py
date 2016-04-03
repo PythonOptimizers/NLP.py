@@ -83,7 +83,8 @@ class TruncatedCG(object):
         # Formats for display
         self.hd_fmt = ' %-5s  %9s  %8s'
         self.header = self.hd_fmt % ('Iter', '<r,g>', 'curv')
-        self.fmt = ' %-5d  %9.2e  %8.2e'
+        self.fmt0 = ' %-5d  %9.2e'
+        self.fmt = self.fmt0 + '  %8.2e'
 
         return
 
@@ -249,7 +250,10 @@ class TruncatedCG(object):
             exitOptimal = sqrtry <= stop_tol
 
         # Output info about the last iteration.
-        self.log.info(self.fmt % (k, ry, pHp))
+        if k > 0:
+            self.log.info(self.fmt % (k, ry, pHp))
+        else:
+            self.log.info(self.fmt0 % (k, ry))
 
         if k >= maxiter:
             self.status = 'max iter'
