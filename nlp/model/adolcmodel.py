@@ -1,6 +1,9 @@
 """Models where derivatives are computed by ADOL-C."""
 
 from nlp.model.nlpmodel import NLPModel
+from nlp.model.qnmodel import QuasiNewtonModel
+from nlp.model.pysparsemodel import PySparseNLPModel
+from nlp.model.scipymodel import SciPyNLPModel
 import numpy as np
 
 try:
@@ -123,14 +126,18 @@ class BaseAdolcModel(NLPModel):
         """Evaluate the objective gradient."""
         return adolc.gradient(self._obj_trace_id, x)
 
-    def hess(self, x, z, **kwargs):
+    def hess(self, x, z=None, **kwargs):
         """Return the dense Hessian of the objective at x."""
+        if z is None:
+            z = np.zeros(self.ncon)
         xz = np.concatenate((x, z))
         H = adolc.hessian(self._lag_trace_id, xz)
         return H[:self.nvar, :self.nvar]
 
     def hprod(self, x, z, v, **kwargs):
-        """Return the Hessian-vector product at x with v."""
+        """Return the Hessian-vector product at (x,z) with v."""
+        if z is None:
+            z = np.zeros(self.ncon)
         xz = np.concatenate((x, z))
         v0 = np.concatenate((v, np.zeros(self.ncon)))
         return adolc.hess_vec(self._lag_trace_id, xz, v0)[:self.nvar]
@@ -169,9 +176,11 @@ class SparseAdolcModel(BaseAdolcModel):
         self.__first_sparse_hess_eval = True
         self.__first_sparse_jac_eval = True
 
-    def hess(self, x, z, **kwargs):
+    def hess(self, x, z=None, **kwargs):
         """Return the Hessian of the objective at x in sparse format."""
         options = np.zeros(2, dtype=int)
+        if z is None:
+            z = np.zeros(self.ncon)
         xz = np.concatenate((x, z))
         if self.__first_sparse_hess_eval:
             nnz, rind, cind, values =  \
@@ -275,3 +284,9 @@ try:
 
 except:
     pass
+
+
+class QNAdolcModel(QuasiNewtonModel, SparseAdolcModel):
+    """`AdolcModel` with quasi-Newton Hessian approximation."""
+
+    pass  # All the work is done by the parent classes.

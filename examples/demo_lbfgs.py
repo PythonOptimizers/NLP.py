@@ -1,31 +1,30 @@
+# -*- coding: utf-8 -*-
 """Demo of the limited-memory BFGS method.
 
 Each problem given on the command line is solved
 for several values of the limited-memory parameter.
 """
 
-from nlp.model.amplpy import AmplModel
-from nlp.optimize.lbfgs import LBFGSFramework
-import os
+from nlp.model.amplpy import QNAmplModel
+from nlp.optimize.lbfgs import LBFGS
+from pykrylov.linop import InverseLBFGSOperator
+from os.path import basename, splitext
 import sys
 
-headerfmt = '%-15s  %-6s  %-5s  %-12s  %-12s  %-6s  %-7s\n'
-header = headerfmt % ('Problem', 'n', 'pairs', 'Obj', 'Grad', 'Iter', 'Time')
-hlen = len(header)
-format = '%-15s  %-6d  %-5d  %-12g  %-12g  %-6d  %-7g\n'
+headerfmt = "%-15s %-6s %-5s %-8s %-7s %-5s %-5s\n"
+header = headerfmt % ("problem", "nvar", "pairs", "f", u"‖∇f‖", "iter", "time")
+format = "%-15s %-6d %-5d %-8.1e %-7.1e %-5d %-5.2f\n"
 sys.stdout.write(header)
-sys.stdout.write('-' * hlen + '\n')
 
 for problem_name in sys.argv[1:]:
-    model = AmplModel(problem_name)
-
     for m in [1, 2, 3, 4, 5, 10, 15, 20]:
-        lbfgs = LBFGSFramework(model, npairs=m, scaling=True, silent=True)
+        model = QNAmplModel(problem_name,
+                            H=InverseLBFGSOperator, scaling=True, npairs=m)
+
+        lbfgs = LBFGS(model)
         lbfgs.solve()
 
         # Output final statistics
-        probname = os.path.basename(problem_name)
-        if probname[-3:] == '.nl':
-            probname = probname[:-3]
-        sys.stdout.write(format % (probname, model.n, lbfgs.npairs, lbfgs.f,
-                                   lbfgs.gnorm, lbfgs.iter, lbfgs.tsolve))
+        probname = basename(splitext(problem_name)[0])
+        sys.stdout.write(format % (probname, model.n, model.H.npairs, lbfgs.f,
+                                   lbfgs.gNorm, lbfgs.iter, lbfgs.tsolve))

@@ -1,6 +1,13 @@
-"""A General module that implements various linesearch schemes."""
+"""A general linesearch framework."""
+
+from math import sqrt
+import numpy as np
+from nlp.tools.exceptions import LineSearchFailure
 
 __docformat__ = 'restructuredtext'
+
+eps = np.finfo(np.double).eps
+sqeps = sqrt(eps)
 
 
 class LineSearch(object):
@@ -9,208 +16,241 @@ class LineSearch(object):
     Most methods of this class should be overridden by subclassing.
     """
 
-    def __init__(self, **kwargs):
-        self._id = 'Generic Linesearch'
-        return
+    def __init__(self, linemodel, name="Generic Linesearch", **kwargs):
+        """Initialize a linesearch method.
 
-    def _test(self, fTrial, slope, t=1.0, **kwargs):
-        """Linesearch condition.
-
-        Given a descent direction `d` for function at the
-        current iterate `x`, see if the steplength `t` satisfies
-        a specific linesearch condition.
-
-        Must be overridden.
-        """
-        return True  # Must override
-
-    def search(self, func, x, d, slope, f=None, **kwargs):
-        """Compute a steplength `t` satisfying a linesearch condition.
-
-        Given a descent direction `d` for function `func` at the current
-        iterate `x`, compute a steplength `t` such that `func(x + t * d)`
-        satisfies a linesearch condition when compared to `func(x)`.
+        :parameters:
+            :linemodel: ``C1LineModel`` or ``C2LineModel`` instance
 
         :keywords:
-            :func: Pointer to a defined function or to a lambda function.
-                   For example, in the univariate case:
-
-                        `test(lambda x: x**2, 2.0, -1, 4.0)`
-            :x: Current iterate
-            :d: Direction along which doing the backtracking linesearch
-            :slope: The directional derivative of `func` at `x` in the
-                    direction `d`: slope = f'(x;d) < 0
-            :bkmax: Maximum number of backtracking steps
-            :f: If given, it should be the value of `func` at `x`.
-                If not given, it will be evaluated.
-            :fTrial: If given, it should be the value of `func` at `x+d`.
-                     If not given, it will be evaluated.
-
-        :returns:
-            :xTrial: New iterate `x + t * step` which satisfies a linesearch
-                     condition.
-            :fTrial: Value of `func` at this new point.
-            :t: Final step length.
+            :step: initial step size (default: 1.0)
+            :value: initial function value (computed if not supplied)
+            :slope: initial slope (computed if not supplied)
+            :name: linesearch procedure name.
         """
-        # Must override
+        self.__linemodel = linemodel
+        self.__name = name
+        self._value = kwargs.get("value", linemodel.obj(0))
+        self._slope = kwargs.get("slope", linemodel.grad(0))
+        self.check_slope(self.slope)
+
+        self._trial_value = self._value
+        self._step0 = max(kwargs.get("step", 1.0), 0)
+        self._step = self._step0
+
+        self._stepmin = sqrt(eps) / 100
+        if self._step <= self.stepmin:
+            raise LineSearchFailure("initial linesearch step too small")
+
+        self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
+        self._trial_value = self.linemodel.obj(self.step, x=self.iterate)
+        return
+
+    @property
+    def linemodel(self):
+        """Return underlying line model."""
+        return self.__linemodel
+
+    @property
+    def name(self):
+        """Return linesearch procedure name."""
+        return self.__name
+
+    @property
+    def value(self):
+        """Return initial merit function value."""
+        return self._value
+
+    @property
+    def step(self):
+        """Return current step size."""
+        return self._step
+
+    @property
+    def stepmin(self):
+        """Return minimum permitted step size."""
+        return self._stepmin
+
+    @property
+    def trial_value(self):
+        """Return current merit function value."""
+        return self._trial_value
+
+    @property
+    def iterate(self):
+        """Return current full-space iterate.
+
+        While not normally needed by the linesearch procedure, it is here so it
+        can be recovered on exit and doesn't need to be recomputed.
+        """
+        return self._trial_iterate
+
+    @property
+    def slope(self):
+        """Return initial merit function slope in search direction."""
+        return self._slope
+
+    def check_slope(self, slope):
         if slope >= 0.0:
             raise ValueError("Direction must be a descent direction")
-            return None
-        t = 1.0
-        while not self._test(fTrial, slope, t=t, **kwargs):
-            pass
-        return t
+
+    def __iter__(self):
+        # This method makes LineSearch objects iterable.
+        self._step = self._step0  # reinitialize search
+        return self
+
+    def __next__(self):
+        return self.next()
+
+    def next(self):
+        raise NotImplementedError("Please subclass")
 
 
 class ArmijoLineSearch(LineSearch):
-    """An Armijo linesearch with backtracking."""
+    """Armijo backtracking linesearch."""
 
-    def __init__(self, **kwargs):
-        """Implement the simple Armijo test.
+    def __init__(self, *args, **kwargs):
+        """Instantiate an Armijo backtracking linesearch.
 
-        f(x + t * d) <= f(x) + t * beta * f'(x;d)
+        The search stops as soon as a step size t is found such that
 
-        where 0 < beta < 1/2 and f'(x;d) is the directional derivative of f in
-        the direction d. Note that f'(x;d) < 0 must be true.
+            ϕ(t) <= ϕ(0) + t * ftol * ϕ'(0)
+
+        where 0 < ftol < 1 and ϕ'(0) is the directional derivative of
+        a merit function f in the descent direction d. true.
 
         :keywords:
-
-            :beta:      Value of beta (default 1e-4)
-            :tfactor:   Amount by which to reduce the steplength
-                        during the backtracking (default 0.1).
+            :ftol: constant used in Armijo condition (default: 1.0e-4)
+            :bkmax: maximum number of backtracking steps (default: 20)
+            :decr: factor by which to reduce the steplength
+                   during the backtracking (default: 1.5).
         """
-        super(ArmijoLineSearch, self).__init__(**kwargs)
-        self.beta = max(min(kwargs.get('beta', 1.0e-4), 0.5), 1.0e-10)
-        self.tfactor = max(min(kwargs.get('tfactor', 0.1), 0.999), 1.0e-3)
+        name = kwargs.pop("name", "Armijo linesearch")
+        super(ArmijoLineSearch, self).__init__(*args, name=name, **kwargs)
+        self.__ftol = max(min(kwargs.get("ftol", 1.0e-4), 1 - sqeps), sqeps)
+        self.__bkmax = max(kwargs.get("bkmax", 20), 0)
+        self.__decr = max(min(kwargs.get("decr", 1.5), 100), 1.001)
+        self._bk = 0
         return
 
-    def _test(self, fTrial, slope, t=1.0, **kwargs):
-        """Armijo condition.
+    @property
+    def ftol(self):
+        return self.__ftol
 
-        Given a descent direction d for function func at the
-        current iterate x, see if the steplength t satisfies
-        the Armijo linesearch condition.
-        """
-        return (fTrial <= f + t * self.beta * slope)
+    @property
+    def bkmax(self):
+        return self.__bkmax
 
-    def search(self, func, x, d, slope, bkmax=5,
-               f=None, fTrial=None, **kwargs):
-        """Compute a steplength `t` satisfying the Armijo condition.
+    @property
+    def decr(self):
+        return self.__decr
 
-        Given a descent direction `d` for function `func` at the current
-        iterate `x`, compute a steplength `t` such that `func(x + t * d)`
-        satisfies the Armijo linesearch condition when compared to `func(x)`.
+    @property
+    def bk(self):
+        return self._bk
+
+    def next(self):
+        if self.trial_value <= self.value + self.step * self.ftol * self.slope:
+            raise StopIteration()
+
+        self._bk += 1
+        if self._bk > self.__bkmax:
+            raise LineSearchFailure("backtracking limit exceeded")
+
+        step = self.step
+        self._step /= self.decr
+        if self.step < self.stepmin:
+            raise LineSearchFailure("linesearch step too small")
+
+        self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
+        self._trial_value = self.linemodel.obj(self.step, x=self.iterate)
+
+        return step  # return value of step just tested
+
+
+class ArmijoWolfeLineSearch(ArmijoLineSearch):
+    """Improved Armijo backtracking linesearch."""
+
+    def __init__(self, *args, **kwargs):
+        """Instantiate an improved Armijo backtracking linesearch.
+
+        The search stops as soon as a step size t is found such that
+
+            ϕ(t) <= ϕ(0) + t * ftol * ϕ'(0)
+
+        where 0 < ftol < 1 and ϕ'(0) is the directional derivative of
+        a merit function f in the descent direction d. true.
 
         :keywords:
-            :func: Pointer to a defined function or to a lambda function.
-                   For example, in the univariate case:
-
-                        `test(lambda x: x**2, 2.0, -1, 4.0)`
-            :x: Current iterate
-            :d: Direction along which doing the backtracking linesearch
-            :slope: The directional derivative of `func` at `x` in the
-                    direction `d`: slope = f'(x;d) < 0
-            :bkmax: Maximum number of backtracking steps
-            :f: If given, it should be the value of `func` at `x`.
-                If not given, it will be evaluated.
-            :fTrial: If given, it should be the value of `func` at `x+d`.
-                     If not given, it will be evaluated.
-
-        :returns:
-            :xTrial: New iterate `x + t * step` which satisfies the
-                     Armijo condition.
-            :fTrial: Value of `func` at this new point.
-            :t: Final step length.
+            :ftol: constant used in Armijo condition (default: 1.0e-4)
+            :gtol:constant used in curvature condition (default: 0.9999)
+            :bkmax: maximum number of Armijo backtracking steps (default: 20)
+            :wmax: maximum number of expansion steps (default: 5)
+            :incr: factor by which to increase the steplength during the
+                   loose Wolfe search (default: 5.0)
+            :decr: factor by which to reduce the steplength
+                   during the backtracking (default: 1.5).
         """
-        if f is None:
-            f = func(x)
-        xTrial = x + d
+        name = kwargs.pop("name", "Armijo-Wolfe linesearch")
+        super(ArmijoWolfeLineSearch, self).__init__(*args, name=name, **kwargs)
+        self.__gtol = min(max(kwargs.get("gtol", 0.9999),
+                              self.ftol + sqeps),
+                          1 - sqeps)
+        self.__wmax = max(kwargs.get("wmax", 5), 0)
+        self.__incr = max(min(kwargs.get("incr", 5.0), 100), 1.001)
+        self._nw = 0
 
-        if fTrial is None:
-            fTrial = func(xTrial)
+        self._trial_slope = self.linemodel.grad(self.step, x=self.iterate)
+        return
 
-        if slope >= 0.0:
-            raise ValueError("Direction must be a descent direction")
-            return None
-        bk = 0
-        t = 1.0
-        while not self._test(fTrial, slope, t=t, **kwargs) and bk < bkmax:
-            bk += 1
-            t *= self.tfactor
-            xTrial = x + t * d
-            fTrial = func(xTrial)
-        return (xTrial, fTrial, t)
+    @property
+    def gtol(self):
+        return self.__gtol
 
+    @property
+    def wmax(self):
+        return self.__wmax
 
-if __name__ == '__main__':
+    @property
+    def incr(self):
+        return self.__incr
 
-    # Simple example:
-    #    steepest descent method
-    #    with Armijo backtracking
-    from numpy import array, dot
-    from nlp.tools.norms import norm_infty
+    @property
+    def trial_slope(self):
+        return self._trial_slope
 
-    def rosenbrock(x):
-        """Usual 2D Rosenbrock function."""
-        return 10.0 * (x[1]-x[0]**2)**2 + (1-x[0])**2
+    def next(self):
+        goal = self.value + self.step * self.ftol * self.slope
+        armijo = self.trial_value <= goal
 
-    def rosenbrockxy(x, y):
-        """For plotting purposes."""
-        return rosenbrock((x, y))
+        # Increase step to try and satisfy loose Wolfe condition.
+        wolfe = self.trial_slope >= self.gtol * self.slope
+        if self._nw < self.wmax and armijo and not wolfe:
+            step = self.step
+            self._nw += 1
+            self._step *= self.incr
+            self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
+            self._trial_value = self.linemodel.obj(self.step)
+            self._trial_slope = self.linemodel.grad(self.step)
+            return step
 
-    def rosengrad(x):
-        """Gradient of `rosenbrock`."""
-        return array([-40.0 * (x[1] - x[0]**2) * x[0] - 2.0 * (1-x[0]),
-                      20.0 * (x[1] - x[0]**2)], 'd')
+        if self._bk > self.bkmax:
+            raise LineSearchFailure("backtracking limit exceeded")
 
-    ALS = ArmijoLineSearch(tfactor=0.2)
-    x = array([-0.5, 1.0], 'd')
-    xmin = xmax = x[0]
-    ymin = ymax = x[1]
-    f = rosenbrock(x)
-    grad = rosengrad(x)
-    d = -grad
-    slope = dot(grad, d)
-    t = 0.0
-    tlist = []
-    xlist = [x[0]]
-    ylist = [x[1]]
-    iter = 0
-    print '%-d\t%-g\t%-g\t%-g\t%-g\t%-g\t%-g' % (iter, f, norm_infty(grad),
-                                                 x[0], x[1], t, slope)
-    while norm_infty(grad) > 1.0e-5:
+        if armijo:
+            raise StopIteration()
 
-        iter += 1
+        hz = self.trial_value <= self.value + 1.0e-10 * abs(self.value)
+        if self.trial_slope <= -0.8 * self.slope and hz:
+            raise StopIteration()
 
-        # Perform linesearch
-        (x, f, t) = ALS.search(rosenbrock, x, d, slope, ftrial=f)
-        tlist.append(t)
+        step = self.step
+        self._bk += 1
+        self._step /= self.decr
+        if self.step < self.stepmin:
+            raise LineSearchFailure("linesearch step too small")
 
-        xlist.append(x[0])
-        ylist.append(x[1])
-        xmin = min(xmin, x[0])
-        xmax = max(xmax, x[0])
-        ymin = min(ymin, x[1])
-        ymax = max(ymax, x[1])
-        grad = rosengrad(x)
-        d = -grad
-        slope = dot(grad, d)
-        print '%-d\t%-g\t%-g\t%-g\t%-g\t%-g\t%-g' % (iter, f, norm_infty(grad),
-                                                     x[0], x[1], t, slope)
-
-    try:
-        from pylab import *
-    except:
-        import sys
-        sys.stderr.write('If you had Matplotlib, you would be looking\n')
-        sys.stderr.write('at a contour plot right now...\n')
-        sys.exit(0)
-    xx = arange(-1.5, 1.5, 0.01)
-    yy = arange(-0.5, 1.5, 0.01)
-    XX, YY = meshgrid(xx, yy)
-    ZZ = rosenbrockxy(XX, YY)
-    plot(xlist, ylist, 'r-', lw=1.5)
-    plot([xlist[0]], [ylist[0]], 'go', [xlist[-1]], [ylist[-1]], 'go')
-    contour(XX, YY, ZZ, 30, linewidths=1.5, alpha=0.75, origin='lower')
-    title('Steepest descent with Armijo linesearch on the Rosenbrock function')
-    show()
+        self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
+        self._trial_value = self.linemodel.obj(self.step)
+        self._trial_slope = self.linemodel.grad(self.step)
+        return step  # return value of step just tested

@@ -4,6 +4,7 @@
 from nlp.model.pysparsemodel import PySparseAmplModel
 from nlp.tools.dercheck import DerivativeChecker
 from nlp.tools.logs import config_logger
+import sys
 
 if len(sys.argv) == 1:
     raise ValueError("Please supply problem name as argument")

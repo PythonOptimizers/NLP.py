@@ -10,9 +10,10 @@ except:
 
 import numpy as np
 from nlp.model.nlpmodel import NLPModel
+from nlp.model.qnmodel import QuasiNewtonModel
 from pykrylov.linop import CoordLinearOperator
 from nlp.tools import sparse_vector_class as sv
-import warnings
+
 import tempfile
 import os
 
@@ -453,3 +454,8 @@ class AmplModel(NLPModel):
             write('This problem is a linear program.\n')
 
         return
+
+
+class QNAmplModel(QuasiNewtonModel, AmplModel):
+    """AMPL model with quasi-Newton Hessian approximation."""
+    pass  # All the work is done by the parent classes.

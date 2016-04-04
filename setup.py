@@ -8,6 +8,7 @@ D. Orban     <dominique.orban@gerad.ca>
 S. Arreckx   <sylvain.arreckx@gmail.com>
 """
 import os
+import glob
 
 from setuptools import setup   # enables 'python setup.py develop'
 from distutils.extension import Extension
@@ -94,7 +95,8 @@ packages_list = ['nlp',
                  'tests',
                  'tests.model']
 
-scripts_list = [os.path.join('nlp', 'tools', 'nlpy_pprof.py')]
+drivers = glob.glob(os.path.join('nlp', 'drivers', 'nlp_*.py'))
+scripts_list = [os.path.join('nlp', 'tools', 'nlpy_pprof.py')] + drivers
 
 setup(
     name='nlp',
