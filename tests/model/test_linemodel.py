@@ -1,6 +1,8 @@
-from nlp.model.nlpmodel import NLPModel, UnconstrainedNLPModel
+# -*- coding: utf-8 -*-
+from nlp.model.nlpmodel import NLPModel, UnconstrainedNLPModel, \
+                               BoundConstrainedNLPModel
 from nlp.model.linemodel import C1LineModel, C2LineModel
-
+from nlp.tools.utils import where
 import numpy as np
 import pytest
 
@@ -98,3 +100,55 @@ def test_c2rosenbrock(c2rosenbrock_restriction):
 
     assert np.allclose(c2rosenbrock_restriction.hprod(0, 0, 2),
                        2 * np.dot(d, model.hprod(x, 0, d)))
+
+
+class BoundedRosenbrock(BoundConstrainedNLPModel):
+    def __init__(self, nvar, Lvar, Uvar, **kwargs):
+        assert (nvar > 1)
+        super(BoundedRosenbrock, self).__init__(nvar, Lvar, Uvar, **kwargs)
+
+    def obj(self, x):
+        return np.sum(100 * (x[1:] - x[:-1]**2)**2 + (1 - x[:-1])**2)
+
+
+@pytest.fixture(params=[2, 5, 10])
+def c1boundedrosenbrock_restriction_feas(request):
+    nvar = request.param
+    # The original model has bounds 0 ≤ x ≤ 1.
+    # We choose an x inside the bounds and a random d.
+    return C1LineModel(BoundedRosenbrock(nvar, np.zeros(nvar), np.ones(nvar)),
+                       np.random.random(nvar),
+                       np.random.random(nvar) - 0.5)
+
+
+def test_bounded_rosenbrock_feas(c1boundedrosenbrock_restriction_feas):
+    linemodel = c1boundedrosenbrock_restriction_feas
+    model = linemodel.model
+    x = linemodel.x
+    d = linemodel.d
+    tmin = linemodel.Lvar[0]
+    tmax = linemodel.Uvar[0]
+    assert tmin <= tmax
+    assert np.all(model.Lvar <= x + tmin * d)
+    assert np.all(x + tmin * d <= model.Uvar)
+    assert np.all(model.Lvar <= x + tmax * d)
+    assert np.all(x + tmax * d <= model.Uvar)
+
+
+@pytest.fixture(params=[2, 5, 10])
+def c1boundedrosenbrock_restriction_infeas(request):
+    nvar = request.param
+    # The original model has bounds 0 ≤ x ≤ 1.
+    # We choose an x outside the bounds and  d.
+    x = np.zeros(nvar)
+    x[0] = 2
+    return C1LineModel(BoundedRosenbrock(nvar, np.zeros(nvar), np.ones(nvar)),
+                       x,
+                       np.ones(nvar))
+
+
+def test_bounded_rosenbrock_infeas(c1boundedrosenbrock_restriction_infeas):
+    linemodel = c1boundedrosenbrock_restriction_infeas
+    tmin = linemodel.Lvar[0]
+    tmax = linemodel.Uvar[0]
+    assert tmin > tmax
