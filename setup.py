@@ -96,7 +96,7 @@ packages_list = ['nlp',
                  'tests.model']
 
 drivers = glob.glob(os.path.join('nlp', 'drivers', 'nlp_*.py'))
-scripts_list = [os.path.join('nlp', 'tools', 'nlpy_pprof.py')] + drivers
+scripts_list = drivers
 
 setup(
     name='nlp',
