@@ -2,6 +2,7 @@
 """Restriction of models to lines."""
 
 from nlp.model.nlpmodel import NLPModel
+from nlp.tools.utils import where, Min, Max
 import numpy as np
 
 
@@ -24,7 +25,7 @@ class C1LineModel(NLPModel):
     first derivatives of ϕ and γ are defined.
     """
 
-    def __init__(self, model, x, d):
+    def __init__(self, model, x, d, **kwargs):
         """Instantiate the restriction of a model to the line x + td.
 
         :parameters:
@@ -33,14 +34,29 @@ class C1LineModel(NLPModel):
             :d: Numpy array assumed to be nonzero (no check is performed).
         """
         name = "line-" + model.name
+        kwargs.pop("name", None)
+        kwargs.pop("Lvar", None)
+        kwargs.pop("Uvar", None)
+        kwargs.pop("Lcon", None)
+        kwargs.pop("Ucon", None)
+        pos = where(d > 0)
+        neg = where(d < 0)
+        tmax = Min((model.Uvar[pos] - x[pos]) / d[pos])
+        tmax = min(tmax, Min((model.Lvar[neg] - x[neg]) / d[neg]))
+        tmin = Max((model.Lvar[pos] - x[pos]) / d[pos])
+        tmin = max(tmin, Max((model.Uvar[neg] - x[neg]) / d[neg]))
         super(C1LineModel, self).__init__(1,
                                           m=model.ncon,
                                           name=name,
-                                          x0=0,
-                                          Lvar=model.Lvar,
-                                          Uvar=model.Uvar,
+                                          x0=kwargs.get("x0", 0.0),
+                                          Lvar=np.array([tmin]),
+                                          Uvar=np.array([tmax]),
                                           Lcon=model.Lcon,
-                                          Ucon=model.Ucon)
+                                          Ucon=model.Ucon,
+                                          **kwargs)
+        if tmin > tmax:
+            # no intersection between the original bounds and the line
+            self.logger.warn("restricted model is infeasible")
         self.__x = x
         self.__d = d
         self.__f = None  # most recent objective value of `model`

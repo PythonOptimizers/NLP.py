@@ -868,10 +868,10 @@ class LPModel(QPModel):
 class BoundConstrainedNLPModel(NLPModel):
     """Generic class to represent a bound-constrained problem."""
 
-    def __init__(self, nvar, **kwargs):
+    def __init__(self, nvar, Lvar, Uvar, **kwargs):
         """Initialize a bound-constrained problem with ``nvar`` variables.
 
-        The bounds may be specified via the keyword arguments ``Lvar``
+        The bounds may be specified via the arguments ``Lvar``
         and ``Uvar``. See the documentation of :class:`NLPModel` for more
         information.
         """
@@ -880,10 +880,15 @@ class BoundConstrainedNLPModel(NLPModel):
         kwargs.pop('ncon', None)
         kwargs.pop('Lcon', None)
         kwargs.pop('Ucon', None)
-        super(BoundConstrainedNLPModel, self).__init__(nvar, **kwargs)
+        kwargs.pop('Lvar', None)
+        kwargs.pop('Uvar', None)
+        super(BoundConstrainedNLPModel, self).__init__(nvar,
+                                                       Lvar=Lvar,
+                                                       Uvar=Uvar,
+                                                       **kwargs)
 
 
-class UnconstrainedNLPModel(BoundConstrainedNLPModel):
+class UnconstrainedNLPModel(NLPModel):
     """Generic class to represent an unconstrained problem."""
 
     def __init__(self, nvar, **kwargs):
@@ -891,7 +896,11 @@ class UnconstrainedNLPModel(BoundConstrainedNLPModel):
 
         See the documentation of :class:`NLPModel` for more information.
         """
-        # Discard options related to bound-constrained problems.
+        # Discard options related to constrained problems.
+        kwargs.pop('m', None)
+        kwargs.pop('ncon', None)
+        kwargs.pop('Lcon', None)
+        kwargs.pop('Ucon', None)
         kwargs.pop('Lvar', None)
         kwargs.pop('Uvar', None)
         super(UnconstrainedNLPModel, self).__init__(nvar, **kwargs)
