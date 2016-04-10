@@ -1,4 +1,11 @@
-"""A module to create and plot performance profiles."""
+u"""A module to create and plot performance profiles.
+
+Performance profiles are implemented as described in
+
+    E. Dolan and J. J. Moré, *Benchmarking optimization software with
+    performance profiles*, Mathematical Programming, Series B, 91:201–213,
+    2002.
+"""
 
 import re
 from string import atof
@@ -11,28 +18,29 @@ default_options = {'datacol': 2, 'logscale': True, 'sep': '\s+', 'bw': False,
 
 
 class PerformanceProfile(object):
+    u"""Draw performance profile of Dolan and Moré."""
 
     def __init__(self, solvers, **opts):
-        """Draw performance profile of Dolan and More.
+        r"""Initialize a :class:`PerformanceProfile` instance.
 
         :parameters:
-            :solvers: a list of file names containing solver statistics
-                      Failures must be indicated with negative statistics
+            :solvers: a list of file names containing solver statistics.
+                      Failures must be indicated with negative statistics.
             :options: a dictionary of options. Currently recognized options are
                       listed below.
 
         :options:
             :datacol:  the (1-based) column index containing the relevant
-                       metric in the solver files
-            :logscale: True if log-scale ratios are requested
-            :sep:      the column separator as a regexp (default: '\s+')
-            :bw:       True if a black and white plot is requested
+                       metric in the solver files.
+            :logscale: True if log-scale ratios are requested.
+            :sep:      the column separator as a regexp (default: '\s+').
+            :bw:       True if a black and white plot is requested.
             :title:    string containing the plot title.
 
         :returns:
-            A PerformanceProfile object on which `plot()` may be called.
+            A :class:`PerformanceProfile` object on which `plot()` may be
+            called.
         """
-
         self.solvers = solvers
         self.options = default_options.copy()
         for opt in opts:
@@ -86,10 +94,10 @@ class PerformanceProfile(object):
             self.ratios[solv, :].sort()
 
     def plot(self):
-        """Need we say more?"""
+        """Draw performance profile."""
         import matplotlib.pyplot as plt
         nsolvs, nprobs = self.ratios.shape
-        y = np.arange(nprobs, dtype=np.float)/nprobs
+        y = np.arange(nprobs, dtype=np.float) / nprobs
         grays = ['0.0', '0.5', '0.8', '0.2', '0.6', '0.9', '0.4', '0.95']
         ngrays = len(grays)
 
