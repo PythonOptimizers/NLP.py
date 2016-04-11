@@ -1,12 +1,15 @@
+# -*- coding: utf-8 -*-
 u"""Trust-Region Method for Bound-Constrained Programming.
 
 A pure Python/Numpy implementation of TRON as described in
 
-    Chih-Jen Lin and Jorge J. Moré, *Newton's Method for Large Bound-
-    Constrained Optimization Problems*, SIAM J. Optim., 9(4), 1100–1127, 1999.
+Chih-Jen Lin and Jorge J. Moré, *Newton"s Method for Large Bound-
+Constrained Optimization Problems*, SIAM J. Optim., 9(4), 1100–1127, 1999.
 """
-import numpy as np
+
+import math
 import logging
+import numpy as np
 from pykrylov.linop import SymmetricallyReducedLinearOperator as ReducedHessian
 from nlp.tr.trustregion import GeneralizedTrustRegion
 from nlp.tools import norms
@@ -15,17 +18,18 @@ from nlp.tools.timing import cputime
 from nlp.tools.exceptions import UserExitRequest
 
 
-__docformat__ = 'restructuredtext'
+__docformat__ = "restructuredtext"
 
 
 class TRON(object):
-    """Trust-region Newton method for bound-constrained optimization problems.
-
-            min f(x)  subject to xl <= x <= xu.
-    """
+    u"""Trust-region Newton method for bound-constrained problems."""
 
     def __init__(self, model, **kwargs):
-        """Instantiate a trust-region solver for ``model``.
+        u"""Instantiate a trust-region solver for a bound-constrained problem.
+
+        The model should have the general form
+
+            min f(x)  subject to l ≤ x ≤ u.
 
         :parameters:
             :model:        a :class:`NLPModel` instance.
@@ -44,7 +48,7 @@ class TRON(object):
         self.TR = GeneralizedTrustRegion()
         self.iter = 0         # Iteration counter
         self.total_cgiter = 0
-        self.x = kwargs.get('x0', self.model.x0.copy())
+        self.x = kwargs.get("x0", self.model.x0.copy())
         self.f = None
         self.f0 = None
         self.g = None
@@ -54,24 +58,22 @@ class TRON(object):
         self.pg0 = None
         self.tsolve = 0.0
 
-        self.reltol = kwargs.get('reltol', 1e-12)
-        self.abstol = kwargs.get('abstol', 1e-6)
-        self.maxiter = kwargs.get('maxiter', 100 * self.model.n)
-        self.maxfuncall = kwargs.get('maxfuncall', 1000)
+        self.reltol = kwargs.get("reltol", 1e-12)
+        self.abstol = kwargs.get("abstol", 1e-6)
+        self.maxiter = kwargs.get("maxiter", 100 * self.model.n)
+        self.maxfuncall = kwargs.get("maxfuncall", 1000)
         self.cgtol = 0.1
         self.alphac = 1
 
-        self.hformat = '%-5s  %8s  %7s  %5s  %8s  %8s  %8s  %4s'
-        self.header = self.hformat % ('Iter', 'f(x)', '|g(x)|', 'cg',
-                                      'rho', 'Step', 'Radius', 'Stat')
-        self.hlen = len(self.header)
-        self.hline = '-' * self.hlen
-        self.format = '%-5d  %8.1e  %7.1e  %5d  %8.1e  %8.1e  %8.1e  %4s'
-        self.format0 = '%-5d  %8.1e  %7.1e  %5s  %8s  %8s  %8.1e  %4s'
+        self.hformat = "%-5s  %8s  %7s  %5s  %8s  %8s  %8s  %4s"
+        self.header = self.hformat % ("iter", "f", u"‖P∇f‖", "inner",
+                                      u"ρ", u"‖step‖", "radius", "stat")
+        self.format = "%-5d  %8.1e  %7.1e  %5d  %8.1e  %8.1e  %8.1e  %4s"
+        self.format0 = "%-5d  %8.1e  %7.1e  %5s  %8s  %8s  %8.1e  %4s"
         self.radii = [self.TR.radius]
 
         # Setup the logger. Install a NullHandler if no output needed.
-        logger_name = kwargs.get('logger_name', 'tron')
+        logger_name = kwargs.get("logger_name", "nlp.tron")
         self.log = logging.getLogger(logger_name)
         self.log.addHandler(logging.NullHandler())
         self.log.propagate = False
@@ -88,29 +90,25 @@ class TRON(object):
         """
         return None
 
-    def project(self, x, xl, xu):
-        """Project x into the bounds [xl, xu]."""
-        return np.maximum(np.minimum(x, xu), xl)
+    def project(self, x, l, u):
+        """Project x into the bounds [l, u]."""
+        return np.maximum(np.minimum(x, u), l)
 
-    def projected_step(self, x, d, xl, xu):
-        """Compute the projected step x + d into the feasible box.
+    def projected_step(self, x, d, l, u):
+        """Project the step d into the feasible box [l, u].
 
-        Feasible box is defined as
-
-                   xl <= x <= xu
-
-                   s = P[x + d] - x
+        The projected step is defined as s := P[x + d] - x.
         """
-        return self.project(x + d, xl, xu) - x
+        return self.project(x + d, l, u) - x
 
-    def breakpoints(self, x, d, xl, xu):
+    def breakpoints(self, x, d, l, u):
         """Find the smallest and largest breakpoints on the half line x + t d.
 
         We assume that x is feasible. Return the smallest and largest t such
         that x + t d lies on the boundary.
         """
-        pos = where((d > 0) & (x < xu))  # Hit the upper bound.
-        neg = where((d < 0) & (x > xl))  # Hit the lower bound.
+        pos = where((d > 0) & (x < u))  # Hit the upper bound.
+        neg = where((d < 0) & (x > l))  # Hit the lower bound.
         npos = len(pos)
         nneg = len(neg)
 
@@ -122,53 +120,50 @@ class TRON(object):
         brptmin = np.inf
         brptmax = 0
         if npos > 0:
-            steps = (xu[pos] - x[pos]) / d[pos]
+            steps = (u[pos] - x[pos]) / d[pos]
             brptmin = min(brptmin, np.min(steps))
             brptmax = max(brptmax, np.max(steps))
         if nneg > 0:
-            steps = (xl[neg] - x[neg]) / d[neg]
+            steps = (l[neg] - x[neg]) / d[neg]
             brptmin = min(brptmin, np.min(steps))
             brptmax = max(brptmax, np.max(steps))
 
-        self.log.debug('Nearest  breakpoint: %7.1e', brptmin)
-        self.log.debug('Farthest breakpoint: %7.1e', brptmax)
+        self.log.debug("nearest  breakpoint: %7.1e", brptmin)
+        self.log.debug("farthest breakpoint: %7.1e", brptmax)
         return (nbrpt, brptmin, brptmax)
 
-    def cauchy(self, x, g, H, xl, xu, delta, alpha):
+    def cauchy(self, x, g, H, l, u, delta, alpha):
         u"""Compute a Cauchy step.
 
         This step must satisfy a trust region constraint and a sufficient
-        decrease condition.
+        decrease condition. The Cauchy step is computed for the quadratic
 
-        The Cauchy step is computed for the quadratic
+           q(s) = gᵀs + ½ sᵀHs,
 
-           q(s) = 0.5 s'Hs + g's,
-
-        where H is a symmetric matrix and g is a vector.
-        Given a parameter alpha, the Cauchy step is
+        where H=Hᵀ and g is a vector. Given a parameter α, the Cauchy step is
 
            s[α] = P[x - α g] - x,
 
-        with P the projection onto the n-dimensional interval [xl,xu].
-        The Cauchy step satisfies the trust region constraint and the
+        with P the projection into the box [l, u].
+        The Cauchy step satisfies the trust-region constraint and the
         sufficient decrease condition
 
-           || s || <= Δ,      q(s) <= mu_0 (g's),
+           ‖s‖ ≤ Δ,      q(s) ≤ μ₀ gᵀs,
 
-        where mu_0 is a constant in (0, 1).
+        where μ₀ ∈ (0, 1).
         """
         # Constant that defines sufficient decrease.
         mu0 = 0.01
+
         # Interpolation and extrapolation factors.
         interpf = 0.1
         extrapf = 10
 
-        # Find the minimal and maximal break-point on x - alpha*g.
-        (_, _, brptmax) = self.breakpoints(x, -g, xl, xu)
+        # Find the minimal and maximal breakpoints along x - α g.
+        (_, _, brptmax) = self.breakpoints(x, -g, l, u)
 
-        # Evaluate the initial alpha and decide if the algorithm
-        # must interpolate or extrapolate.
-        s = self.projected_step(x, -alpha * g, xl, xu)
+        # Decide whether to interpolate or extrapolate.
+        s = self.projected_step(x, -alpha * g, l, u)
         if norms.norm2(s) > delta:
             interp = True
         else:
@@ -182,7 +177,7 @@ class TRON(object):
             search = True
             while search:
                 alpha *= interpf
-                s = self.projected_step(x, -alpha * g, xl, xu)
+                s = self.projected_step(x, -alpha * g, l, u)
                 if norms.norm2(s) <= delta:
                     Hs = H * s
                     gts = np.dot(g, s)
@@ -193,7 +188,7 @@ class TRON(object):
             alphas = alpha
             while search and alpha <= brptmax:
                 alpha *= extrapf
-                s = self.projected_step(x, -alpha * g, xl, xu)
+                s = self.projected_step(x, -alpha * g, l, u)
                 if norms.norm2(s) <= delta:
                     Hs = H * s
                     gts = np.dot(g, s)
@@ -205,17 +200,17 @@ class TRON(object):
 
             # Recover the last successful step.
             alpha = alphas
-            s = self.projected_step(x, -alpha * g, xl, xu)
+            s = self.projected_step(x, -alpha * g, l, u)
         return (s, alpha)
 
     def trqsol(self, x, p, delta):
         u"""Compute a solution of the quadratic trust region equation.
 
-        It returns the largest (non-negative) solution of
-            ||x + σ p|| = Δ.
+        Return the largest (non-negative) solution of
+            ‖x + σ p‖ = Δ.
 
         The code is only guaranteed to produce a non-negative solution
-        if ||x|| <= Δ, and p != 0.
+        if ‖x‖ ≤ Δ, and p != 0.
         If the trust region equation has no solution, σ is set to 0.
         """
         ptx = np.dot(p, x)
@@ -225,7 +220,7 @@ class TRON(object):
 
         # Guard against abnormal cases.
         rad = ptx**2 + ptp * (dsq - xtx)
-        rad = np.sqrt(max(rad, 0))
+        rad = math.sqrt(max(rad, 0.0))
 
         if ptx > 0:
             sigma = (dsq - xtx) / (ptx + rad)
@@ -241,17 +236,17 @@ class TRON(object):
         This method uses a preconditioned conjugate gradient method
         to find an approximate minimizer of the trust region subproblem
 
-           min { q(s) : || s || <= Δ }.
+           min {q(s) | ‖s‖ ≤ Δ}.
 
         where q is the quadratic
 
-           q(s) = 0.5 s'Hs + g's,
+           q(s) = gᵀs + ½ sᵀHs,
 
-        and H is a symmetric matrix.
+        and H=Hᵀ.
 
         Returned status is one of the following:
             info = 1  Convergence test is satisfied.
-                      || ∇ q(s) || <= tol
+                      ‖∇q(s)‖ ≤ tol
 
             info = 2  Failure to converge within itermax iterations.
 
@@ -266,14 +261,14 @@ class TRON(object):
         w = np.zeros(len(g))
 
         # Initialize the residual r of grad q to -g.
-        r = -g.copy()
+        r = -g
 
         # Initialize the direction p.
         p = r.copy()
 
         # Initialize rho and the norm of r.
         rho = np.dot(r, r)
-        rnorm0 = np.sqrt(rho)
+        rnorm0 = math.sqrt(rho)
         iters = 0
 
         # Exit if g = 0.
@@ -282,8 +277,9 @@ class TRON(object):
             return (w, iters, info)
 
         while not (exitOptimal or exitIter):
-            z = p.copy()
-            q = H * z
+            # z = p.copy()
+            # q = H * z
+            q = H * p
 
             # Compute alpha and determine sigma such that the trust region
             # constraint || w + sigma*p || = delta is satisfied.
@@ -298,7 +294,8 @@ class TRON(object):
             # Exit if there is negative curvature or if the
             # iterates exit the trust region.
             if ptq <= 0 or alpha >= sigma:
-                w += sigma * p
+                p *= sigma
+                w += p
                 if ptq <= 0:
                     info = 3
                 else:
@@ -311,7 +308,7 @@ class TRON(object):
 
             # Exit if the residual convergence test is satisfied.
             rtr = np.dot(r, r)
-            rnorm = np.sqrt(rtr)
+            rnorm = math.sqrt(rtr)
             if rnorm <= tol:
                 exitOptimal = True
                 info = 1
@@ -332,37 +329,36 @@ class TRON(object):
 
         return (w, iters, info)
 
-    def projected_newton_step(self, x, g, H, delta, xl, xu, s, cgtol, itermax):
-        """Generate a sequence of approximate minimizers to the QP subprolem.
+    def projected_newton_step(self, x, g, H, delta, l, u, s, cgtol, itermax):
+        u"""Generate a sequence of approximate minimizers to the QP subproblem.
 
-            min q(x) subject to  xl <= x <= xu
+            min q(x) subject to  l ≤ x ≤ u
 
-        where q(x[0] + s) = 0.5 s' H s + g' s,
+        where q(x₀ + s) = gᵀs + ½ sᵀHs,
 
-        x[0] is a base point provided by the user, H is a symmetric
-        matrix and g is a vector.
+        x₀ is a base point provided by the user, H=Hᵀ and g is a vector.
 
-        At each stage we have an approximate minimizer x[k], and generate
-        a direction p[k] by using a preconditioned conjugate gradient
+        At each stage we have an approximate minimizer xₖ, and generate
+        a direction pₖ by using a preconditioned conjugate gradient
         method on the subproblem
 
-           min { q(x[k] + p) : || p || <= delta, s(fixed) = 0 },
+           min {q(xₖ + p) | ‖p‖ ≤ Δ, s(fixed)=0 },
 
-        where fixed is the set of variables fixed at x[k] and delta is the
-        trust region bound. Given p[k],
-        the next minimizer x[k+1] is generated by a projected search.
+        where fixed is the set of variables fixed at xₖ and Δ is the
+        trust-region bound. Given pₖ, the next minimizer is generated by a
+        projected search.
 
-        The starting point for this subroutine is x[1] = x[0] + s, where
-        x[0] is a base point and s is the Cauchy step.
+        The starting point for this subroutine is x₁ = x₀ + s, where
+        s is the Cauchy step.
 
         Returned status is one of the following:
             info = 1  Convergence. The final step s satisfies
-                      || (g + H s)[free] || <= cgtol || g[free] ||, and the
+                      ‖(g + H s)[free]‖ ≤ cgtol ‖g[free]‖, and the
                       final x is an approximate minimizer in the face defined
                       by the free variables.
 
             info = 2  Termination. The trust region bound does not allow
-                      further progress: || p[k] || = delta.
+                      further progress: ‖pₖ‖ = Δ.
 
             info = 3  Failure to converge within itermax iterations.
         """
@@ -373,7 +369,7 @@ class TRON(object):
         w = H * s
 
         # Compute the Cauchy point.
-        x = self.project(x + s, xl, xu)
+        x = self.project(x + s, l, u)
 
         # Start the main iteration loop.
         # There are at most n iterations because at each iteration
@@ -381,7 +377,7 @@ class TRON(object):
         iters = 0
         while not (exitOptimal or exitPCG or exitIter):
             # Determine the free variables at the current minimizer.
-            free_vars = where((x > xl) & (x < xu))
+            free_vars = where((x > l) & (x < u))
             nfree = len(free_vars)
 
             # Exit if there are no free constraints.
@@ -393,7 +389,7 @@ class TRON(object):
             # Obtain the submatrix of H for the free variables.
             ZHZ = ReducedHessian(H, free_vars)
 
-            # Compute the norm of the reduced gradient Z'*g
+            # Compute the norm of the reduced gradient Zᵀg
             gfree = g[free_vars] + w[free_vars]
             gfnorm = norms.norm2(g[free_vars])
 
@@ -407,9 +403,9 @@ class TRON(object):
 
             # Use a projected search to obtain the next iterate
             xfree = x[free_vars]
-            xlfree = xl[free_vars]
-            xufree = xu[free_vars]
-            (xfree, w) = self.projected_linesearch(xfree, xlfree, xufree,
+            lfree = l[free_vars]
+            ufree = u[free_vars]
+            (xfree, w) = self.projected_linesearch(xfree, lfree, ufree,
                                                    gfree, w, ZHZ, alpha=1.0)
 
             # Update the minimizer and the step.
@@ -442,40 +438,39 @@ class TRON(object):
 
         return (x, s, iters, info)
 
-    def projected_linesearch(self, x, xl, xu, g, d, H, alpha=1.0):
+    def projected_linesearch(self, x, l, u, g, d, H, alpha=1.0):
         u"""Use a projected search to compute a satisfactory step.
 
         This step must satisfy a sufficient decrease condition for the
         quadratic
 
-            q(s) = 0.5 s'Hs + g's,
+            q(s) = gᵀs + ½ sᵀHs,
 
-        where H is a symmetric matrix and g is a vector.
-        Given the parameter α, the step is
+        where H=Hᵀ and g is a vector. Given the parameter α, the step is
 
            s[α] = P[x + α d] - x,
 
-        where d is the search direction and P the projection onto the
-        n-dimensional interval [xl,xu]. The final step s = s[α] satisfies
-        the sufficient decrease condition
+        where d is the search direction and P the projection into the
+        box [l, u]. The final step s = s[α] satisfies the sufficient decrease
+        condition
 
-           q(s) <= mu_0*(g'*s),
+           q(s) ≤ μ₀ gᵀs,
 
-        where mu_0 is a constant in (0, 1).
+        where μ₀ ∈ (0, 1).
 
         The search direction d must be a descent direction for the quadratic q
-        at x such that the quadratic is decreasing in the ray  x + α d
-        for 0 <= α <= 1.
+        at x such that the quadratic is decreasing along the ray  x + α d
+        for 0 ≤ α ≤ 1.
         """
         mu0 = 0.01
         interpf = 0.5
         nsteps = 0
 
-        # Find the smallest break-point on the ray x + alpha*d.
-        (_, brptmin, _) = self.breakpoints(x, d, xl, xu)
+        # Find the smallest break-point on the ray x + α d.
+        (_, brptmin, _) = self.breakpoints(x, d, l, u)
 
         # Reduce alpha until the sufficient decrease condition is
-        # satisfied or x + alpha*w is feasible.
+        # satisfied or x + α w is feasible.
 
         search = True
         while search and alpha > brptmin:
@@ -484,7 +479,7 @@ class TRON(object):
             # decrease condition.
             nsteps += 1
 
-            s = self.projected_step(x, alpha * d, xl, xu)
+            s = self.projected_step(x, alpha * d, l, u)
             Hs = H * s
             gts = np.dot(g, s)
             q = .5 * np.dot(Hs, s) + gts
@@ -501,20 +496,20 @@ class TRON(object):
             alpha = brptmin
 
         # Compute the final iterate and step.
-        s = self.projected_step(x, alpha * d, xl, xu)
-        x = self.project(x + alpha * s, xl, xu)
+        s = self.projected_step(x, alpha * d, l, u)
+        x = self.project(x + alpha * s, l, u)
         return (x, s)
 
-    def projected_gradient_norm2(self, x, g, xl, xu):
+    def projected_gradient_norm2(self, x, g, l, u):
         """Compute the Euclidean norm of the projected gradient at x."""
-        lower = where(x == xl)
-        upper = where(x == xu)
+        lower = where(x == l)
+        upper = where(x == u)
 
         pg = g.copy()
         pg[lower] = np.minimum(g[lower], 0)
         pg[upper] = np.maximum(g[upper], 0)
 
-        return norms.norm2(pg[where(xl != xu)])
+        return norms.norm2(pg[where(l != u)])
 
     def solve(self):
         """Solve method.
@@ -524,7 +519,7 @@ class TRON(object):
         """
         model = self.model
 
-        # Project the initial point into [xl,xu].
+        # Project the initial point into [l,u].
         self.project(self.x, model.Lvar, model.Uvar)
 
         # Gather initial information.
@@ -549,7 +544,7 @@ class TRON(object):
         exitOptimal = pgnorm <= stoptol
         exitIter = self.iter >= self.maxiter
         exitFunCall = model.obj.ncalls >= self.maxfuncall
-        status = ''
+        status = ""
 
         # Wrap Hessian into an operator.
         H = model.hop(self.x, self.model.pi0)
@@ -557,21 +552,12 @@ class TRON(object):
 
         # Print out header and initial log.
         if self.iter % 20 == 0:
-            self.log.info(self.hline)
             self.log.info(self.header)
-            self.log.info(self.hline)
             self.log.info(self.format0, self.iter, self.f, pgnorm,
-                          '', '', '', self.TR.radius, '')
+                          "", "", "", self.TR.radius, "")
 
         while not (exitUser or exitOptimal or exitIter or exitFunCall):
             self.iter += 1
-
-            # Compute a step and evaluate the function at the trial point.
-
-            # Save the best function value, iterate, and gradient.
-            self.fc = self.f
-            self.xc = self.x.copy()
-            self.gc = self.g.copy()
 
             # Compute the Cauchy step and store in s.
             (s, self.alphac) = self.cauchy(self.x, self.g, H,
@@ -628,48 +614,48 @@ class TRON(object):
                 self.x = x_trial
                 self.f = f_trial
                 self.g = model.grad(self.x)
-                step_status = 'Acc'
+                step_status = "Acc"
 
             else:
                 # Unsuccessful iterate
                 # Trust-region step is rejected.
-                step_status = 'Rej'
+                step_status = "Rej"
 
             self.step_status = step_status
             self.radii.append(self.TR.radius)
-            status = ''
+            status = ""
             try:
                 self.post_iteration()
             except UserExitRequest:
-                status = 'usr'
+                status = "usr"
 
             # Print out header, say, every 20 iterations
             if self.iter % 20 == 0:
                 self.log.info(self.header)
 
-            pstatus = step_status if step_status != 'Acc' else ''
+            pstatus = step_status if step_status != "Acc" else ""
 
             # Test for convergence. FATOL and FRTOL
             if abs(ared) <= self.abstol and -m <= self.abstol:
                 exitOptimal = True
-                status = 'fatol'
+                status = "fatol"
             if abs(ared) <= self.reltol * abs(self.f) and \
                (-m <= self.reltol * abs(self.f)):
                 exitOptimal = True
-                status = 'frtol'
+                status = "frtol"
 
             pgnorm = self.projected_gradient_norm2(self.x, self.g,
                                                    model.Lvar, model.Uvar)
-            if pstatus == '':
+            if pstatus == "":
                 if pgnorm <= stoptol:
                     exitOptimal = True
-                    status = 'gtol'
+                    status = "gtol"
             else:
                 self.iter -= 1  # to match TRON iteration number
 
             exitIter = self.iter > self.maxiter
             exitFunCall = model.obj.ncalls >= self.maxfuncall
-            exitUser = status == 'usr'
+            exitUser = status == "usr"
 
             self.log.info(self.format, self.iter, self.f, pgnorm,
                           cg_iter, rho, snorm, self.TR.radius, pstatus)
@@ -677,8 +663,8 @@ class TRON(object):
         self.tsolve = cputime() - t    # Solve time
         self.pgnorm = pgnorm
         # Set final solver status.
-        if status == 'usr':
+        if status == "usr":
             pass
         elif self.iter > self.maxiter:
-            status = 'itr'
+            status = "itr"
         self.status = status
