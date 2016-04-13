@@ -374,7 +374,7 @@ class TRON(object):
         cgitermax = model.n
 
         # Initialize the trust region radius
-        self.tr.radius = self.pg0
+        self.tr.radius = min(max(0.1 * self.pg0, 1.0), 100)
 
         # Test for convergence or termination
         # stoptol = max(self.abstol, self.reltol * self.pgnorm)
