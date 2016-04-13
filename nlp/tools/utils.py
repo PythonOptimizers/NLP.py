@@ -1,4 +1,6 @@
-# Various utilities.
+# -*- coding: utf-8 -*-
+"""Utilities."""
+
 import numpy as np
 import logging
 from math import copysign, sqrt
@@ -16,6 +18,7 @@ def Min(a):
 
 class NullHandler(logging.Handler):
     """A simple implementation of the null handler for Python 2.6.x.
+
     Useful for compatibility with older versions of Python.
     """
 
@@ -89,7 +92,7 @@ def roots_quadratic(q2, q1, q0, tol=1.0e-8, nitref=1):
     # Perform a few Newton iterations to improve accuracy.
     new_roots = []
     for root in roots:
-        for it in range(nitref):
+        for _ in xrange(nitref):
             val = (a2 * root + a1) * root + a0
             der = 2.0 * a2 * root + a1
             if der == 0.0:
