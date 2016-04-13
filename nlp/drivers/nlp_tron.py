@@ -23,7 +23,7 @@ tron_logger = config_logger("nlp.tron",
 
 if nprobs > 1:
     logger.info("%10s %5s %5s %8s %7s %5s %5s %5s %s",
-                "name", "nvar", "#iter", "f", u"‖P∇f‖", "#f", u"#∇f", "stat",
+                "name", "nvar", "iter", "f", u"‖P∇f‖", "#f", u"#∇f", "stat",
                 "time")
 
 for problem in sys.argv[1:]:
