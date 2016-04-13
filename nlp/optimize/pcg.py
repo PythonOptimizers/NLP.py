@@ -237,9 +237,3 @@ class TruncatedCG(object):
         self.onBoundary = onBoundary
         self.infDescent = infDescent
         return
-
-
-class TruncatedCGLBFGS(TruncatedCG):
-
-    def post_iteration(self):
-        self.qp.H.store(self.ds, self.dr)
