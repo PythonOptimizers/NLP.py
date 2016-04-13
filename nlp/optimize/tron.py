@@ -119,6 +119,7 @@ class TRON(object):
 
         where μ₀ ∈ (0, 1).
         """
+        self.log.debug(u"computing Cauchy point with α=%g, δ=%d", alpha, delta)
         # Constant that defines sufficient decrease.
         mu0 = 0.01
 
@@ -142,22 +143,28 @@ class TRON(object):
         # Either interpolate or extrapolate to find a successful step.
         if interp:
             # Reduce alpha until a successful step is found.
+            self.log.debug("interpolating")
             search = True
             while search:
                 alpha *= interpf
                 s = projected_step(x, -alpha * g, l, u)
-                if norms.norm2(s) <= delta:
+                s_norm = norms.norm2(s)
+                self.log.debug("step norm = %g", s_norm)
+                if s_norm <= delta:
                     Hs = H * s
                     gts = np.dot(g, s)
                     search = (.5 * np.dot(Hs, s) + gts >= mu0 * gts)
         else:
             # Increase alpha until a successful step is found.
+            self.log.debug("extrapolating")
             search = True
             alphas = alpha
             while search and alpha <= brptmax:
                 alpha *= extrapf
                 s = projected_step(x, -alpha * g, l, u)
-                if norms.norm2(s) <= delta:
+                s_norm = norms.norm2(s)
+                self.log.debug("step norm = %g", s_norm)
+                if s_norm <= delta:
                     Hs = H * s
                     gts = np.dot(g, s)
                     if .5 * np.dot(Hs, s) + gts < mu0 * gts:
@@ -204,7 +211,7 @@ class TRON(object):
 
             info = 3  Failure to converge within itermax iterations.
         """
-        self.log.debug("Entering projected_newton_step")
+        self.log.debug("entering projected_newton_step")
         exitOptimal = False
         exitPCG = False
         exitIter = False
@@ -284,7 +291,7 @@ class TRON(object):
                 exitIter = True
                 info = 3
 
-        self.log.debug("Leaving projected_newton_step with info=%d", info)
+        self.log.debug("leaving projected_newton_step with info=%d", info)
         return (x, s, iters, info)
 
     def projected_linesearch(self, x, l, u, g, d, H, alpha=1.0):
@@ -311,6 +318,7 @@ class TRON(object):
         at x such that the quadratic is decreasing along the ray  x + α d
         for 0 ≤ α ≤ 1.
         """
+        self.log.debug("performing projected linesearch")
         mu0 = 0.01
         interpf = 0.5
         nsteps = 0
@@ -356,6 +364,7 @@ class TRON(object):
         All keyword arguments are passed directly to the constructor of the
         trust-region solver.
         """
+        self.log.debug("entering solve")
         model = self.model
 
         # Project the initial point into [l,u].
