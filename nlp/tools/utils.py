@@ -4,6 +4,7 @@
 import numpy as np
 import logging
 from math import copysign, sqrt
+from nlp.tools.norms import norm2
 
 
 def Max(a):
@@ -131,3 +132,58 @@ def to_boundary(x, p, delta, xx=None):
     else:
         sigma = 0
     return sigma
+
+
+def projected_gradient_norm2(x, g, l, u):
+    """Compute the Euclidean norm of the projected gradient at x."""
+    lower = where(x == l)
+    upper = where(x == u)
+
+    pg = g.copy()
+    pg[lower] = np.minimum(g[lower], 0)
+    pg[upper] = np.maximum(g[upper], 0)
+
+    return norm2(pg[where(l != u)])
+
+
+def project(x, l, u):
+    """Project x into the box [l, u]."""
+    return np.maximum(np.minimum(x, u), l)
+
+
+def projected_step(x, d, l, u):
+    """Project the step d into the box [l, u].
+
+    The projected step is defined as s := P[x + d] - x.
+    """
+    return project(x + d, l, u) - x
+
+
+def breakpoints(x, d, l, u):
+    """Find the smallest and largest breakpoints on the half line x + t d.
+
+    We assume that x is feasible. Return the smallest and largest t such
+    that x + t d lies on the boundary.
+    """
+    pos = where((d > 0) & (x < u))  # Hit the upper bound.
+    neg = where((d < 0) & (x > l))  # Hit the lower bound.
+    npos = len(pos)
+    nneg = len(neg)
+
+    nbrpt = npos + nneg
+    # Handle the exceptional case.
+    if nbrpt == 0:
+        return (0, 0, 0)
+
+    brptmin = np.inf
+    brptmax = 0
+    if npos > 0:
+        steps = (u[pos] - x[pos]) / d[pos]
+        brptmin = min(brptmin, np.min(steps))
+        brptmax = max(brptmax, np.max(steps))
+    if nneg > 0:
+        steps = (l[neg] - x[neg]) / d[neg]
+        brptmin = min(brptmin, np.min(steps))
+        brptmax = max(brptmax, np.max(steps))
+
+    return (nbrpt, brptmin, brptmax)

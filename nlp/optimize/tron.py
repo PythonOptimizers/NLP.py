@@ -7,7 +7,6 @@ Chih-Jen Lin and Jorge J. Moré, *Newton"s Method for Large Bound-
 Constrained Optimization Problems*, SIAM J. Optim., 9(4), 1100–1127, 1999.
 """
 
-import math
 import logging
 import numpy as np
 from pykrylov.linop import SymmetricallyReducedLinearOperator as ReducedHessian
@@ -16,7 +15,8 @@ from nlp.model.nlpmodel import QPModel
 from nlp.tr.trustregion import TrustRegionSolver
 from nlp.tr.trustregion import GeneralizedTrustRegion
 from nlp.tools import norms
-from nlp.tools.utils import where, to_boundary
+from nlp.tools.utils import where, projected_gradient_norm2, \
+                            project, projected_step, breakpoints
 from nlp.tools.timing import cputime
 from nlp.tools.exceptions import UserExitRequest
 
@@ -99,48 +99,6 @@ class TRON(object):
         """
         return None
 
-    def project(self, x, l, u):
-        """Project x into the bounds [l, u]."""
-        return np.maximum(np.minimum(x, u), l)
-
-    def projected_step(self, x, d, l, u):
-        """Project the step d into the feasible box [l, u].
-
-        The projected step is defined as s := P[x + d] - x.
-        """
-        return self.project(x + d, l, u) - x
-
-    def breakpoints(self, x, d, l, u):
-        """Find the smallest and largest breakpoints on the half line x + t d.
-
-        We assume that x is feasible. Return the smallest and largest t such
-        that x + t d lies on the boundary.
-        """
-        pos = where((d > 0) & (x < u))  # Hit the upper bound.
-        neg = where((d < 0) & (x > l))  # Hit the lower bound.
-        npos = len(pos)
-        nneg = len(neg)
-
-        nbrpt = npos + nneg
-        # Handle the exceptional case.
-        if nbrpt == 0:
-            return (0, 0, 0)
-
-        brptmin = np.inf
-        brptmax = 0
-        if npos > 0:
-            steps = (u[pos] - x[pos]) / d[pos]
-            brptmin = min(brptmin, np.min(steps))
-            brptmax = max(brptmax, np.max(steps))
-        if nneg > 0:
-            steps = (l[neg] - x[neg]) / d[neg]
-            brptmin = min(brptmin, np.min(steps))
-            brptmax = max(brptmax, np.max(steps))
-
-        self.log.debug("nearest  breakpoint: %7.1e", brptmin)
-        self.log.debug("farthest breakpoint: %7.1e", brptmax)
-        return (nbrpt, brptmin, brptmax)
-
     def cauchy(self, x, g, H, l, u, delta, alpha):
         u"""Compute a Cauchy step.
 
@@ -169,10 +127,11 @@ class TRON(object):
         extrapf = 10
 
         # Find the minimal and maximal breakpoints along x - α g.
-        (_, _, brptmax) = self.breakpoints(x, -g, l, u)
+        (_, _, brptmax) = breakpoints(x, -g, l, u)
+        self.log.debug("farthest breakpoint: %7.1e", brptmax)
 
         # Decide whether to interpolate or extrapolate.
-        s = self.projected_step(x, -alpha * g, l, u)
+        s = projected_step(x, -alpha * g, l, u)
         if norms.norm2(s) > delta:
             interp = True
         else:
@@ -186,7 +145,7 @@ class TRON(object):
             search = True
             while search:
                 alpha *= interpf
-                s = self.projected_step(x, -alpha * g, l, u)
+                s = projected_step(x, -alpha * g, l, u)
                 if norms.norm2(s) <= delta:
                     Hs = H * s
                     gts = np.dot(g, s)
@@ -197,7 +156,7 @@ class TRON(object):
             alphas = alpha
             while search and alpha <= brptmax:
                 alpha *= extrapf
-                s = self.projected_step(x, -alpha * g, l, u)
+                s = projected_step(x, -alpha * g, l, u)
                 if norms.norm2(s) <= delta:
                     Hs = H * s
                     gts = np.dot(g, s)
@@ -209,7 +168,7 @@ class TRON(object):
 
             # Recover the last successful step.
             alpha = alphas
-            s = self.projected_step(x, -alpha * g, l, u)
+            s = projected_step(x, -alpha * g, l, u)
         return (s, alpha)
 
     def projected_newton_step(self, x, g, H, delta, l, u, s, cgtol, itermax):
@@ -253,13 +212,12 @@ class TRON(object):
         w = H * s
 
         # Compute the Cauchy point.
-        x = self.project(x + s, l, u)
+        x = project(x + s, l, u)
 
         # Start the main iteration loop.
         # There are at most n iterations because at each iteration
         # at least one variable becomes active.
         iters = 0
-        tol = 1.0
 
         while not (exitOptimal or exitPCG or exitIter):
             # Determine the free variables at the current minimizer.
@@ -318,19 +276,15 @@ class TRON(object):
             if gfnormf <= cgtol * gfnorm:
                 exitOptimal = True
                 info = 1
-                continue
             elif self.solver.status == "trust-region boundary active":
                 #  infotr == 3 or infotr == 4:
                 exitPCG = True
                 info = 2
-                continue
             elif iters >= itermax:
                 exitIter = True
                 info = 3
-                continue
 
         self.log.debug("Leaving projected_newton_step with info=%d", info)
-
         return (x, s, iters, info)
 
     def projected_linesearch(self, x, l, u, g, d, H, alpha=1.0):
@@ -362,7 +316,8 @@ class TRON(object):
         nsteps = 0
 
         # Find the smallest break-point on the ray x + α d.
-        (_, brptmin, _) = self.breakpoints(x, d, l, u)
+        (_, brptmin, _) = breakpoints(x, d, l, u)
+        self.log.debug("nearest  breakpoint: %7.1e", brptmin)
 
         # Reduce alpha until the sufficient decrease condition is
         # satisfied or x + α w is feasible.
@@ -374,7 +329,7 @@ class TRON(object):
             # decrease condition.
             nsteps += 1
 
-            s = self.projected_step(x, alpha * d, l, u)
+            s = projected_step(x, alpha * d, l, u)
             Hs = H * s
             gts = np.dot(g, s)
             q = .5 * np.dot(Hs, s) + gts
@@ -391,20 +346,9 @@ class TRON(object):
             alpha = brptmin
 
         # Compute the final iterate and step.
-        s = self.projected_step(x, alpha * d, l, u)
-        x = self.project(x + alpha * s, l, u)
+        s = projected_step(x, alpha * d, l, u)
+        x = project(x + alpha * s, l, u)
         return (x, s)
-
-    def projected_gradient_norm2(self, x, g, l, u):
-        """Compute the Euclidean norm of the projected gradient at x."""
-        lower = where(x == l)
-        upper = where(x == u)
-
-        pg = g.copy()
-        pg[lower] = np.minimum(g[lower], 0)
-        pg[upper] = np.maximum(g[upper], 0)
-
-        return norms.norm2(pg[where(l != u)])
 
     def solve(self):
         """Solve method.
@@ -415,15 +359,15 @@ class TRON(object):
         model = self.model
 
         # Project the initial point into [l,u].
-        self.project(self.x, model.Lvar, model.Uvar)
+        project(self.x, model.Lvar, model.Uvar)
 
         # Gather initial information.
         self.f = model.obj(self.x)
         self.f0 = self.f
         self.g = model.grad(self.x)  # Current  gradient
         self.g_old = self.g.copy()
-        pgnorm = self.projected_gradient_norm2(self.x, self.g,
-                                               model.Lvar, model.Uvar)
+        pgnorm = projected_gradient_norm2(self.x, self.g,
+                                          model.Lvar, model.Uvar)
         self.pg0 = pgnorm
         cgtol = self.cgtol
         cg_iter = 0
@@ -530,7 +474,7 @@ class TRON(object):
 
             pstatus = step_status if step_status != "Acc" else ""
 
-            # Test for convergence. FATOL and FRTOL
+            # Test for convergence.
             if abs(ared) <= self.abstol and -m <= self.abstol:
                 exitOptimal = True
                 status = "fatol"
@@ -539,8 +483,8 @@ class TRON(object):
                 exitOptimal = True
                 status = "frtol"
 
-            pgnorm = self.projected_gradient_norm2(self.x, self.g,
-                                                   model.Lvar, model.Uvar)
+            pgnorm = projected_gradient_norm2(self.x, self.g,
+                                              model.Lvar, model.Uvar)
             if pstatus == "":
                 if pgnorm <= stoptol:
                     exitOptimal = True
