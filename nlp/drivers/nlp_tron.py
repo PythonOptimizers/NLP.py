@@ -18,8 +18,9 @@ logger = config_logger("nlp", "%(name)-3s %(levelname)-5s %(message)s")
 
 # Create TRON logger.
 tron_logger = config_logger("nlp.tron",
-                            "%(name)-9s %(levelname)-5s %(message)s",
+                            "%(name)-8s %(levelname)-5s %(message)s",
                             level=logging.WARN if nprobs > 1 else logging.INFO)
+
 if nprobs > 1:
     logger.info("%10s %5s %5s %8s %7s %5s %5s %4s %s",
                 "name", "nvar", "#iter", "f", u"‖P∇f‖", "#f", u"#∇f", "stat",

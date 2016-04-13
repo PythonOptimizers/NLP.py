@@ -77,8 +77,9 @@ class TruncatedCG(object):
         self.pHp = None
 
         # Setup the logger. Install a NullHandler if no output needed.
-        logger_name = kwargs.get('logger_name', 'nlpy.trcg')
+        logger_name = kwargs.get('logger_name', 'nlp.trcg')
         self.log = logging.getLogger(logger_name)
+        self.log.addHandler(logging.NullHandler())
         self.log.propagate = False
 
         # Formats for display
@@ -232,12 +233,16 @@ class TruncatedCG(object):
             exitOptimal = sqrtry <= stop_tol
 
         # Output info about the last iteration.
-        self.log.info(self.fmt % (k, ry, pHp))
+        if k > 0:
+            self.log.info(self.fmt % (k, ry, pHp))
+        else:
+            self.log.info(" %-5d  %9.2e", k, ry)
 
         if k >= maxiter:
             self.status = 'max iter'
         elif not onBoundary and not infDescent and not exitUser:
             self.status = 'residual small'
+        self.log.info(self.status)
         self.step = s
         self.niter = k
         self.step_norm = sqrt(snorm2)
