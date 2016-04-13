@@ -1,34 +1,118 @@
 # Build instructions for Mac OS/X users
 
-Installing NLP.py will be much easier if you use [Homebrew](https://brew.sh).
-Follow the instructions to install Homebrew.
-Then, the following dependencies can be installed automatically:
-
+If you require one of ASL, `pyadolc`, `pycppad`, MUMPS, qr_mumps or SuiteSparse, installing `NLP.py` will be much easier if you use [Homebrew](https://brew.sh).
+Follow the instructions to install Homebrew and import the *science* formulas:
 ```bash
-brew install gcc  # currently v5. Contains gfortran
-
 brew tap homebrew/science
-brew install adol-c                             # will also install Colpack
-brew install boost --with-mpi --without-single  # to use pycppad
-brew install cppad --with-adol-c --with-boost --cc=gcc-5
-brew install asl
-brew install metis
-
-pip install algopy
-pip install git+https://github.com/b45ch1/pycppad.git
 ```
 
-## Installing PyAdolc
+## Requirements
+
+Install `numpy` and `PyKrylov`:
+```bash
+pip install -q numpy
+pip install -q git+https://github.com/PythonOptimizers/pykrylov.git@develop
+```
+
+## Optional Dependencies
+
+### Sparse Matrix Storage
+
+#### CySparse
 
 ```bash
-git clone https://github.com/b45ch1/pyadolc.git
-cd pyadolc
-BOOST_DIR=$(brew --prefix boost-python) ADOLC_DIR=$(brew --prefix adol-c) COLPACK_DIR=$(brew --prefix colpack) CC=clang CXX=clang++ python setup.py install
-cd
-python -c "import adolc; adolc.test()"
+pip install -q git+https://github.com/PythonOptimizers/cysparse.git
 ```
 
-If you encounter build errors, edit and change `setup.py` as follows:
+#### PySparse
+
+```bash
+pip install -q git+https://github.com/optimizers/pysparse.git
+```
+
+### SciPy
+
+```bash
+pip install -q scipy
+```
+
+### Derivatives Computation
+
+#### ASL
+
+The ASL will allow [AMPL](http://www.ampl.com) models to be loaded in `NLP.py` after they have been decoded to a `.nl` file.
+Creating the `.nl` file for anything else than small models requires an AMPL license.
+A few sample `.nl` files are included with `NLP.py`.
+The ASL will compute sparse first and second derivatives.
+
+The ASL may be installed from Homebrew:
+```bash
+brew install asl
+```
+Specify the location of the ASL in `setup.cfg`:
+```bash
+echo "[ASL]" > site.cfg
+echo "asl_dir = $(brew --prefix asl)" >> site.cfg
+```
+
+#### ADOL-C
+
+ADOL-C will allow models to be coded up directly in Python and sparse first and second derivatives to be computed via automatic differentiation.
+This is the preferred way to model large-scale problems in Python.
+First install ADOL-C:
+```bash
+brew install adol-c  # will also install Colpack
+brew install boost-python
+```
+Then install `pyadolc`:
+```bash
+cd $HOME  # or another local
+git clone https://github.com/b45ch1/pyadolc.git && cd pyadolc
+python setup.py install  # press [Enter] when prompted
+```
+
+#### CppAD
+
+CppAD will allow models to be coded up directly in Python and *dense* first and second derivatives to be computed via automatic differentiation.
+
+First install CppAD:
+```bash
+brew install cppad [--with-adol-c] --with-openmp
+```
+Then install `pycppad`:
+```bash
+pip install -q git+https://github.com/b45ch1/pycppad.git
+```
+
+#### AlgoPy
+
+AlgoPy will allow models to be coded up directly in Python and *dense* first and second derivatives to be computed via automatic differentiation.
+
+```bash
+pip install -q algopy
+```
+
+### Factorizations
+
+#### HSL.py
+
+Follow instructions at https://github.com/PythonOptimizers/HSL.py
+
+#### MUMPS.py
+
+Follow instructions at https://github.com/PythonOptimizers/MUMPS.py
+
+#### qr_mumps.py
+
+Follow instructions at https://github.com/PythonOptimizers/qr_mumps.py
+
+#### SuiteSparse.py
+
+Follow instructions at https://github.com/PythonOptimizers/SuiteSparse.py
+
+## Troubleshooting
+
+If you encounter build errors while installing `pyadolc`, edit and change `setup.py` as follows:
 ```diff
 diff --git a/setup.py b/setup.py
 index 5e6e695..68f5c68 100644
