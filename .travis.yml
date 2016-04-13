@@ -35,6 +35,9 @@ install:
   - python setup.py install
 
 script:
+  - nlp_lbfgs.py examples/rosenbr.nl
+  - nlp_trunk.py examples/rosenbr.nl
+  - nlp_dercheck.py examples/rosenbr.nl
   # - py.test -v --cov-report= --cov=nlp tests/  # when repository goes public
   - py.test -v --cov=nlp tests/
 
