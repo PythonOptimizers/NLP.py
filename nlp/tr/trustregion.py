@@ -157,6 +157,7 @@ class TrustRegionSolver(object):
         self._step_norm = 0.0
         self._step = None
         self._m = None  # Model value at candidate solution
+        self.status = ""
 
     @property
     def qp(self):
@@ -195,3 +196,4 @@ class TrustRegionSolver(object):
         self._step_norm = self._cg_solver.step_norm
         self._step = self._cg_solver.step
         self._m = self.qp.obj(self.step)        # Compute model reduction.
+        self.status = self._cg_solver.status

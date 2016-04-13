@@ -6,6 +6,7 @@ import logging
 import sys
 from nlp.model.cysparsemodel import AmplModel
 from nlp.optimize.tron import TRON
+from nlp.optimize.pcg import TruncatedCG
 from nlp.tools.logs import config_logger
 
 nprobs = len(sys.argv) - 1
@@ -33,7 +34,7 @@ for problem in sys.argv[1:]:
         logger.error(msg, model.name, model.m)
         continue
 
-    tron = TRON(model, maxiter=100)
+    tron = TRON(model, TruncatedCG, maxiter=100)
     tron.solve()
 
     logger.info("%10s %5d %5d %8.1e %7.1e %5d %5d %4s %.3f",

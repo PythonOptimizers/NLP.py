@@ -101,6 +101,30 @@ def roots_quadratic(q2, q1, q0, tol=1.0e-8, nitref=1):
     return new_roots
 
 
-if __name__ == '__main__':
-    roots = roots_quadratic(2.0e+20, .1, -4)
-    print 'Received: ', roots
+def to_boundary(x, p, delta, xx=None):
+    u"""Compute a solution of the quadratic trust region equation.
+
+    Return the largest (non-negative) solution of
+        ‖x + σ p‖ = Δ.
+
+    The code is only guaranteed to produce a non-negative solution
+    if ‖x‖ ≤ Δ, and p != 0.
+    If the trust region equation has no solution, σ is set to 0.
+    """
+    px = np.dot(p, x)
+    pp = np.dot(p, p)
+    if xx is None:
+        xx = np.dot(x, x)
+    d2 = delta**2
+
+    # Guard against abnormal cases.
+    rad = px**2 + pp * (d2 - xx)
+    rad = sqrt(max(rad, 0.0))
+
+    if px > 0:
+        sigma = (d2 - xx) / (px + rad)
+    elif rad > 0:
+        sigma = (rad - px) / pp
+    else:
+        sigma = 0
+    return sigma

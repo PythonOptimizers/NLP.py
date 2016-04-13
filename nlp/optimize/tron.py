@@ -11,9 +11,12 @@ import math
 import logging
 import numpy as np
 from pykrylov.linop import SymmetricallyReducedLinearOperator as ReducedHessian
+
+from nlp.model.nlpmodel import QPModel
+from nlp.tr.trustregion import TrustRegionSolver
 from nlp.tr.trustregion import GeneralizedTrustRegion
 from nlp.tools import norms
-from nlp.tools.utils import where
+from nlp.tools.utils import where, to_boundary
 from nlp.tools.timing import cputime
 from nlp.tools.exceptions import UserExitRequest
 
@@ -24,7 +27,7 @@ __docformat__ = "restructuredtext"
 class TRON(object):
     u"""Trust-region Newton method for bound-constrained problems."""
 
-    def __init__(self, model, **kwargs):
+    def __init__(self, model, tr_solver, **kwargs):
         u"""Instantiate a trust-region solver for a bound-constrained problem.
 
         The model should have the general form
@@ -45,7 +48,11 @@ class TRON(object):
                            iteration                          (``None``)
         """
         self.model = model
-        self.TR = GeneralizedTrustRegion()
+        self.tr = GeneralizedTrustRegion()
+
+        self.tr_solver = tr_solver
+        self.solver = None
+
         self.iter = 0         # Iteration counter
         self.total_cgiter = 0
         self.x = kwargs.get("x0", self.model.x0.copy())
@@ -57,6 +64,9 @@ class TRON(object):
         self.pgnorm = None
         self.pg0 = None
         self.tsolve = 0.0
+
+        self.status = ""
+        self.step_status = ""
 
         self.reltol = kwargs.get("reltol", 1e-12)
         self.abstol = kwargs.get("abstol", 1e-6)
@@ -70,7 +80,6 @@ class TRON(object):
                                       u"ρ", u"‖step‖", "radius", "stat")
         self.format = "%-5d  %8.1e  %7.1e  %5d  %8.1e  %8.1e  %8.1e  %4s"
         self.format0 = "%-5d  %8.1e  %7.1e  %5s  %8s  %8s  %8.1e  %4s"
-        self.radii = [self.TR.radius]
 
         # Setup the logger. Install a NullHandler if no output needed.
         logger_name = kwargs.get("logger_name", "nlp.tron")
@@ -203,132 +212,6 @@ class TRON(object):
             s = self.projected_step(x, -alpha * g, l, u)
         return (s, alpha)
 
-    def trqsol(self, x, p, delta):
-        u"""Compute a solution of the quadratic trust region equation.
-
-        Return the largest (non-negative) solution of
-            ‖x + σ p‖ = Δ.
-
-        The code is only guaranteed to produce a non-negative solution
-        if ‖x‖ ≤ Δ, and p != 0.
-        If the trust region equation has no solution, σ is set to 0.
-        """
-        ptx = np.dot(p, x)
-        ptp = np.dot(p, p)
-        xtx = np.dot(x, x)
-        dsq = delta**2
-
-        # Guard against abnormal cases.
-        rad = ptx**2 + ptp * (dsq - xtx)
-        rad = math.sqrt(max(rad, 0.0))
-
-        if ptx > 0:
-            sigma = (dsq - xtx) / (ptx + rad)
-        elif rad > 0:
-            sigma = (rad - ptx) / ptp
-        else:
-            sigma = 0
-        return sigma
-
-    def truncated_cg(self, g, H, delta, tol, itermax):
-        u"""Preconditioned conjugate-gradient method.
-
-        This method uses a preconditioned conjugate gradient method
-        to find an approximate minimizer of the trust region subproblem
-
-           min {q(s) | ‖s‖ ≤ Δ}.
-
-        where q is the quadratic
-
-           q(s) = gᵀs + ½ sᵀHs,
-
-        and H=Hᵀ.
-
-        Returned status is one of the following:
-            info = 1  Convergence test is satisfied.
-                      ‖∇q(s)‖ ≤ tol
-
-            info = 2  Failure to converge within itermax iterations.
-
-            info = 3  Conjugate gradient iterates leave the trust-region.
-
-            info = 4  The trust-region bound does not allow further progress.
-        """
-        exitOptimal = False
-        exitIter = False
-
-        # Initialize the iterate w and the residual r.
-        w = np.zeros(len(g))
-
-        # Initialize the residual r of grad q to -g.
-        r = -g
-
-        # Initialize the direction p.
-        p = r.copy()
-
-        # Initialize rho and the norm of r.
-        rho = np.dot(r, r)
-        rnorm0 = math.sqrt(rho)
-        iters = 0
-
-        # Exit if g = 0.
-        if rnorm0 == 0:
-            info = 1
-            return (w, iters, info)
-
-        while not (exitOptimal or exitIter):
-            # z = p.copy()
-            # q = H * z
-            q = H * p
-
-            # Compute alpha and determine sigma such that the trust region
-            # constraint || w + sigma*p || = delta is satisfied.
-            ptq = np.dot(p, q)
-            if ptq > 0:
-                alpha = rho / ptq
-            else:
-                alpha = 0
-
-            sigma = self.trqsol(w, p, delta)
-
-            # Exit if there is negative curvature or if the
-            # iterates exit the trust region.
-            if ptq <= 0 or alpha >= sigma:
-                p *= sigma
-                w += p
-                if ptq <= 0:
-                    info = 3
-                else:
-                    info = 4
-                return (w, iters, info)
-
-            # Update w and the residual r
-            w += alpha * p
-            r += -alpha * q
-
-            # Exit if the residual convergence test is satisfied.
-            rtr = np.dot(r, r)
-            rnorm = math.sqrt(rtr)
-            if rnorm <= tol:
-                exitOptimal = True
-                info = 1
-                continue
-
-            if iters >= itermax:
-                exitIter = True
-                info = 2
-                continue
-
-            # Compute p = r + beta*p and update rho.
-            beta = rtr / rho
-            p *= beta
-            p += r
-            rho = rtr
-
-            iters += 1
-
-        return (w, iters, info)
-
     def projected_newton_step(self, x, g, H, delta, l, u, s, cgtol, itermax):
         u"""Generate a sequence of approximate minimizers to the QP subproblem.
 
@@ -362,6 +245,7 @@ class TRON(object):
 
             info = 3  Failure to converge within itermax iterations.
         """
+        self.log.debug("Entering projected_newton_step")
         exitOptimal = False
         exitPCG = False
         exitIter = False
@@ -375,6 +259,8 @@ class TRON(object):
         # There are at most n iterations because at each iteration
         # at least one variable becomes active.
         iters = 0
+        tol = 1.0
+
         while not (exitOptimal or exitPCG or exitIter):
             # Determine the free variables at the current minimizer.
             free_vars = where((x > l) & (x < u))
@@ -396,27 +282,33 @@ class TRON(object):
             # Solve the trust region subproblem in the free variables
             # to generate a direction p[k]
 
-            tol = cgtol * gfnorm
-            (w, trpcg_iters, infotr) = self.truncated_cg(gfree, ZHZ, delta,
-                                                         tol, 1000)
-            iters += trpcg_iters
+            tol = cgtol * gfnorm  # note: gfnorm ≠ norm(gfree)
+            qp = QPModel(gfree, ZHZ)
+            self.solver = TrustRegionSolver(qp, self.tr_solver)
+            self.solver.solve(prec=self.precon,
+                              radius=self.tr.radius,
+                              abstol=tol)
+
+            step = self.solver.step
+            iters += self.solver.niter
 
             # Use a projected search to obtain the next iterate
             xfree = x[free_vars]
             lfree = l[free_vars]
             ufree = u[free_vars]
-            (xfree, w) = self.projected_linesearch(xfree, lfree, ufree,
-                                                   gfree, w, ZHZ, alpha=1.0)
+            (xfree, proj_step) = self.projected_linesearch(xfree, lfree, ufree,
+                                                           gfree, step, ZHZ,
+                                                           alpha=1.0)
 
             # Update the minimizer and the step.
             # Note that s now contains x[k+1] - x[0]
             x[free_vars] = xfree
-            s[free_vars] += w
+            s[free_vars] += proj_step
 
             # Compute the gradient grad q(x[k+1]) = g + H*(x[k+1] - x[0])
             # of q at x[k+1] for the free variables.
-            w = H * s
-            gfree = g[free_vars] + w[free_vars]
+            Hs = H * s
+            gfree = g[free_vars] + Hs[free_vars]
             gfnormf = norms.norm2(gfree)
 
             # Convergence and termination test.
@@ -427,7 +319,8 @@ class TRON(object):
                 exitOptimal = True
                 info = 1
                 continue
-            elif infotr == 3 or infotr == 4:
+            elif self.solver.status == "trust-region boundary active":
+                #  infotr == 3 or infotr == 4:
                 exitPCG = True
                 info = 2
                 continue
@@ -435,6 +328,8 @@ class TRON(object):
                 exitIter = True
                 info = 3
                 continue
+
+        self.log.debug("Leaving projected_newton_step with info=%d", info)
 
         return (x, s, iters, info)
 
@@ -535,7 +430,7 @@ class TRON(object):
         cgitermax = model.n
 
         # Initialize the trust region radius
-        self.TR.radius = self.pg0
+        self.tr.radius = self.pg0
 
         # Test for convergence or termination
         # stoptol = max(self.abstol, self.reltol * self.pgnorm)
@@ -554,7 +449,7 @@ class TRON(object):
         if self.iter % 20 == 0:
             self.log.info(self.header)
             self.log.info(self.format0, self.iter, self.f, pgnorm,
-                          "", "", "", self.TR.radius, "")
+                          "", "", "", self.tr.radius, "")
 
         while not (exitUser or exitOptimal or exitIter or exitFunCall):
             self.iter += 1
@@ -562,13 +457,13 @@ class TRON(object):
             # Compute the Cauchy step and store in s.
             (s, self.alphac) = self.cauchy(self.x, self.g, H,
                                            model.Lvar, model.Uvar,
-                                           self.TR.radius,
+                                           self.tr.radius,
                                            self.alphac)
 
             # Compute the projected Newton step.
             (x, s, cg_iter, info) = self.projected_newton_step(self.x, self.g,
                                                                H,
-                                                               self.TR.radius,
+                                                               self.tr.radius,
                                                                model.Lvar,
                                                                model.Uvar, s,
                                                                cgtol,
@@ -587,42 +482,42 @@ class TRON(object):
             # Evaluate the step and determine if the step is successful.
 
             # Compute the actual reduction.
-            rho = self.TR.ratio(self.f, f_trial, m)
+            rho = self.tr.ratio(self.f, f_trial, m)
             ared = self.f - f_trial
 
             # On the first iteration, adjust the initial step bound.
             snorm = norms.norm2(s)
             if self.iter == 1:
-                self.TR.radius = min(self.TR.radius, snorm)
+                self.tr.radius = min(self.tr.radius, snorm)
 
             # Update the trust region bound
             slope = np.dot(self.g, s)
             if f_trial - self.f - slope <= 0:
-                alpha = self.TR.gamma3
+                alpha = self.tr.gamma3
             else:
-                alpha = max(self.TR.gamma1,
+                alpha = max(self.tr.gamma1,
                             -0.5 * (slope / (f_trial - self.f - slope)))
 
             # Update the trust region bound according to the ratio
             # of actual to predicted reduction
-            self.TR.update_radius(rho, snorm, alpha)
+            self.tr.update_radius(rho, snorm, alpha)
 
             # Update the iterate.
-            if rho > self.TR.eta0:
+            if rho > self.tr.eta0:
                 # Successful iterate
                 # Trust-region step is accepted.
                 self.x = x_trial
                 self.f = f_trial
                 self.g = model.grad(self.x)
                 step_status = "Acc"
-
             else:
                 # Unsuccessful iterate
                 # Trust-region step is rejected.
                 step_status = "Rej"
 
+                # TODO: backtrack along step.
+
             self.step_status = step_status
-            self.radii.append(self.TR.radius)
             status = ""
             try:
                 self.post_iteration()
@@ -658,7 +553,7 @@ class TRON(object):
             exitUser = status == "usr"
 
             self.log.info(self.format, self.iter, self.f, pgnorm,
-                          cg_iter, rho, snorm, self.TR.radius, pstatus)
+                          cg_iter, rho, snorm, self.tr.radius, pstatus)
 
         self.tsolve = cputime() - t    # Solve time
         self.pgnorm = pgnorm
@@ -668,3 +563,4 @@ class TRON(object):
         elif self.iter > self.maxiter:
             status = "itr"
         self.status = status
+        self.log.info("final status: %s", self.status)
