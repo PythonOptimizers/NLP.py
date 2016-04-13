@@ -22,7 +22,7 @@ tron_logger = config_logger("nlp.tron",
                             level=logging.WARN if nprobs > 1 else logging.INFO)
 
 if nprobs > 1:
-    logger.info("%10s %5s %5s %8s %7s %5s %5s %4s %s",
+    logger.info("%10s %5s %5s %8s %7s %5s %5s %5s %s",
                 "name", "nvar", "#iter", "f", u"‖P∇f‖", "#f", u"#∇f", "stat",
                 "time")
 
@@ -39,7 +39,7 @@ for problem in sys.argv[1:]:
     tron = TRON(model, TruncatedCG, maxiter=100)
     tron.solve()
 
-    logger.info("%10s %5d %5d %8.1e %7.1e %5d %5d %4s %.3f",
+    logger.info("%10s %5d %5d %8.1e %7.1e %5d %5d %5s %.3f",
                 model.name, model.nvar, tron.iter, tron.f, tron.pgnorm,
                 model.obj.ncalls, model.grad.ncalls,
                 tron.status, tron.tsolve)
