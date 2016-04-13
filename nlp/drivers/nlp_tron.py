@@ -28,6 +28,7 @@ if nprobs > 1:
 
 for problem in sys.argv[1:]:
     model = AmplModel(problem)
+    model.compute_scaling_obj()
 
     # Check for inequality- or equality-constrained problem.
     if model.m > 0:
