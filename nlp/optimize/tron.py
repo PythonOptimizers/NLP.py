@@ -367,7 +367,7 @@ class TRON(object):
         model = self.model
 
         # Project the initial point into [l,u].
-        project(self.x, model.Lvar, model.Uvar)
+        self.x = project(self.x, model.Lvar, model.Uvar)
 
         # Gather initial information.
         self.f = model.obj(self.x)
