@@ -3,7 +3,7 @@ u"""Trust-Region Method for Bound-Constrained Programming.
 
 A pure Python/Numpy implementation of TRON as described in
 
-Chih-Jen Lin and Jorge J. Moré, *Newton"s Method for Large Bound-
+Chih-Jen Lin and Jorge J. Moré, *Newton's Method for Large Bound-
 Constrained Optimization Problems*, SIAM J. Optim., 9(4), 1100–1127, 1999.
 """
 
@@ -63,7 +63,7 @@ class TRON(object):
         self.save_g = False
         self.pgnorm = None
         self.pg0 = None
-        self.tsolve = 0.0
+        self.tsolve = None
 
         self.status = ""
         self.step_status = ""
@@ -395,7 +395,7 @@ class TRON(object):
 
         # Wrap Hessian into an operator.
         H = model.hop(self.x, self.model.pi0)
-        t = cputime()
+        tick = cputime()
 
         # Print out header and initial log.
         if self.iter % 20 == 0:
@@ -507,12 +507,14 @@ class TRON(object):
             self.log.info(self.format, self.iter, self.f, pgnorm,
                           cg_iter, rho, snorm, self.tr.radius, pstatus)
 
-        self.tsolve = cputime() - t    # Solve time
+        self.tsolve = cputime() - tick    # Solve time
         self.pgnorm = pgnorm
         # Set final solver status.
         if status == "usr":
             pass
         elif self.iter > self.maxiter:
             status = "itr"
+        elif status == "":  # corner case; initial guess was optimal
+            status = "gtol"
         self.status = status
         self.log.info("final status: %s", self.status)
