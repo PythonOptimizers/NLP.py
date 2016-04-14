@@ -153,7 +153,7 @@ class TRON(object):
                 if s_norm <= delta:
                     Hs = H * s
                     gts = np.dot(g, s)
-                    search = (.5 * np.dot(Hs, s) + gts >= mu0 * gts)
+                    search = (.5 * np.dot(Hs, s) + gts > mu0 * gts)
         else:
             # Increase alpha until a successful step is found.
             self.log.debug("extrapolating")
