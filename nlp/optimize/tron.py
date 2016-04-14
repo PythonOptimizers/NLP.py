@@ -12,13 +12,15 @@ import numpy as np
 from pykrylov.linop import SymmetricallyReducedLinearOperator as ReducedHessian
 
 from nlp.model.nlpmodel import QPModel
+from nlp.model.linemodel import C1LineModel
+from nlp.ls.linesearch import ArmijoLineSearch
 from nlp.tr.trustregion import TrustRegionSolver
 from nlp.tr.trustregion import GeneralizedTrustRegion
 from nlp.tools import norms
 from nlp.tools.utils import where, projected_gradient_norm2, \
                             project, projected_step, breakpoints
 from nlp.tools.timing import cputime
-from nlp.tools.exceptions import UserExitRequest
+from nlp.tools.exceptions import UserExitRequest, LineSearchFailure
 
 
 __docformat__ = "restructuredtext"
@@ -365,6 +367,7 @@ class TRON(object):
         """
         self.log.debug("entering solve")
         model = self.model
+        ls_fmt = "%7.1e  %8.1e"
 
         # Project the initial point into [l,u].
         self.x = project(self.x, model.Lvar, model.Uvar)
@@ -463,11 +466,30 @@ class TRON(object):
                 self.g = model.grad(self.x)
                 step_status = "Acc"
             else:
-                # Unsuccessful iterate
-                # Trust-region step is rejected.
-                step_status = "Rej"
+                # Trust-region step is rejected; backtrack.
+                line_model = C1LineModel(model, self.x, s)
+                ls = ArmijoLineSearch(line_model, bkmax=5, decr=1.75)
 
-                # TODO: backtrack along step.
+                try:
+                    for step in ls:
+                        self.log.debug(ls_fmt, step, ls.trial_value)
+
+                    ared = self.f - f_trial
+                    self.x = ls.iterate
+                    self.f = ls.trial_value
+                    self.g = model.grad(self.x)
+                    snorm *= ls.step
+                    self.tr.radius = snorm
+                    step_status = "N-Y"
+
+                    # self.step_accepted = True
+                    # self.dvars = self.alpha * step
+                    # if self.save_g:
+                    #     self.dgrad = self.g - self.g_old
+
+                except LineSearchFailure:
+                    # Fall back on trust-region rule.
+                    step_status = "Rej"
 
             self.step_status = step_status
             status = ""
