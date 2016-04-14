@@ -1,6 +1,4 @@
-"""
-Class definition for Trust-Region Algorithm
-"""
+"""Class definition for Trust-Region Algorithm and Management."""
 
 import numpy as np
 
@@ -11,7 +9,7 @@ class TrustRegion(object):
     """A trust-region management class."""
 
     def __init__(self, **kwargs):
-        """Initializes an object allowing management of a trust region.
+        """Instantiate an object allowing management of a trust region.
 
         :keywords:
 
@@ -21,7 +19,7 @@ class TrustRegion(object):
             :gamma1:        Radius decrease factor      (default: 1/3)
             :gamma2:        Radius increase factor      (default: 2.5)
 
-        Subclass and override :meth:`UpdateRadius` to implement custom
+        Subclass and override :meth:`update_radius` to implement custom
         trust-region management rules.
 
         See, e.g.,
@@ -33,7 +31,7 @@ class TrustRegion(object):
         self.radius_max = 1.0e+10
         self.eta1 = kwargs.get('eta1', 0.01)    # Step acceptance threshold
         self.eta2 = kwargs.get('eta2', 0.99)    # Radius increase threshold
-        self.gamma1 = kwargs.get('gamma1', 1.0/3)  # Radius decrease factor
+        self.gamma1 = kwargs.get('gamma1', 1.0 / 3)  # Radius decrease factor
         self.gamma2 = kwargs.get('gamma2', 2.5)    # Radius increase factor
         self.eps = np.finfo(np.double).eps  # Machine epsilon.
 
@@ -45,7 +43,7 @@ class TrustRegion(object):
         pred = -m + max(1.0, abs(f)) * 10.0 * self.eps
         ared = f - f_trial + max(1.0, abs(f)) * 10.0 * self.eps
         if pred > 0 or not check_positive:
-            return ared/pred
+            return ared / pred
         else:
             # Error: Negative predicted reduction
             msg = 'TrustRegion:: Nonpositive predicted reduction: %8.1e' % pred
@@ -72,6 +70,58 @@ class TrustRegion(object):
     def reset_radius(self):
         """Reset radius to original value."""
         self.radius = self.radius0
+
+
+class GeneralizedTrustRegion(TrustRegion):
+    """A more general trust-region management class.
+
+    Subclass of `TrustRegion` implementing a more flexible update of the
+    trust-region radius.
+
+    See :meth:`update_radius` for more details.
+    """
+
+    def __init__(self, **kwargs):
+        """Instantiate an object allowing management of a trust region.
+
+        :keywords:
+            :radius:        Initial trust-region radius (default: 1.0)
+        """
+        self.radius = self.radius0 = kwargs.get('radius', 1.0)
+        self.radius_max = 1.0e+10
+        self.eta0 = 1e-4
+        self.eta1 = 0.25
+        self.eta2 = 0.75
+        self.gamma1 = 0.25
+        self.gamma2 = 0.5
+        self.gamma3 = 4.0
+        self.eps = np.finfo(np.double).eps  # Machine epsilon.
+
+    def update_radius(self, ratio, step_norm, alpha):
+        u"""Update the trust-region radius.
+
+        The rule implemented by this method is:
+
+        radius = min(max(α, γ1) * step_norm, γ2 radius       if ratio <= η0
+        radius = max(γ1*radius, min(α*step_norm, γ2*radius)) if ratio ∈ (η0,η1]
+        radius = max(γ1*radius,
+                     min(α*step_norm, γ3*self.radius))       if ratio ∈ (η1,η2]
+        radius = max(radius, min(α*step_norm, γ3*radius))    if ratio > η2.
+        """
+        if ratio <= self.eta0:
+            self.radius = min(max(alpha, self.gamma1) * step_norm,
+                              self.gamma2 * self.radius)
+        elif ratio <= self.eta1:
+            self.radius = max(self.gamma1 * self.radius,
+                              min(alpha * step_norm,
+                                  self.gamma2 * self.radius))
+        elif ratio <= self.eta2:
+            self.radius = max(self.gamma1 * self.radius,
+                              min(alpha * step_norm,
+                                  self.gamma3 * self.radius))
+        else:
+            self.radius = max(self.radius, min(alpha * step_norm,
+                                               self.gamma3 * self.radius))
 
 
 class TrustRegionSolver(object):
@@ -107,6 +157,7 @@ class TrustRegionSolver(object):
         self._step_norm = 0.0
         self._step = None
         self._m = None  # Model value at candidate solution
+        self.status = ""
 
     @property
     def qp(self):
@@ -145,3 +196,4 @@ class TrustRegionSolver(object):
         self._step_norm = self._cg_solver.step_norm
         self._step = self._cg_solver.step
         self._m = self.qp.obj(self.step)        # Compute model reduction.
+        self.status = self._cg_solver.status

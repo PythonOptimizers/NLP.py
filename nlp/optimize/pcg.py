@@ -9,6 +9,7 @@ truncated preconditioned conjugate gradient algorithm as described in
 .. moduleauthor:: D. Orban <dominique.orban@gerad.ca>
 """
 
+from nlp.tools.utils import to_boundary
 from nlp.tools.exceptions import UserExitRequest
 import numpy as np
 from math import sqrt
@@ -76,8 +77,9 @@ class TruncatedCG(object):
         self.pHp = None
 
         # Setup the logger. Install a NullHandler if no output needed.
-        logger_name = kwargs.get('logger_name', 'nlpy.trcg')
+        logger_name = kwargs.get('logger_name', 'nlp.trcg')
         self.log = logging.getLogger(logger_name)
+        self.log.addHandler(logging.NullHandler())
         self.log.propagate = False
 
         # Formats for display
@@ -87,25 +89,6 @@ class TruncatedCG(object):
         self.fmt = self.fmt0 + '  %8.2e'
 
         return
-
-    def to_boundary(self, s, p, radius, ss=None):
-        """
-        Given vectors `s` and `p` and a trust-region radius `radius` > 0,
-        return the positive scalar `sigma` such that
-
-          `|| s + sigma * p || = radius`
-
-        in Euclidian norm. If known, supply optional argument `ss` whose value
-        should be the squared Euclidian norm of `s`.
-        """
-        if radius is None:
-            raise ValueError('Input radius must be positive number.')
-        sp = np.dot(s, p)
-        pp = np.dot(p, p)
-        if ss is None: ss = np.dot(s, s)
-        sigma = (-sp + sqrt(sp*sp + pp * (radius*radius - ss)))
-        sigma /= pp
-        return sigma
 
     def post_iteration(self, *args, **kwargs):
         """
@@ -151,13 +134,7 @@ class TruncatedCG(object):
 
         y = prec(r)
         ry = np.dot(r, y)
-
-        try:
-            sqrtry = sqrt(ry)
-        except:
-            msg = 'Preconditioned residual = %8.1e\n' % ry
-            msg += 'Is preconditioner positive definite?'
-            raise ValueError(msg)
+        sqrtry = sqrt(ry)
 
         stop_tol = max(abstol, reltol * sqrtry)
         k = 0
@@ -185,7 +162,7 @@ class TruncatedCG(object):
 
             # Compute steplength to the boundary.
             if radius is not None:
-                sigma = self.to_boundary(s, p, radius, ss=snorm2)
+                sigma = to_boundary(s, p, radius, xx=snorm2)
 
             if pHp <= 0 and radius is None:
                 # p is direction of singularity or negative curvature.
@@ -231,13 +208,7 @@ class TruncatedCG(object):
             self.alpha = alpha
             self.beta = beta
 
-            try:
-                sqrtry = sqrt(ry)
-            except:
-                msg = 'Preconditioned residual = %8.1e\n' % ry
-                msg += 'Is preconditioner positive definite?'
-                raise ValueError(msg)
-
+            sqrtry = sqrt(ry)
             snorm2 = np.dot(s, s)
 
             try:
@@ -259,15 +230,10 @@ class TruncatedCG(object):
             self.status = 'max iter'
         elif not onBoundary and not infDescent and not exitUser:
             self.status = 'residual small'
+        self.log.info(self.status)
         self.step = s
         self.niter = k
         self.step_norm = sqrt(snorm2)
         self.onBoundary = onBoundary
         self.infDescent = infDescent
         return
-
-
-class TruncatedCGLBFGS(TruncatedCG):
-
-    def post_iteration(self):
-        self.qp.H.store(self.ds, self.dr)

@@ -1,7 +1,10 @@
-# Various utilities.
+# -*- coding: utf-8 -*-
+"""Utilities."""
+
 import numpy as np
 import logging
 from math import copysign, sqrt
+from nlp.tools.norms import norm2
 
 
 def Max(a):
@@ -16,6 +19,7 @@ def Min(a):
 
 class NullHandler(logging.Handler):
     """A simple implementation of the null handler for Python 2.6.x.
+
     Useful for compatibility with older versions of Python.
     """
 
@@ -89,7 +93,7 @@ def roots_quadratic(q2, q1, q0, tol=1.0e-8, nitref=1):
     # Perform a few Newton iterations to improve accuracy.
     new_roots = []
     for root in roots:
-        for it in range(nitref):
+        for _ in xrange(nitref):
             val = (a2 * root + a1) * root + a0
             der = 2.0 * a2 * root + a1
             if der == 0.0:
@@ -101,6 +105,85 @@ def roots_quadratic(q2, q1, q0, tol=1.0e-8, nitref=1):
     return new_roots
 
 
-if __name__ == '__main__':
-    roots = roots_quadratic(2.0e+20, .1, -4)
-    print 'Received: ', roots
+def to_boundary(x, p, delta, xx=None):
+    u"""Compute a solution of the quadratic trust region equation.
+
+    Return the largest (non-negative) solution of
+        ‖x + σ p‖ = Δ.
+
+    The code is only guaranteed to produce a non-negative solution
+    if ‖x‖ ≤ Δ, and p != 0.
+    If the trust region equation has no solution, σ is set to 0.
+    """
+    px = np.dot(p, x)
+    pp = np.dot(p, p)
+    if xx is None:
+        xx = np.dot(x, x)
+    d2 = delta**2
+
+    # Guard against abnormal cases.
+    rad = px**2 + pp * (d2 - xx)
+    rad = sqrt(max(rad, 0.0))
+
+    if px > 0:
+        sigma = (d2 - xx) / (px + rad)
+    elif rad > 0:
+        sigma = (rad - px) / pp
+    else:
+        sigma = 0
+    return sigma
+
+
+def projected_gradient_norm2(x, g, l, u):
+    """Compute the Euclidean norm of the projected gradient at x."""
+    lower = where(x == l)
+    upper = where(x == u)
+
+    pg = g.copy()
+    pg[lower] = np.minimum(g[lower], 0)
+    pg[upper] = np.maximum(g[upper], 0)
+
+    return norm2(pg[where(l != u)])
+
+
+def project(x, l, u):
+    """Project x into the box [l, u]."""
+    return np.maximum(np.minimum(x, u), l)
+
+
+def projected_step(x, d, l, u):
+    """Project the step d into the box [l, u].
+
+    The projected step is defined as s := P[x + d] - x.
+    """
+    return project(x + d, l, u) - x
+
+
+def breakpoints(x, d, l, u):
+    """Find the smallest and largest breakpoints on the half line x + t d.
+
+    We assume that x is feasible. Return the smallest and largest t such
+    that x + t d lies on the boundary.
+    """
+    pos = where((d > 0) & (x < u))  # Hit the upper bound.
+    neg = where((d < 0) & (x > l))  # Hit the lower bound.
+    npos = len(pos)
+    nneg = len(neg)
+
+    nbrpt = npos + nneg
+    # Handle the exceptional case.
+    if nbrpt == 0:
+        return (0, 0, 0)
+
+    brptmin = np.inf
+    brptmax = 0
+    if npos > 0:
+        steps = (u[pos] - x[pos]) / d[pos]
+        brptmin = min(brptmin, np.min(steps))
+        brptmax = max(brptmax, np.max(steps))
+    if nneg > 0:
+        steps = (l[neg] - x[neg]) / d[neg]
+        brptmin = min(brptmin, np.min(steps))
+        brptmax = max(brptmax, np.max(steps))
+
+    return (nbrpt, brptmin, brptmax)
