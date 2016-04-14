@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 u"""A module to create and plot performance profiles.
 
 Performance profiles are implemented as described in
@@ -13,7 +14,7 @@ import numpy as np
 
 __docformat__ = 'restructuredtext'
 
-default_options = {'datacol': 2, 'logscale': True, 'sep': '\s+', 'bw': False,
+default_options = {'datacol': 2, 'logscale': True, 'sep': r'\s+', 'bw': False,
                    'title': 'Deathmatch'}
 
 
@@ -29,11 +30,11 @@ class PerformanceProfile(object):
             :options: a dictionary of options. Currently recognized options are
                       listed below.
 
-        :options:
+        :keywords:
             :datacol:  the (1-based) column index containing the relevant
                        metric in the solver files.
             :logscale: True if log-scale ratios are requested.
-            :sep:      the column separator as a regexp (default: '\s+').
+            :sep:      the column separator as a regexp (default: r'\s+').
             :bw:       True if a black and white plot is requested.
             :title:    string containing the plot title.
 
@@ -112,13 +113,15 @@ class PerformanceProfile(object):
                 pltargs = (grays[solv % ngrays],)
             # Draw profile tail all the way.
             self.ratios[solv, -1] = xmax
-            pltcmd(self.ratios[solv, :], y,
-                   linewidth=2.5,
-                   drawstyle='steps-pre',
-                   antialiased=True,
-                   *pltargs)
+            line, = pltcmd(self.ratios[solv, :], y,
+                           linewidth=2,
+                           drawstyle='steps-pre',
+                           antialiased=True,
+                           alpha=0.75,
+                           *pltargs)
+            line.set_label(self.solvers[solv])
 
-        plt.legend(self.solvers, 'lower right')
+        plt.legend(loc='lower right')
         ax = plt.gca()
         if self.options['logscale']:
             ax.set_xscale('log', basex=2)
@@ -130,13 +133,3 @@ class PerformanceProfile(object):
         if self.options['title'] is not None:
             ax.set_title(self.options['title'])
         plt.show()
-
-
-if __name__ == '__main__':
-
-    import sys
-
-    # Only specify non-default options.
-    options = {'bw': True}
-    pprof = PerformanceProfile(sys.argv[1:], **options)
-    pprof.plot()
