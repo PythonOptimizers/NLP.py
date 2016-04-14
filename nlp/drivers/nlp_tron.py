@@ -4,7 +4,7 @@
 
 import logging
 import sys
-from nlp.model.cysparsemodel import AmplModel
+from nlp.model.amplpy import AmplModel
 from nlp.optimize.tron import TRON
 from nlp.optimize.pcg import TruncatedCG
 from nlp.tools.logs import config_logger
