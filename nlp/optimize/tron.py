@@ -258,10 +258,9 @@ class TRON(object):
             iters += self.solver.niter
 
             # Use a projected search to obtain the next iterate
-            xfree = x[free_vars]
-            lfree = l[free_vars]
-            ufree = u[free_vars]
-            (xfree, proj_step) = self.projected_linesearch(xfree, lfree, ufree,
+            (xfree, proj_step) = self.projected_linesearch(x[free_vars],
+                                                           l[free_vars],
+                                                           u[free_vars],
                                                            gfree, step, ZHZ,
                                                            alpha=1.0)
 
