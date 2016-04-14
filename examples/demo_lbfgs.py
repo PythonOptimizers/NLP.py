@@ -5,7 +5,7 @@ Each problem given on the command line is solved
 for several values of the limited-memory parameter.
 """
 
-from nlp.model.amplpy import QNAmplModel
+from nlp.model.amplmodel import QNAmplModel
 from nlp.optimize.lbfgs import LBFGS
 from pykrylov.linop import InverseLBFGSOperator
 from os.path import basename, splitext

@@ -41,7 +41,7 @@ class CySparseNLPModel(NLPModel):
         return J
 
 try:
-    from nlp.model.amplpy import AmplModel
+    from nlp.model.amplmodel import AmplModel
 
     class CySparseAmplModel(CySparseNLPModel, AmplModel):
         # MRO: 1. CySparseAmplModel

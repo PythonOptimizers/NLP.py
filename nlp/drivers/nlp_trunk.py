@@ -4,7 +4,7 @@
 
 import logging
 import sys
-from nlp.model.amplpy import AmplModel
+from nlp.model.amplmodel import AmplModel
 from nlp.tr.trustregion import TrustRegion
 from nlp.optimize.trunk import Trunk
 from nlp.optimize.pcg import TruncatedCG

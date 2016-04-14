@@ -35,19 +35,19 @@ if nlp_config.has_section('ASL'):
         raise ValueError("Please check if ASL paths are correct:" +
                          "\n   %s\n    %s" % (libampl_libdir, libampl_include))
 
-    amplpy_params = {}
-    amplpy_params['library_dirs'] = [libampl_libdir]
-    amplpy_params['include_dirs'] = [os.path.join('nlp', 'model', 'src'),
-                                     libampl_include,
-                                     np.get_include()]
-    amplpy_params['libraries'] = ['asl']
+    amplmodel_params = {}
+    amplmodel_params['library_dirs'] = [libampl_libdir]
+    amplmodel_params['include_dirs'] = [os.path.join('nlp', 'model', 'src'),
+                                        libampl_include,
+                                        np.get_include()]
+    amplmodel_params['libraries'] = ['asl']
 
-    amplpy_src = [os.path.join('nlp', 'model', 'src', '_amplpy.c'),
-                  os.path.join('nlp', 'model', 'src', 'amplutils.c')]
+    amplmodel_src = [os.path.join('nlp', 'model', 'src', '_amplmodel.c'),
+                     os.path.join('nlp', 'model', 'src', 'amplutils.c')]
 
-    nlp_ext.append(Extension(name="nlp.model._amplpy",
-                             sources=amplpy_src,
-                             **amplpy_params))
+    nlp_ext.append(Extension(name="nlp.model._amplmodel",
+                             sources=amplmodel_src,
+                             **amplmodel_params))
 
 
 #############################

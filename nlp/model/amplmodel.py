@@ -4,7 +4,7 @@
 .. moduleauthor:: D. Orban <dominique.orban@gerad.ca>
 """
 try:
-    from nlp.model import _amplpy
+    from nlp.model import _amplmodel
 except:
     raise
 
@@ -87,7 +87,7 @@ class AmplModel(NLPModel):
 
         # Initialize the ampl module
         try:
-            model = self.model = _amplpy.ampl(stub)
+            model = self.model = _amplmodel.ampl(stub)
         except:
             raise ValueError('Cannot initialize model %s' % stub)
 
@@ -125,8 +125,6 @@ class AmplModel(NLPModel):
     def writesol(self, x, z, msg):
         """Write primal-dual solution and message msg to `stub.sol`."""
         return self.model.ampl_sol(x, z, msg)
-
-    # The following methods mirror the module functions defined in _amplpy.c.
 
     def obj(self, x, obj_num=0):
         """Evaluate objective function value at x.
