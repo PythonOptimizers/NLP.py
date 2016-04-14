@@ -216,7 +216,7 @@ class TRON(object):
         exitPCG = False
         exitIter = False
 
-        w = H * s
+        Hs = H * s
 
         # Compute the Cauchy point.
         x = project(x + s, l, u)
@@ -241,7 +241,7 @@ class TRON(object):
             ZHZ = ReducedHessian(H, free_vars)
 
             # Compute the norm of the reduced gradient Zᵀg
-            gfree = g[free_vars] + w[free_vars]
+            gfree = g[free_vars] + Hs[free_vars]
             gfnorm = norms.norm2(g[free_vars])
 
             # Solve the trust region subproblem in the free variables
