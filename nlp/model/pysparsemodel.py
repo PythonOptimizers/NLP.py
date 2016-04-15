@@ -39,7 +39,7 @@ class PySparseNLPModel(NLPModel):
 
 
 try:
-    from nlp.model.amplpy import AmplModel
+    from nlp.model.amplmodel import AmplModel
 
     class PySparseAmplModel(PySparseNLPModel, AmplModel):
         # MRO: 1. PySparseAmplModel

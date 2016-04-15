@@ -3,7 +3,7 @@
 from scipy import sparse as sp
 
 from nlp.model.nlpmodel import NLPModel
-from nlp.model.amplpy import AmplModel
+from nlp.model.amplmodel import AmplModel
 from nlp.model.snlp import SlackModel
 from nlp.model.qnmodel import QuasiNewtonModel
 from pykrylov.linop.linop import linop_from_ndarray

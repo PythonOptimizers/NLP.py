@@ -14,7 +14,7 @@ class Test_AmplRosenbrock(TestCase, Rosenbrock):  # Test def'd in Rosenbrock
         return get_derivatives_coord(model)
 
     def setUp(self):
-        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("nlp.model.amplmodel")
         model = os.path.join(this_path, 'rosenbrock.nl')
         self.model = AmplModel(model)  # x0 = (-1, ..., -1)
 
@@ -24,7 +24,7 @@ class Test_AmplHS7(TestCase, Hs7):  # Test defined in Hs7
         return get_derivatives_coord(model)
 
     def setUp(self):
-        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("nlp.model.amplmodel")
         model = os.path.join(this_path, 'hs007.nl')
         self.model = AmplModel(model)  # x0 = (2, 2)
         self.model.pi0 = np.ones(1)
@@ -36,7 +36,7 @@ class Test_PySparseAmplRosenbrock(TestCase, Rosenbrock):
         return get_derivatives_llmat(model)
 
     def setUp(self):
-        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("pysparse")
         model = os.path.join(this_path, 'rosenbrock.nl')
         self.model = PySparseAmplModel(model)    # x0 = (-1, ..., -1)
@@ -48,7 +48,7 @@ class Test_PySparseAmplHS7(TestCase, Hs7):
         return get_derivatives_llmat(model)
 
     def setUp(self):
-        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("pysparse")
         model = os.path.join(this_path, 'hs007.nl')
         self.model = PySparseAmplModel(model)
@@ -63,7 +63,7 @@ class Test_PySparseSlackHS7(TestCase, GenericTest):
         return get_derivatives_llmat(model)
 
     def setUp(self):
-        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("pysparse")
         model = os.path.join(this_path, 'hs007.nl')
         self.model = PySparseSlackModel(PySparseAmplModel(model))
@@ -78,7 +78,7 @@ class Test_PySparseSlackHS10(TestCase, GenericTest):
         return get_derivatives_llmat(model)
 
     def setUp(self):
-        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("pysparse")
         model = os.path.join(this_path, 'hs010.nl')
         self.model = PySparseSlackModel(PySparseAmplModel(model))
@@ -91,7 +91,7 @@ class Test_SciPyAmplRosenbrock(TestCase, Rosenbrock):
         return get_derivatives_scipy(model)
 
     def setUp(self):
-        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("scipy")
         model = os.path.join(this_path, 'rosenbrock.nl')
         self.model = SciPyAmplModel(model)  # x0 = (-1, ..., -1)
@@ -102,7 +102,7 @@ class Test_SciPyAmplHS7(TestCase, Hs7):
         return get_derivatives_scipy(model)
 
     def setUp(self):
-        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("scipy")
         model = os.path.join(this_path, 'hs007.nl')
         self.model = SciPyAmplModel(model)
@@ -117,7 +117,7 @@ class Test_SciPySlackHS7(TestCase, GenericTest):
         return get_derivatives_scipy(model)
 
     def setUp(self):
-        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("scipy")
         model = os.path.join(this_path, 'hs007.nl')
         self.model = SciPySlackModel(SciPyAmplModel(model))
@@ -132,7 +132,7 @@ class Test_SciPySlackHS10(TestCase, GenericTest):
         return get_derivatives_scipy(model)
 
     def setUp(self):
-        pytest.importorskip("nlp.model.amplpy")
+        pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("scipy")
         model = os.path.join(this_path, 'hs010.nl')
         self.model = SciPySlackModel(SciPyAmplModel(model))

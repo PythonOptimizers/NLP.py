@@ -15,7 +15,7 @@ except:
     pass
 
 try:
-    from nlp.model.amplpy import AmplModel
+    from nlp.model.amplmodel import AmplModel
 except:
     pass
 

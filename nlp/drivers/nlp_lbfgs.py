@@ -4,7 +4,7 @@
 
 import logging
 import sys
-from nlp.model.amplpy import QNAmplModel
+from nlp.model.amplmodel import QNAmplModel
 from nlp.optimize.lbfgs import LBFGS
 from nlp.tools.logs import config_logger
 

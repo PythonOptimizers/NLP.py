@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-"""Test for amplpy module."""
+"""Test for amplmodel module."""
 
-from nlp.model.amplpy import AmplModel
+from nlp.model.amplmodel import AmplModel
 import numpy as np
 import sys
 
