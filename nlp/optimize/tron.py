@@ -46,6 +46,8 @@ class TRON(object):
             :maxiter:      maximum number of iterations       (max(1000,10n))
             :maxfuncall:   maximum number of objective function evaluations
                                                               (1000)
+            :ny:           perform backtracking linesearch when trust-region
+                           step is rejected                   (``False``)
             :logger_name:  name of a logger object that can be used in the post
                            iteration                          (``None``)
         """
@@ -74,6 +76,7 @@ class TRON(object):
         self.abstol = kwargs.get("abstol", 1e-6)
         self.maxiter = kwargs.get("maxiter", 100 * self.model.n)
         self.maxfuncall = kwargs.get("maxfuncall", 1000)
+        self.ny = kwargs.get("ny", False)
         self.cgtol = 0.1
         self.alphac = 1
 
@@ -465,7 +468,8 @@ class TRON(object):
                 self.f = f_trial
                 self.g = model.grad(self.x)
                 step_status = "Acc"
-            else:
+
+            elif self.ny:
                 # Trust-region step is rejected; backtrack.
                 line_model = C1LineModel(model, self.x, s)
                 ls = ArmijoLineSearch(line_model, bkmax=5, decr=1.75)
@@ -482,14 +486,12 @@ class TRON(object):
                     self.tr.radius = snorm
                     step_status = "N-Y"
 
-                    # self.step_accepted = True
-                    # self.dvars = self.alpha * step
-                    # if self.save_g:
-                    #     self.dgrad = self.g - self.g_old
-
                 except LineSearchFailure:
-                    # Fall back on trust-region rule.
                     step_status = "Rej"
+
+            else:
+                # Fall back on trust-region rule.
+                step_status = "Rej"
 
             self.step_status = step_status
             status = ""
