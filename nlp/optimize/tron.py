@@ -3,7 +3,7 @@ u"""Trust-Region Method for Bound-Constrained Programming.
 
 A pure Python/Numpy implementation of TRON as described in
 
-Chih-Jen Lin and Jorge J. Moré, *Newton"s Method for Large Bound-
+Chih-Jen Lin and Jorge J. Moré, *Newton's Method for Large Bound-
 Constrained Optimization Problems*, SIAM J. Optim., 9(4), 1100–1127, 1999.
 """
 
@@ -12,13 +12,15 @@ import numpy as np
 from pykrylov.linop import SymmetricallyReducedLinearOperator as ReducedHessian
 
 from nlp.model.nlpmodel import QPModel
+from nlp.model.linemodel import C1LineModel
+from nlp.ls.linesearch import ArmijoLineSearch
 from nlp.tr.trustregion import TrustRegionSolver
 from nlp.tr.trustregion import GeneralizedTrustRegion
 from nlp.tools import norms
 from nlp.tools.utils import where, projected_gradient_norm2, \
                             project, projected_step, breakpoints
 from nlp.tools.timing import cputime
-from nlp.tools.exceptions import UserExitRequest
+from nlp.tools.exceptions import UserExitRequest, LineSearchFailure
 
 
 __docformat__ = "restructuredtext"
@@ -44,6 +46,8 @@ class TRON(object):
             :maxiter:      maximum number of iterations       (max(1000,10n))
             :maxfuncall:   maximum number of objective function evaluations
                                                               (1000)
+            :ny:           perform backtracking linesearch when trust-region
+                           step is rejected                   (``False``)
             :logger_name:  name of a logger object that can be used in the post
                            iteration                          (``None``)
         """
@@ -63,7 +67,7 @@ class TRON(object):
         self.save_g = False
         self.pgnorm = None
         self.pg0 = None
-        self.tsolve = 0.0
+        self.tsolve = None
 
         self.status = ""
         self.step_status = ""
@@ -72,6 +76,7 @@ class TRON(object):
         self.abstol = kwargs.get("abstol", 1e-6)
         self.maxiter = kwargs.get("maxiter", 100 * self.model.n)
         self.maxfuncall = kwargs.get("maxfuncall", 1000)
+        self.ny = kwargs.get("ny", False)
         self.cgtol = 0.1
         self.alphac = 1
 
@@ -365,6 +370,7 @@ class TRON(object):
         """
         self.log.debug("entering solve")
         model = self.model
+        ls_fmt = "%7.1e  %8.1e"
 
         # Project the initial point into [l,u].
         self.x = project(self.x, model.Lvar, model.Uvar)
@@ -395,7 +401,7 @@ class TRON(object):
 
         # Wrap Hessian into an operator.
         H = model.hop(self.x, self.model.pi0)
-        t = cputime()
+        tick = cputime()
 
         # Print out header and initial log.
         if self.iter % 20 == 0:
@@ -462,12 +468,30 @@ class TRON(object):
                 self.f = f_trial
                 self.g = model.grad(self.x)
                 step_status = "Acc"
-            else:
-                # Unsuccessful iterate
-                # Trust-region step is rejected.
-                step_status = "Rej"
 
-                # TODO: backtrack along step.
+            elif self.ny:
+                # Trust-region step is rejected; backtrack.
+                line_model = C1LineModel(model, self.x, s)
+                ls = ArmijoLineSearch(line_model, bkmax=5, decr=1.75)
+
+                try:
+                    for step in ls:
+                        self.log.debug(ls_fmt, step, ls.trial_value)
+
+                    ared = self.f - f_trial
+                    self.x = ls.iterate
+                    self.f = ls.trial_value
+                    self.g = model.grad(self.x)
+                    snorm *= ls.step
+                    self.tr.radius = snorm
+                    step_status = "N-Y"
+
+                except LineSearchFailure:
+                    step_status = "Rej"
+
+            else:
+                # Fall back on trust-region rule.
+                step_status = "Rej"
 
             self.step_status = step_status
             status = ""
@@ -507,12 +531,14 @@ class TRON(object):
             self.log.info(self.format, self.iter, self.f, pgnorm,
                           cg_iter, rho, snorm, self.tr.radius, pstatus)
 
-        self.tsolve = cputime() - t    # Solve time
+        self.tsolve = cputime() - tick    # Solve time
         self.pgnorm = pgnorm
         # Set final solver status.
         if status == "usr":
             pass
         elif self.iter > self.maxiter:
             status = "itr"
+        elif status == "":  # corner case; initial guess was optimal
+            status = "gtol"
         self.status = status
         self.log.info("final status: %s", self.status)

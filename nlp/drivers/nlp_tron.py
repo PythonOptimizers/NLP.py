@@ -4,10 +4,26 @@
 
 import logging
 import sys
-from nlp.model.cysparsemodel import AmplModel
+from nlp.model.amplmodel import AmplModel
 from nlp.optimize.tron import TRON
 from nlp.optimize.pcg import TruncatedCG
 from nlp.tools.logs import config_logger
+
+
+def tron_stats(tron):
+    """Obtain TRON statistics and indicate failures with negatives."""
+    if tron.status in ("fatol", "frtol", "gtol"):
+        it = tron.iter
+        fc, gc = tron.model.obj.ncalls, tron.model.grad.ncalls
+        pg = tron.pgnorm
+        ts = tron.tsolve
+    else:
+        it = -tron.iter
+        fc, gc = -tron.model.obj.ncalls, -tron.model.grad.ncalls
+        pg = -1.0 if tron.pgnorm is None else -tron.pgnorm
+        ts = -1.0 if tron.tsolve is None else -tron.tsolve
+    return (it, fc, gc, pg, ts)
+
 
 nprobs = len(sys.argv) - 1
 if nprobs == 0:
@@ -22,7 +38,7 @@ tron_logger = config_logger("nlp.tron",
                             level=logging.WARN if nprobs > 1 else logging.INFO)
 
 if nprobs > 1:
-    logger.info("%12s %5s %5s %8s %7s %5s %5s %5s %s",
+    logger.info("%12s %5s %6s %8s %8s %6s %6s %5s %7s",
                 "name", "nvar", "iter", "f", u"‖P∇f‖", "#f", u"#∇f", "stat",
                 "time")
 
@@ -37,9 +53,15 @@ for problem in sys.argv[1:]:
         continue
 
     tron = TRON(model, TruncatedCG, maxiter=100)
-    tron.solve()
+    try:
+        tron.solve()
+        status = tron.status
+        niter, fcalls, gcalls, pgnorm, tsolve = tron_stats(tron)
+    except:
+        msg = sys.exc_info()[1].message
+        status = msg if len(msg) > 0 else "xfail"  # unknown failure
+        niter, fcalls, gcalls, pgnorm, tsolve = tron_stats(tron)
 
-    logger.info("%12s %5d %5d %8.1e %7.1e %5d %5d %5s %.3f",
-                model.name, model.nvar, tron.iter, tron.f, tron.pgnorm,
-                model.obj.ncalls, model.grad.ncalls,
-                tron.status, tron.tsolve)
+    logger.info("%12s %5d %6d %8.1e %8.1e %6d %6d %5s %7.3f",
+                model.name, model.nvar, niter, tron.f, pgnorm,
+                fcalls, gcalls, status, tsolve)
