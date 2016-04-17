@@ -4,6 +4,7 @@
 import logging
 from nlp.model.linemodel import C1LineModel
 from nlp.ls.linesearch import ArmijoWolfeLineSearch
+from nlp.ls.wolfe import StrongWolfeLineSearch
 from nlp.tools import norms
 from nlp.tools.exceptions import UserExitRequest, LineSearchFailure
 from nlp.tools.timing import cputime
@@ -144,3 +145,14 @@ class LBFGS(object):
         else:  # self.iter > self.maxiter:
             status = "itr"
         self.status = status
+
+
+class WolfeLBFGS(LBFGS):
+    """L-BFGS with a strong Wolfe linesearch."""
+
+    def setup_linesearch(self, line_model, step0):
+        u"""Set up linesearch for the line model with the given initial step.
+
+        This variant uses the strong Wolfe linesearch of Moré and Thuente.
+        """
+        return StrongWolfeLineSearch(line_model, ftol=1.0e-4, gtol=0.1)
