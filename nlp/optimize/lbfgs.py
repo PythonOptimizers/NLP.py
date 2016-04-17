@@ -40,9 +40,9 @@ class LBFGS(object):
         self.x = model.x0.copy()
         self.f = None
         self.g = None
-        self.gNorm = None
+        self.g_norm = None
         self.f0 = None
-        self.gNorm0 = None
+        self.g_norm0 = None
 
         self.s = None
         self.y = None
@@ -67,12 +67,12 @@ class LBFGS(object):
 
         self.f0 = f = model.obj(x)
         g = model.grad(x)
-        self.gNorm0 = gNorm = norms.norm2(g)
-        stoptol = max(self.abstol, self.reltol * self.gNorm0)
+        self.g_norm0 = g_norm = norms.norm2(g)
+        stoptol = max(self.abstol, self.reltol * self.g_norm0)
 
         exitUser = False
         exitLS = False
-        exitOptimal = gNorm <= stoptol
+        exitOptimal = g_norm <= stoptol
         exitIter = self.iter >= self.maxiter
         status = ""
 
@@ -83,7 +83,7 @@ class LBFGS(object):
             d = -(H * g)
 
             # Prepare for modified linesearch
-            step0 = max(1.0e-3, 1.0 / gNorm) if self.iter == 0 else 1.0
+            step0 = max(1.0e-3, 1.0 / g_norm) if self.iter == 0 else 1.0
             line_model = C1LineModel(self.model, x, d)
             ls = ArmijoWolfeLineSearch(line_model, step=step0)
             try:
@@ -93,7 +93,7 @@ class LBFGS(object):
                 exitLS = True
                 continue
 
-            self.logger.info(fmt, self.iter, f, gNorm, ls.slope, ls.bk)
+            self.logger.info(fmt, self.iter, f, g_norm, ls.slope, ls.bk)
 
             # Prepare new pair {s,y} to be inserted into L-BFGS operator.
             self.s = ls.step * d
@@ -108,26 +108,26 @@ class LBFGS(object):
 
             # Prepare for next round.
             g = g_next
-            gNorm = norms.norm2(g)
+            g_norm = norms.norm2(g)
             f = ls.trial_value
             self.iter += 1
 
-            exitOptimal = gNorm <= stoptol
+            exitOptimal = g_norm <= stoptol
             exitIter = self.iter >= self.maxiter
             exitUser = status == "usr"
 
         self.tsolve = cputime() - tstart
-        self.logger.info(fmt_short, self.iter, f, gNorm)
+        self.logger.info(fmt_short, self.iter, f, g_norm)
 
         self.x = x
         self.f = f
         self.g = g
-        self.gNorm = gNorm
+        self.g_norm = g_norm
 
         # Set final solver status.
         if status == "usr":
             pass
-        elif self.gNorm <= stoptol:
+        elif self.g_norm <= stoptol:
             status = "opt"
         elif exitLS:
             status = "lsf"
