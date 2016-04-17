@@ -18,7 +18,7 @@ from nlp.tr.trustregion import TrustRegionSolver
 from nlp.tr.trustregion import GeneralizedTrustRegion
 from nlp.tools import norms
 from nlp.tools.utils import where, projected_gradient_norm2, \
-                            project, projected_step, breakpoints
+    project, projected_step, breakpoints
 from nlp.tools.timing import cputime
 from nlp.tools.exceptions import UserExitRequest, LineSearchFailure
 
@@ -73,10 +73,12 @@ class TRON(object):
         self.status = ""
         self.step_status = ""
 
-        self.reltol = kwargs.get("reltol", 1e-12)
-        self.abstol = kwargs.get("abstol", 1e-6)
+        self.gabstol = kwargs.get("gabstol", 1e-6)
+        self.greltol = kwargs.get("greltol", 1e-6)
+        self.reltol = kwargs.get("reltol", 1e-6)
+        self.abstol = kwargs.get("abstol", 1e-12)
         self.maxiter = kwargs.get("maxiter", 100 * self.model.n)
-        self.maxfuncall = kwargs.get("maxfuncall", 1000)
+        self.maxfuncall = kwargs.get("maxfuncall", 100000)
         self.ny = kwargs.get("ny", False)
         self.cgtol = 0.1
         self.alphac = 1
@@ -392,8 +394,8 @@ class TRON(object):
         self.tr.radius = min(max(0.1 * self.pg0, 1.0), 100)
 
         # Test for convergence or termination
-        # stoptol = max(self.abstol, self.reltol * self.pgnorm)
-        stoptol = 1e-6 * pgnorm
+        stoptol = max(self.gabstol, self.greltol * self.pg0)
+        # stoptol = self.greltol * pgnorm
         exitUser = False
         exitOptimal = pgnorm <= stoptol
         exitIter = self.iter >= self.maxiter
