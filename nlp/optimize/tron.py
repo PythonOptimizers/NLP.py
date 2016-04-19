@@ -65,6 +65,7 @@ class TRON(object):
         self.g = None
         self.g_old = None
         self.save_g = False
+        self.step_accepted = False
         self.pgnorm = None
         self.pg0 = None
         self.tsolve = None
@@ -412,6 +413,10 @@ class TRON(object):
         while not (exitUser or exitOptimal or exitIter or exitFunCall):
             self.iter += 1
 
+            self.step_accepted = False
+            if self.save_g:
+                self.g_old = self.g.copy()
+
             # Compute the Cauchy step and store in s.
             (s, self.alphac) = self.cauchy(self.x, self.g, H,
                                            model.Lvar, model.Uvar,
@@ -466,6 +471,10 @@ class TRON(object):
                 self.f = f_trial
                 self.g = model.grad(self.x)
                 step_status = "Acc"
+                self.step_accepted = True
+                self.dvars = s
+                if self.save_g:
+                    self.dgrad = self.g - self.g_old
 
             elif self.ny:
                 # Trust-region step is rejected; backtrack.
@@ -483,6 +492,10 @@ class TRON(object):
                     snorm *= ls.step
                     self.tr.radius = snorm
                     step_status = "N-Y"
+                    self.dvars = ls.step * s
+                    self.step_accepted = True
+                    if self.save_g:
+                        self.dgrad = self.g - self.g_old
 
                 except LineSearchFailure:
                     step_status = "Rej"
@@ -540,3 +553,17 @@ class TRON(object):
             status = "gtol"
         self.status = status
         self.log.info("final status: %s", self.status)
+
+
+class QNTRON(TRON):
+    """A variant of TRON with quasi-Newton Hessian."""
+
+    def __init__(self, *args, **kwargs):
+        super(QNTRON, self).__init__(*args, **kwargs)
+        self.save_g = True
+
+    def post_iteration(self, **kwargs):
+        # Update quasi-Newton approximation.
+        # import ipdb; ipdb.set_trace()
+        if self.step_accepted:
+            self.model.H.store(self.dvars, self.dgrad)
