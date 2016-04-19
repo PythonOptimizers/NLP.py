@@ -419,13 +419,11 @@ class TRON(object):
                                            self.alphac)
 
             # Compute the projected Newton step.
-            (x, s, cg_iter, info) = self.projected_newton_step(self.x, self.g,
-                                                               H,
-                                                               self.tr.radius,
-                                                               model.Lvar,
-                                                               model.Uvar, s,
-                                                               cgtol,
-                                                               cgitermax)
+            (x, s, cg_iter, _) = self.projected_newton_step(self.x, self.g, H,
+                                                            self.tr.radius,
+                                                            model.Lvar,
+                                                            model.Uvar, s,
+                                                            cgtol, cgitermax)
 
             snorm = norms.norm2(s)
             self.total_cgiter += cg_iter
@@ -433,7 +431,7 @@ class TRON(object):
             # Compute the predicted reduction.
             m = np.dot(s, self.g) + .5 * np.dot(s, H * s)
 
-            # Compute the function
+            # Evaluate actual objective.
             x_trial = self.x + s
             f_trial = model.obj(x_trial)
 
