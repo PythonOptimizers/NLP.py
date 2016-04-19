@@ -4,8 +4,8 @@
 
 import logging
 import sys
+from argparse import ArgumentParser
 from nlp.model.amplmodel import QNAmplModel
-from nlp.optimize.lbfgs import LBFGS, WolfeLBFGS
 from nlp.tools.logs import config_logger
 
 from pykrylov.linop import InverseLBFGSOperator
@@ -25,8 +25,27 @@ def lbfgs_stats(lbfgs):
         ts = -1.0 if lbfgs.tsolve is None else -lbfgs.tsolve
     return (it, fc, gc, gn, ts)
 
+desc = """Linesearch-based limited-memory BFGS method in inverse form."""
 
-nprobs = len(sys.argv) - 1
+# Define allowed command-line options.
+parser = ArgumentParser(description=desc)
+parser.add_argument("-p", "--pairs", type=int,
+                    default=5, dest="npairs", help="BFGS memory")
+parser.add_argument("-a", "--armijo", action="store_true", dest="armijo",
+                    default=False, help="use improved Armijo linesearch")
+parser.add_argument("-i", "--iter", type=int,
+                    default=100, dest="maxiter",
+                    help="maximum number of iterations")
+
+# Parse command-line arguments.
+(args, other) = parser.parse_known_args()
+
+if args.armijo:
+    from nlp.optimize.lbfgs import LBFGS
+else:
+    from nlp.optimize.lbfgs import WolfeLBFGS as LBFGS
+
+nprobs = len(other)
 if nprobs == 0:
     raise ValueError("Please supply problem name as argument")
 
@@ -42,11 +61,14 @@ slv_log = config_logger("nlp.lbfgs",
 logger.info("%10s %5s %6s %8s %8s %6s %6s %5s %7s",
             "name", "nvar", "iter", "f", u"‖∇f‖", "#f", u"#∇f", "stat", "time")
 
-for problem in sys.argv[1:]:
-    model = QNAmplModel(problem, H=InverseLBFGSOperator, scaling=True)
+for problem in other:
+    model = QNAmplModel(problem,
+                        H=InverseLBFGSOperator,
+                        npairs=args.npairs,
+                        scaling=True)
     model.compute_scaling_obj()
 
-    lbfgs = WolfeLBFGS(model, maxiter=300)
+    lbfgs = LBFGS(model, maxiter=args.maxiter)
     try:
         lbfgs.solve()
         status = lbfgs.status
