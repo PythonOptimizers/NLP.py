@@ -4,8 +4,8 @@
 
 import logging
 import sys
-from nlp.model.amplmodel import AmplModel
-from nlp.optimize.tron import TRON
+from argparse import ArgumentParser
+
 from nlp.optimize.pcg import TruncatedCG
 from nlp.tools.logs import config_logger
 
@@ -25,7 +25,45 @@ def tron_stats(tron):
     return (it, fc, gc, pg, ts)
 
 
-nprobs = len(sys.argv) - 1
+usage = """%prog [options] nlFile [... nlFile]
+where each nlFile is an AMPL nl file."""
+
+# Define allowed command-line options.
+parser = ArgumentParser(description=usage)
+parser.add_argument("-1", "--sr1", action="store_true", dest="sr1",
+                    default=False, help="use limited-memory SR1 approximation")
+parser.add_argument("-2", "--bfgs", action="store_true", dest="bfgs",
+                    default=False,
+                    help="use limited-memory BFGS approximation")
+parser.add_argument("-p", "--pairs", type=int,
+                    default=5, dest="npairs", help="quasi-Newton memory")
+parser.add_argument("-b", "--backtrack", action="store_true", dest="ny",
+                    default=False,
+                    help="backtrack along rejected trust-region step")
+parser.add_argument("-i", "--iter", type=int,
+                    default=100, dest="maxiter",
+                    help="maximum number of iterations")
+
+# Parse command-line arguments.
+(args, other) = parser.parse_known_args()
+opts = {}
+
+# Import appropriate components.
+if args.sr1 or args.bfgs:
+    from nlp.model.amplmodel import QNAmplModel as Model
+    from nlp.optimize.tron import QNTRON as TRON
+    if args.sr1:
+        from pykrylov.linop import CompactLSR1Operator as QNOperator
+    else:
+        from pykrylov.linop import CompactLBFGSOperator as QNOperator
+    opts["H"] = QNOperator
+    opts["npairs"] = args.npairs
+    opts["scaling"] = True
+else:
+    from nlp.model.amplmodel import AmplModel as Model
+    from nlp.optimize.tron import TRON
+
+nprobs = len(other)
 if nprobs == 0:
     raise ValueError("Please supply problem name as argument")
 
@@ -37,13 +75,12 @@ tron_logger = config_logger("nlp.tron",
                             "%(name)-8s %(levelname)-5s %(message)s",
                             level=logging.WARN if nprobs > 1 else logging.INFO)
 
-if nprobs > 1:
-    logger.info("%12s %5s %6s %8s %8s %6s %6s %5s %7s",
-                "name", "nvar", "iter", "f", u"‖P∇f‖", "#f", u"#∇f", "stat",
-                "time")
+logger.info("%12s %5s %6s %8s %8s %6s %6s %5s %7s",
+            "name", "nvar", "iter", "f", u"‖P∇f‖",
+            "#f", u"#∇f", "stat", "time")
 
-for problem in sys.argv[1:]:
-    model = AmplModel(problem)
+for problem in other:
+    model = Model(problem, **opts)
     model.compute_scaling_obj()
 
     # Check for inequality- or equality-constrained problem.
@@ -52,7 +89,7 @@ for problem in sys.argv[1:]:
         logger.error(msg, model.name, model.m)
         continue
 
-    tron = TRON(model, TruncatedCG, maxiter=100)
+    tron = TRON(model, TruncatedCG, maxiter=args.maxiter, ny=args.ny)
     try:
         tron.solve()
         status = tron.status
