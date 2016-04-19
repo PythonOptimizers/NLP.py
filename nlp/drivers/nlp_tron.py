@@ -25,11 +25,11 @@ def tron_stats(tron):
     return (it, fc, gc, pg, ts)
 
 
-usage = """%prog [options] nlFile [... nlFile]
-where each nlFile is an AMPL nl file."""
+desc = """Trust-region active-set method for bound-constrained problems based
+on TRON. By default, exact second derivatives are used."""
 
 # Define allowed command-line options.
-parser = ArgumentParser(description=usage)
+parser = ArgumentParser(description=desc)
 parser.add_argument("-1", "--sr1", action="store_true", dest="sr1",
                     default=False, help="use limited-memory SR1 approximation")
 parser.add_argument("-2", "--bfgs", action="store_true", dest="bfgs",
