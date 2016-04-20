@@ -41,17 +41,15 @@ References
 
 """
 
-from cysparse.sparse.ll_mat import LLSparseMatrix
-import cysparse.common_types.cysparse_types as types
+from pysparse.sparse import spmatrix
 
 try:                            # To compute projections
     from hsl.solvers.pyma57 import PyMa57Solver as LBLContext
-except:
+except ImportError:
     from hsl.solvers.pyma27 import PyMa27Solver as LBLContext
 
 from nlp.tools import norms
 from nlp.tools.timing import cputime
-import numpy as np
 import logging
 
 __docformat__ = 'restructuredtext'
@@ -107,8 +105,8 @@ class ProjectedKrylov(object):
         # Optional keyword arguments
         self.A = kwargs.get('A', None)
         if self.A is not None:
-            self.log.debug('Constraint matrix has shape (%d,%d)' %
-                           (self.A.shape[0], self.A.shape[1]))
+            self.log.debug('Constraint matrix has shape (%d,%d)',
+                           self.A.shape[0], self.A.shape[1])
         else:
             self.log.debug('No constraint matrix specified')
         self.b = kwargs.get('rhs', None)
@@ -151,20 +149,20 @@ class ProjectedKrylov(object):
             raise ValueError('No linear equality constraints were specified')
 
         # Form projection matrix
-        P = LLSparseMatrix(size=self.n + self.m, size_hint=self.nnzA + self.n,
-                           store_symmetric=True, itype=types.INT64_T,
-                           dtype=types.FLOAT64_T)
+        P = spmatrix.ll_mat_sym(self.n + self.m, self.nnzA + self.n)
         if self.precon is not None:
             P[:self.n, :self.n] = self.precon
         else:
-            r = np.arange(self.n)
-            P.put_triplet(r, r, np.ones(self.n))
+            r = range(self.n)
+            P.put(1, r, r)
+            # for i in range(self.n):
+            #    P[i,i] = 1
         P[self.n:, :self.n] = self.A
 
         # Add regularization if requested.
         if self.dreg > 0.0:
-            r = np.arange(self.n, self.n + self.m)
-            P.put_triplet(r, r, -self.dreg)
+            r = range(self.n, self.n + self.m)
+            P.put(-self.dreg, r, r)
 
         msg = 'Factorizing projection matrix '
         msg += '(size %-d, nnz = %-d)...' % (P.shape[0], P.nnz)
