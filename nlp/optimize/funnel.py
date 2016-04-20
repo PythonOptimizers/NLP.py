@@ -1,16 +1,46 @@
+# -*- coding: utf-8 -*-
 """An implementation of the trust-funnel method."""
 from math import sqrt
 import numpy as np
 import logging
 
-from nlp.model.nlpmodel import NLPModel, QPModel
+from nlp.model.nlpmodel import UnconstrainedNLPModel, NLPModel, QPModel
+from nlp.model.linemodel import C1LineModel
 from nlp.ls.linesearch import ArmijoLineSearch
-from nlp.optimize.ppcg import ProjectedCG, LSTRFramework
-from nlp.optimize.lsqr import LSQRFramework
+from nlp.tools.exceptions import LineSearchFailure
+from nlp.optimize.ppcg import ProjectedCG
 from nlp.tools.timing import cputime
+from pykrylov.lls.lsqr import LSQRFramework
 
 
 __docformat__ = 'restructuredtext'
+
+
+class InfeasibilityModel(UnconstrainedNLPModel):
+
+    def __init__(self, model, **kwargs):
+        u"""Instantiate a :class:`InfeasibilityModel`.
+
+        Objective function of this model in the infeasibility measure defined
+        by
+            Θ(x) = 1/2 ‖c(x)‖²
+
+        :parameters:
+            :model: ```NLPModel```.
+        """
+        self.model = model
+        super(InfeasibilityModel, self).__init__(model.n, **kwargs)
+
+    def obj(self, x):
+        u"""Evaluate Θ(x)."""
+        c = self.model.cons(x)
+        return 0.5 * np.dot(c, c)
+
+    def grad(self, x):
+        u"""Evaluate ∇ Θ(x)."""
+        J = self.model.jac(x)
+        c = self.model.cons(x)
+        return J.T * c
 
 
 class Funnel(object):
@@ -21,20 +51,39 @@ class Funnel(object):
     """
 
     def __init__(self, model, **kwargs):
-        """Instantiate a trust-funnel framework.
+        u"""Instantiate a trust-funnel framework.
 
         :parameters:
             :model: `NLPModel` instance (should be equality-constrained only).
 
         :keywords:
             :atol: Absolute stopping tolerance
-            :delta_f: Initial trust-region radius for the objective model
-            :delta_c: Initial trust-region radius for the constraints model
+            :radius_f: Initial trust-region radius for the objective model
+            :radius_c: Initial trust-region radius for the constraints model
             :iterative_solver: solver used to find steps (0=gltr, 1=gmres)
             :maxit: maximum number of iterations allowed
-            :stop_p: required accuracy for ||c||
-            :stop_d: required accuracy for ||g+J'y||
+            :stop_p: required accuracy for ‖c‖
+            :stop_d: required accuracy for ‖g+Jᵀy‖
             :maxit_refine: maximum number of iterative refinements per solve
+
+        iter type status : [f] or [c]
+
+        overall step status: [s]uccessful
+                             [v]ery successful
+                             [u]nsuccessful
+                             (2)nd-order
+
+        :normal step status: [0] (none)
+                             [r]esidual small
+                             [b]oundary
+                             [?] (other)
+
+        :tangent step status: [0] (none)
+                              [r]esidual small
+                              [b]oundary
+                              [-] neg. curvature
+                              [>] max iter
+                              [?] (other)
         """
         # Bail out if model is not a NLPModel instance.
         if not isinstance(model, NLPModel):
@@ -58,16 +107,17 @@ class Funnel(object):
         # Members to memorize old and current Jacobian matrices if needed.
         self.save_J = False
         self.J = self.J_old = None
-
+        self.step = None
+        self.status = None
         self.optimal = False
 
-        self.niter = 0
+        self.iter = 0
         self.tsolve = 0.0
 
         # Set default options.
         self.atol = kwargs.get('atol', 1.0e-8)
-        self.delta_f_0 = self.delta_f = kwargs.get('delta_f', 1.0)
-        self.delta_c_0 = self.delta_c = kwargs.get('delta_c', 1.0)
+        self.radius_f_0 = self.radius_f = kwargs.get('radius_f', 1.0)
+        self.radius_c_0 = self.radius_c = kwargs.get('radius_c', 1.0)
         self.iterative_solver = kwargs.get('iterative_solver', 0)
         self.maxit = kwargs.get('maxit', 200)
         self.stop_p = kwargs.get('stop_p', model.stop_p)
@@ -75,8 +125,8 @@ class Funnel(object):
         self.maxit_refine = kwargs.get('maxit_refine', 0)
 
         self.hdr_fmt = '%4s   %2s %9s %8s %8s %8s %8s %6s %6s'
-        self.hdr = self.hdr_fmt % ('iter', 'NT', 'f', '|c|', '|g+J''y|',
-                                   'delta_f', 'delta_c', 'thetaMax', 'CG')
+        self.hdr = self.hdr_fmt % ('iter', 'NT', 'f', u'‖c‖', u'‖g+Jᵀy‖',
+                                   'radius_f', 'radius_c', 'thetaMax', 'CG')
         self.linefmt1 = '%4d%c%c %c%c %9.2e %8.2e %8.2e ' + \
                         '%8.2e %8.2e %8.2e %6.0f'
         self.linefmt = '%4d%c%c %c%c %9.2e %8.2e %8.2e ' + \
@@ -85,29 +135,6 @@ class Funnel(object):
         # Grab logger if one was configured.
         logger_name = kwargs.get('logger_name', 'funnel.solver')
         self.log = logging.getLogger(logger_name)
-
-        # Display initial information.
-        self.display_basic_info()
-        return
-
-    def display_basic_info(self):
-        """Display basic info about current problem."""
-        model = self.model
-        self.log.info('Problem %s' % model.name)
-        self.log.info('Linear  equality constraints: %d' % model.nlin)
-        self.log.info('General equality constraints: %d' %
-                      (model.nequalC - model.nlin))
-        self.log.info('Primal stopping tolerance: %6.1e' % self.stop_p)
-        self.log.info('Dual   stopping tolerance: %6.1e' % self.stop_d)
-        self.log.info('Key:')
-        self.log.info('iter type   : [f] or [c]')
-        self.log.info('overall step: [s]uccessful, [v]ery successful, ' +
-                      '[u]nsuccessful or (2)nd-order')
-        self.log.info('normal  step: [0] (none), [r]esidual small, ' +
-                      '[b]oundary or [?] (other)')
-        self.log.info('tangent step: [0] (none), [r]esidual small, ' +
-                      '[b]oundary, [-] neg. curvature, ' +
-                      '[>] max iter or [?] (other)')
         return
 
     def forcing(self, k, val):
@@ -126,20 +153,20 @@ class Funnel(object):
         """
         pass
 
-    def lsq(self, A, b, reg=0.0, radius=None, **kwargs):
-        """Solve the linear least-squares problem in the variable x.
+    def lsq(self, A, b, reg=0.0, radius=None):
+        u"""Solve the linear least-squares problem in the variable `x`.
 
-            minimize |Ax - b| + reg * |x|
+            minimize ‖Ax - b‖ + reg * ‖x‖
 
-        in the Euclidian norm with LSQR. Optionally, x may be subject to a
-        Euclidian-norm trust-region constraint |x| <= radius.
-        This function returns (x, x_norm, status).
+        in the Euclidian norm with LSQR. Optionally, `x` may be subject to a
+        Euclidian-norm trust-region constraint ‖x‖ <= radius.
+        This function returns `(x, x_norm, status)`.
         """
         LSQR = LSQRFramework(A)
         LSQR.solve(b, radius=radius, damp=reg, show=False)
         return (LSQR.x, LSQR.xnorm, LSQR.status)
 
-    def nyf(self, x, f, f_trial, g, step, bkmax=5, armijo=1.0 - 4):
+    def nyf(self, x, f, f_trial, g, step, bkmax=5, armijo=1.0e-4):
         """Perform a simple backtracking linesearch on the objective function.
 
         Linesearch is performed starting from `x` along direction `step`.
@@ -149,42 +176,55 @@ class Funnel(object):
         Return (x, f, steplength), where `x + steplength * step` satisfies
         the Armijo condition and `f` is the objective value at this new point.
         """
+        ls_fmt = "nyf-ls: %7.1e  %8.1e"
+
         slope = np.dot(g, step)
-        return self.als_f.search(self.model.obj, x, step, slope,
-                                 bkmax=bkmax, f=f, f_trial=f_trial)
+        line_model = C1LineModel(self.model, x, step)
+        ls = ArmijoLineSearch(line_model, value=f, trial_value=f_trial,
+                              slope=slope, bkmax=bkmax, decr=1.2, ftol=armijo)
+        try:
+            for step in ls:
+                self.log.debug(ls_fmt, step, ls.trial_value)
+        except LineSearchFailure:
+            pass
+        self.log.debug(ls_fmt, ls.step, ls.trial_value)
+
+        return (ls.iterate, ls.trial_value, ls.step)
 
     def nyc(self, x, theta, theta_trial, c, grad_theta, step, bkmax=5,
             armijo=1.0e-4):
         u"""Perform a backtracking linesearch on the infeasibility measure.
 
         Linesearch is performed on the infeasibility measure defined by
-            Θ(x) = 1/2 |c(x)|^2
+            Θ(x) = 1/2 ‖c(x)‖²
         starting from `x` along direction `step`.
 
         Here, `theta` and `theta_trial` are the infeasibility at `x` and
         `x + step`, respectively, `c` is the vector of constraints at `x`, and
         `grad_theta` is the gradient of the infeasibility measure at `x`.
 
-        Note that  ∇ Θ(x) = J(x)^T  c(x).
-
         Return (x, c, theta, steplength), where `x + steplength + step`
         satisifes the Armijo condition, and `c` and `theta` are the vector of
         constraints and the infeasibility at this new point, respectively.
         """
+        ls_fmt = "nyc-ls: %7.1e  %8.1e"
+
         slope = np.dot(grad_theta, step)
+        line_model = C1LineModel(InfeasibilityModel(self.model), x, step)
+        ls = ArmijoLineSearch(line_model, value=theta_trial,
+                              trial_value=theta_trial, slope=slope,
+                              bkmax=bkmax, decr=1.2, ftol=armijo)
 
-        def function_theta(x):
-            c = self.model.cons(x)
-            theta = 0.5 * np.dot(c, c)
-            return theta
+        try:
+            for step in ls:
+                self.log.debug(ls_fmt, step, ls.trial_value)
+        except LineSearchFailure:
+            pass
 
-        (x_trial, theta_trial, alpha) = self.asl_c.search(function_theta, x,
-                                                          step, slope,
-                                                          bkmax=bkmax, f=theta,
-                                                          f_trial=theta_trial)
+        c_trial = self.model.cons(ls.iterate)
+        self.log.debug(ls_fmt, ls.step, ls.trial_value)
 
-        c_trial = self.model.cons(x_trial)
-        return (x_trial, c_trial, theta_trial, alpha)
+        return (ls.iterate, c_trial, ls.trial_value, ls.step)
 
     def solve(self, **kwargs):
         """Solve current problem with trust-funnel framework.
@@ -216,7 +256,6 @@ class Funnel(object):
         f = self.f
         c = model.cons_pos(x)
         y = model.pi0.copy()
-        self.it = 0
 
         # Initialize some constants.
         kappa_n = 1.0e+2   # Factor of p_norm in normal step TR radius.
@@ -233,10 +272,6 @@ class Funnel(object):
         kappa_tx1 = 0.9  # Factor of theta_max in max acceptable infeasibility.
         kappa_tx2 = 0.5  # Convex combination factor of theta and theta_trial.
 
-        # Linesearches
-        self.als_f = ArmijoLineSearch(tfactor=5. / 6)  # objective function
-        self.als_c = ArmijoLineSearch(tfactor=5. / 6)  # infeasibility measure
-
         # Compute constraint violation.
         theta = 0.5 * np.dot(c, c)
 
@@ -251,12 +286,12 @@ class Funnel(object):
         Jop = model.jop(x)
 
         # Initial radius for f- and c-iterations.
-        delta_f = max(self.delta_f, .1 * np.linalg.norm(g))
-        delta_c = max(self.delta_c, .1 * sqrt(2 * theta))
+        radius_f = max(self.radius_f, .1 * np.linalg.norm(g))
+        radius_c = max(self.radius_c, .1 * sqrt(2 * theta))
 
         # Reset initial multipliers to least-squares estimates by
         # approximately solving:
-        #   [ I   J' ] [ w ]   [ -g ]
+        #   [ I   Jᵀ ] [ w ]   [ -g ]
         #   [ J   0  ] [ y ] = [  0 ].
         # This is equivalent to solving
         #   minimize |g + J'y|.
@@ -274,28 +309,28 @@ class Funnel(object):
 
         # Display current info if requested.
         self.log.info(self.hdr)
-        self.log.info(self.linefmt1 % (0, ' ', ' ', ' ', ' ', f, p_norm,
-                                       d_norm, delta_f, delta_c, theta_max, 0))
+        self.log.info(self.linefmt1, 0, ' ', ' ', ' ', ' ', f, p_norm, d_norm,
+                      radius_f, radius_c, theta_max, 0)
 
         # Compute primal stopping tolerance.
         stop_p = max(self.atol, self.stop_p * p_norm)
-        self.log.debug('p_norm=%7.1e, c_norm=%7.1e, d_norm=%7.1e' %
-                       (p_norm, c_norm, d_norm))
+        self.log.debug('p_norm=%7.1e, c_norm=%7.1e, d_norm=%7.1e', p_norm,
+                       c_norm, d_norm)
 
         optimal = (p_norm <= stop_p) and (d_norm <= self.stop_d)
-        self.log.debug('optimal: %s' % repr(optimal))
+        self.log.debug('optimal: %s', repr(optimal))
 
         # Start of main iteration.
-        while not optimal and (self.it < self.maxit):
+        while not optimal and (self.iter < self.maxit):
 
-            self.it += 1
-            delta = min(delta_f, delta_c)
+            self.iter += 1
+            radius = min(radius_f, radius_c)
             cgiter = 0
 
             # 1. Compute normal step as an (approximate) solution to
-            #    minimize |c + J n|  subject to  |n| <= min(delta_c, kN |c|).
+            #    minimize |c + J n|  subject to  |n| <= min(radius_c, kN |c|).
 
-            if self.it > 1 and \
+            if self.iter > 1 and \
                     p_norm <= stop_p and \
                     d_norm >= 1.0e+4 * self.stop_d:
 
@@ -307,7 +342,7 @@ class Funnel(object):
 
             else:
 
-                step_n_max = min(delta_c, kappa_n * p_norm)
+                step_n_max = min(radius_c, kappa_n * p_norm)
                 step_n, step_n_norm, lsq_status = self.lsq(Jop, -c,
                                                            radius=step_n_max,
                                                            reg=reg)
@@ -323,12 +358,12 @@ class Funnel(object):
                 _Hv = model.hprod(x, -y, step_n)  # H*step_n
                 m_xpn = np.dot(g, step_n) + 0.5 * np.dot(step_n, _Hv)
 
-            self.log.debug('Normal step norm = %8.2e' % step_n_norm)
-            self.log.debug('Model value: %9.2e' % m_xpn)
+            self.log.debug('Normal step norm = %8.2e', step_n_norm)
+            self.log.debug('Model value: %9.2e', m_xpn)
 
             # 2. Compute tangential step if normal step is not too long.
 
-            if step_n_norm <= kappa_b * delta:
+            if step_n_norm <= kappa_b * radius:
 
                 # 2.1. Compute Lagrange multiplier estimates and dual residuals
                 #      by minimizing |(g + H n) + J'y|
@@ -338,7 +373,7 @@ class Funnel(object):
                 else:
                     g_n = g + _Hv
 
-                y_new, y_norm, _ = self.lsq(Jop.T, -g_n, reg=reg)
+                y_new, _, _ = self.lsq(Jop.T, -g_n, reg=reg)
                 r = g_n + Jop.T * y_new
 
                 # Here Nick does iterative refinement to improve r and y_new...
@@ -352,32 +387,32 @@ class Funnel(object):
                 # 2.2. If the dual residuals are large, compute a suitable
                 #      tangential step as a solution to:
                 #      minimize    g't + 1/2 t' H t
-                #      subject to  Jt = 0, |n+t| <= delta.
+                #      subject to  Jt = 0, |n+t| <= radius.
 
                 if pi > self.forcing(3, theta):
 
                     self.log.debug('Computing step_t...')
-                    delta_within = delta - step_n_norm
+                    radius_within = radius - step_n_norm
 
                     Hop = model.hop(x, -y_new)
 
                     qp = QPModel(g_n, Hop, A=J.matrix if m > 0 else None)
                     # PPCG = ProjectedCG(g_n, Hop,
                     #                    A=J.matrix if m > 0 else None,
-                    #                    radius=delta_within, dreg=reg)
-                    PPCG = ProjectedCG(qp, radius=delta_within, dreg=reg)
-                    PPCG.Solve()
+                    #                    radius=radius_within, dreg=reg)
+                    PPCG = ProjectedCG(qp, radius=radius_within, dreg=reg)
+                    PPCG.solve()
                     step_t = PPCG.step
-                    step_t_norm = PPCG.stepNorm
+                    step_t_norm = PPCG.step_norm
                     cgiter = PPCG.iter
 
-                    self.log.debug('|t| = %8.2e' % step_t_norm)
+                    self.log.debug(u'‖t‖ = %8.2e', step_t_norm)
 
                     if PPCG.status == 'residual small':
                         status_t = 'r'
-                    elif PPCG.onBoundary and not PPCG.infDescent:
+                    elif PPCG.on_boundary and not PPCG.inf_descent:
                         status_t = 'b'
-                    elif PPCG.infDescent:
+                    elif PPCG.inf_descent:
                         status_t = '-'
                     elif PPCG.status == 'max iter':
                         status_t = '>'
@@ -414,7 +449,7 @@ class Funnel(object):
                 step_norm = step_n_norm
                 m_xps = m_xpn
 
-            self.log.debug('Model decrease = %9.2e' % m_xps)
+            self.log.debug('Model decrease = %9.2e', m_xps)
 
             # Compute trial point and evaluate local data.
             x_trial = x + step
@@ -441,7 +476,7 @@ class Funnel(object):
                 # Decide whether trial point is accepted.
                 ratio = (f - f_trial) / delta_f
 
-                self.log.debug('f-iter ratio = %9.2e' % ratio)
+                self.log.debug('f-iter ratio = %9.2e', ratio)
 
                 if ratio >= eta_1:    # Successful step.
                     suc = 's'
@@ -450,21 +485,22 @@ class Funnel(object):
                     c = c_trial
                     self.step = step.copy()
                     theta = theta_trial
-
+                    self.log.debug('stepnorm = %8.2e   %8.2e',
+                                   step_norm, radius_f)
                     # Decide whether to update f-trust-region radius.
                     if ratio >= eta_2:
                         suc = 'v'
-                        delta_f = min(max(delta_f, gamma_3 * step_norm),
-                                      1.0e+10)
+                        radius_f = min(max(radius_f, gamma_3 * step_norm),
+                                       1.0e+10)
 
                     # Decide whether to update c-trust-region radius.
                     if theta_trial < eta_3 * theta_max:
-                        ns = step_n_norm if step_n_norm > 0 else delta_c
-                        delta_c = min(max(delta_c, gamma_3 * ns),
-                                      1.0e+10)
+                        ns = step_n_norm if step_n_norm > 0 else radius_c
+                        radius_c = min(max(radius_c, gamma_3 * ns),
+                                       1.0e+10)
 
-                    self.log.debug('New delta_f = %8.2e' % delta_f)
-                    self.log.debug('New delta_c = %8.2e' % delta_c)
+                    self.log.debug('New radius_f = %8.2e', radius_f)
+                    self.log.debug('New radius_c = %8.2e', radius_c)
 
                 else:                 # Unsuccessful step (ratio < eta_1).
 
@@ -476,10 +512,10 @@ class Funnel(object):
                         self.log.debug('  Attempting second-order correction')
 
                         # Attempt a second-order correction by solving
-                        # minimize |c_trial + J n|  subject to  |n| <= delta_c.
-                        step_soc, step_soc_norm, status_soc = \
-                            self.lsq(Jop, -c_trial, radius=delta_c, reg=reg)
-
+                        # minimize |c_trial + J n|  subject to  |n| <= radius_c.
+                        step_soc, _, status_soc = \
+                            self.lsq(Jop, -c_trial, radius=radius_c, reg=reg)
+                        self.log.debug("lsq status: %20s", status_soc)
                         if status_soc != 'trust-region boundary active':
 
                             # Consider SOC step as candidate step.
@@ -502,20 +538,21 @@ class Funnel(object):
                                 # Backtracking linesearch a la Nocedal & Yuan.
                                 # Abandon SOC step. Backtrack from x+step.
                                 if ny:
+                                    print"here", x, f, f_trial, g, step
                                     (x, f, alpha) = self.nyf(x, f, f_trial,
                                                              g, step)
                                     # g = model.grad(x)
                                     c = model.cons_pos(x)
                                     theta = 0.5 * np.dot(c, c)
                                     self.step = step + alpha * step_soc
-                                    delta_f = min(alpha, .8) * step_norm
+                                    radius_f = min(alpha, .8) * step_norm
                                     suc = 'y'
 
                                 else:
-                                    delta_f = gamma_1 * delta_f
+                                    radius_f = gamma_1 * radius_f
 
                         else:  # SOC step lies on boundary of trust region.
-                            delta_f = gamma_1 * delta_f
+                            radius_f = gamma_1 * radius_f
 
                     else:  # SOC step not attempted.
 
@@ -525,10 +562,10 @@ class Funnel(object):
                             c = model.cons_pos(x)
                             theta = 0.5 * np.dot(c, c)
                             self.step = alpha * step
-                            delta_f = min(alpha, .8) * step_norm
+                            radius_f = min(alpha, .8) * step_norm
                             suc = 'y'
                         else:
-                            delta_f = gamma_1 * delta_f
+                            radius_f = gamma_1 * radius_f
 
             else:
 
@@ -540,21 +577,21 @@ class Funnel(object):
                 if step_t_norm == 0.0:
                     self.log.debug('|t|=0')
                 if delta_f < self.forcing(2, theta):
-                    self.log.debug('delta_f=%8.2e < forcing=%8.2e' %
-                                   (delta_f, self.forcing(2, theta)))
+                    self.log.debug('delta_f=%8.2e < forcing=%8.2e',
+                                   delta_f, self.forcing(2, theta))
                 if delta_f < kappa_delta * delta_ft:
-                    self.log.debug('delta_f=%8.2e < frac * delta_ft=%8.2e' %
-                                   (delta_f, delta_ft))
+                    self.log.debug('delta_f=%8.2e < frac * delta_ft=%8.2e',
+                                   delta_f, delta_ft)
                 if theta_trial > theta_max:
-                    self.log.debug('theta_trial=%8.2e > theta_max=%8.2e' %
-                                   (theta_trial, theta_max))
+                    self.log.debug('theta_trial=%8.2e > theta_max=%8.2e',
+                                   theta_trial, theta_max)
 
                 # Step 4.1. Check trial point for acceptability.
                 if delta_feas < 0:
                     self.log.debug(' !!! Warning: delta_feas is negative !!!')
 
                 ratio = (theta - theta_trial + 1.e-16) / (delta_feas + 1.e-16)
-                self.log.debug('c-iter ratio = %9.2e' % ratio)
+                self.log.debug('c-iter ratio = %9.2e', ratio)
 
                 if ratio >= eta_1:  # Successful step.
                     x = x_trial
@@ -563,11 +600,11 @@ class Funnel(object):
                     self.step = step.copy()
                     suc = 's'
 
-                    # Step 4.2. Update delta_c.
+                    # Step 4.2. Update radius_c.
                     if ratio >= eta_2:     # Very successful step.
-                        ns = step_n_norm if step_n_norm > 0 else delta_c
-                        delta_c = min(max(delta_c, gamma_3 * ns),
-                                      1.0e+10)
+                        ns = step_n_norm if step_n_norm > 0 else radius_c
+                        radius_c = min(max(radius_c, gamma_3 * ns),
+                                       1.0e+10)
                         suc = 'v'
 
                     # Step 4.3. Update maximum acceptable infeasibility.
@@ -576,23 +613,23 @@ class Funnel(object):
                                     (1 - kappa_tx2) * theta_trial)
                     theta = theta_trial
 
-                else:                      # Unsuccessful step.
+                else:  # Unsuccessful step.
 
                     # Backtracking linesearch a la Nocedal & Yuan.
-                    ns = step_n_norm if step_n_norm > 0 else delta_c
+                    ns = step_n_norm if step_n_norm > 0 else radius_c
                     if ny:
                         (x, c, theta, alpha) = self.nyc(x, theta, theta_trial,
                                                         c, Jop.T * c, step)
                         f = model.obj(x)
                         self.step = alpha * step
-                        delta_c = min(alpha, .8) * ns
+                        radius_c = min(alpha, .8) * ns
                         suc = 'y'
                     else:
-                        delta_c = gamma_1 * ns
+                        radius_c = gamma_1 * ns
                         suc = 'u'
 
-                self.log.debug('New delta_c = %8.2e' % delta_c)
-                self.log.debug('New theta_max = %8.2e' % theta_max)
+                self.log.debug('New radius_c = %8.2e', radius_c)
+                self.log.debug('New theta_max = %8.2e', theta_max)
 
             # Step 5. Book keeping.
             if ratio >= eta_1 or ny:
@@ -615,11 +652,11 @@ class Funnel(object):
                     grad_lag = g.copy()
                 d_norm = np.linalg.norm(grad_lag) / (1 + np.linalg.norm(y))
 
-            if self.it % 20 == 0:
+            if self.iter % 20 == 0:
                 self.log.info(self.hdr)
-            self.log.info(self.linefmt % (self.it, it_type, suc, status_n,
-                                          status_t, f, p_norm, d_norm, delta_f,
-                                          delta_c, theta_max, cgiter))
+            self.log.info(self.linefmt, self.iter, it_type, suc, status_n,
+                          status_t, f, p_norm, d_norm, radius_f, radius_c,
+                          theta_max, cgiter)
 
             optimal = (p_norm <= stop_p) and (d_norm <= self.stop_d)
         # End while.
@@ -637,23 +674,5 @@ class Funnel(object):
         self.optimal = optimal
         self.p_resid = p_norm
         self.d_resid = d_norm
-        self.niter = self.it
 
         return
-
-
-class LSTRFunnel(Funnel):
-    """A Variant of the Funnel class using LSTR instead of LSQR."""
-
-    def lsq(self, A, b, radius=None, **kwargs):
-        """Solve the linear least-squares problem in the variable x.
-
-            minimize |Ax - b|
-
-        in the Euclidian norm with LSTR. Optionally, x may be
-        subject to a Euclidian-norm trust-region constraint
-        |x| <= radius. This function returns (x, x_norm, status).
-        """
-        LSTR = LSTRFramework(A, -b, radius=radius)
-        LSTR.Solve()
-        return (LSTR.step, LSTR.stepNorm, LSTR.status)
