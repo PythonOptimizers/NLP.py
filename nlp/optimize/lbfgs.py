@@ -4,6 +4,7 @@
 import logging
 from nlp.model.linemodel import C1LineModel
 from nlp.ls.linesearch import ArmijoWolfeLineSearch
+from nlp.ls.wolfe import StrongWolfeLineSearch
 from nlp.tools import norms
 from nlp.tools.exceptions import UserExitRequest, LineSearchFailure
 from nlp.tools.timing import cputime
@@ -40,12 +41,18 @@ class LBFGS(object):
         self.x = model.x0.copy()
         self.f = None
         self.g = None
-        self.gNorm = None
+        self.g_norm = None
         self.f0 = None
-        self.gNorm0 = None
+        self.g_norm0 = None
 
         self.s = None
         self.y = None
+
+        self.hdr = "%4s  %8s  %7s  %8s  %7s" % ("iter", "f",
+                                                u"‖∇f‖", u"∇f'd", "step")
+        self.fmt_short = "%4d  %8.1e  %7.1e"
+        self.fmt = self.fmt_short + "  %8.1e  %7.1e"
+        self.ls_fmt = "%7.1e  %8.1e"
 
         self.tsolve = 0.0
 
@@ -53,26 +60,30 @@ class LBFGS(object):
         """Bookkeeping at the end of a general iteration."""
         self.model.H.store(self.s, self.y)
 
+    def setup_linesearch(self, line_model, step0):
+        """Set up linesearch for the line model with the given initial step.
+
+        By default, use an ``ArmijoWolfeLineSearch``.
+        Override this method to use a different line search.
+        """
+        return ArmijoWolfeLineSearch(line_model, step=step0)
+
     def solve(self):
         """Solve model with the L-BFGS method."""
         model = self.model
         x = self.x
-        hdr = "%4s  %8s  %7s  %8s  %4s" % ("iter", "f", u"‖∇f‖", u"∇f'd", "bk")
-        self.logger.info(hdr)
-        fmt_short = "%4d  %8.1e  %7.1e"
-        fmt = fmt_short + "  %8.1e  %4d"
-        ls_fmt = "%7.1e  %8.1e"
+        self.logger.info(self.hdr)
 
         tstart = cputime()
 
-        self.f0 = f = model.obj(x)
-        g = model.grad(x)
-        self.gNorm0 = gNorm = norms.norm2(g)
-        stoptol = max(self.abstol, self.reltol * self.gNorm0)
+        self.f0 = self.f = f = model.obj(x)
+        self.g = g = model.grad(x)
+        self.g_norm0 = g_norm = norms.norm2(g)
+        stoptol = max(self.abstol, self.reltol * self.g_norm0)
 
         exitUser = False
         exitLS = False
-        exitOptimal = gNorm <= stoptol
+        exitOptimal = g_norm <= stoptol
         exitIter = self.iter >= self.maxiter
         status = ""
 
@@ -83,17 +94,17 @@ class LBFGS(object):
             d = -(H * g)
 
             # Prepare for modified linesearch
-            step0 = max(1.0e-3, 1.0 / gNorm) if self.iter == 0 else 1.0
+            step0 = max(1.0e-3, 1.0 / g_norm) if self.iter == 0 else 1.0
             line_model = C1LineModel(self.model, x, d)
-            ls = ArmijoWolfeLineSearch(line_model, step=step0)
+            ls = self.setup_linesearch(line_model, step0)
             try:
                 for step in ls:
-                    self.logger.debug(ls_fmt, step, ls.trial_value)
+                    self.logger.debug(self.ls_fmt, step, ls.trial_value)
             except LineSearchFailure:
                 exitLS = True
                 continue
 
-            self.logger.info(fmt, self.iter, f, gNorm, ls.slope, ls.bk)
+            self.logger.info(self.fmt, self.iter, f, g_norm, ls.slope, ls.step)
 
             # Prepare new pair {s,y} to be inserted into L-BFGS operator.
             self.s = ls.step * d
@@ -108,29 +119,40 @@ class LBFGS(object):
 
             # Prepare for next round.
             g = g_next
-            gNorm = norms.norm2(g)
+            g_norm = norms.norm2(g)
             f = ls.trial_value
             self.iter += 1
 
-            exitOptimal = gNorm <= stoptol
+            exitOptimal = g_norm <= stoptol
             exitIter = self.iter >= self.maxiter
             exitUser = status == "usr"
 
         self.tsolve = cputime() - tstart
-        self.logger.info(fmt_short, self.iter, f, gNorm)
+        self.logger.info(self.fmt_short, self.iter, f, g_norm)
 
         self.x = x
         self.f = f
         self.g = g
-        self.gNorm = gNorm
+        self.g_norm = g_norm
 
         # Set final solver status.
         if status == "usr":
             pass
-        elif self.gNorm <= stoptol:
+        elif self.g_norm <= stoptol:
             status = "opt"
         elif exitLS:
             status = "lsf"
         else:  # self.iter > self.maxiter:
             status = "itr"
         self.status = status
+
+
+class WolfeLBFGS(LBFGS):
+    """L-BFGS with a strong Wolfe linesearch."""
+
+    def setup_linesearch(self, line_model, step0):
+        u"""Set up linesearch for the line model with the given initial step.
+
+        This variant uses the strong Wolfe linesearch of Moré and Thuente.
+        """
+        return StrongWolfeLineSearch(line_model, ftol=1.0e-4, gtol=0.1)
