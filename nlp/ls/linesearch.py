@@ -41,7 +41,7 @@ class LineSearch(object):
         self._slope = kwargs.get("slope", None)
         if self._slope is None:
             self._slope = linemodel.grad(0)
-        self.check_slope(self.slope)
+        # self.check_slope(self.slope)
 
         self._step0 = max(kwargs.get("step", 1.0), 0)
         self._step = self._step0
