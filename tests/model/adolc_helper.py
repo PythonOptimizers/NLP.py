@@ -1,8 +1,8 @@
-from nlp.model.adolcmodel import BaseAdolcModel, SparseAdolcModel
+from nlp.model.adolcmodel import AdolcModel, SparseAdolcModel
 import numpy as np
 
 
-class AdolcRosenbrock(BaseAdolcModel):
+class AdolcRosenbrock(AdolcModel):
     """The standard Rosenbrock function."""
 
     def obj(self, x, **kwargs):
@@ -13,7 +13,7 @@ class SparseRosenbrock(SparseAdolcModel, AdolcRosenbrock):
     pass
 
 
-class AdolcHs7(BaseAdolcModel):
+class AdolcHs7(AdolcModel):
     """Problem #7 in the Hock and Schittkowski collection."""
 
     def obj(self, x, **kwargs):

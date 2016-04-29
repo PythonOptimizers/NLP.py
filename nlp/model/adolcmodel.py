@@ -12,7 +12,7 @@ except:
     print "ADOL-C is not installed"
 
 
-class BaseAdolcModel(NLPModel):
+class AdolcModel(NLPModel):
     """Model with derivatives computed by ADOL-C.
 
     A class to represent optimization problems in which derivatives
@@ -23,7 +23,7 @@ class BaseAdolcModel(NLPModel):
 
     def __init__(self, n, m=0, name='Adolc-Generic', **kwargs):
         """Initialize a model with `n` variables and `m` constraints."""
-        super(BaseAdolcModel, self).__init__(n, m=m, name=name, **kwargs)
+        super(AdolcModel, self).__init__(n, m=m, name=name, **kwargs)
 
         # Trace objective and constraint functions.
         self._obj_trace_id = None
@@ -163,7 +163,7 @@ class BaseAdolcModel(NLPModel):
         return adolc.vec_jac(self._con_trace_id, x, v)
 
 
-class SparseAdolcModel(BaseAdolcModel):
+class SparseAdolcModel(AdolcModel):
     """`AdolcModel` with sparse Jacobian and Hessian.
 
     AdolC must have been built with Colpack support for the sparse
@@ -171,7 +171,7 @@ class SparseAdolcModel(BaseAdolcModel):
     """
 
     def __init__(self, *args, **kwargs):
-        """See `BaseAdolcModel.__init__`."""
+        """See `AdolcModel.__init__`."""
         super(SparseAdolcModel, self).__init__(*args, **kwargs)
         self.__first_sparse_hess_eval = True
         self.__first_sparse_jac_eval = True
@@ -237,7 +237,7 @@ try:
         # MRO: 1. PySparseAdolcModel
         #      2. PySparseNLPModel
         #      3. SparseAdolcModel
-        #      4. BaseAdolcModel
+        #      4. AdolcModel
         #      5. NLPModel
         pass
 

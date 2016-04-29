@@ -1,4 +1,4 @@
-# Tests relative to algorithmic differentiation with ADOL-C.
+"""Tests relative to algorithmic differentiation with ADOL-C."""
 
 from unittest import TestCase
 from helper import *
