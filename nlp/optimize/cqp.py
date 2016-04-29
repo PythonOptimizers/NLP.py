@@ -4,13 +4,13 @@
 From Algorithm IPF on p.110 of Stephen J. Wright's book
 "Primal-Dual Interior-Point Methods", SIAM ed., 1997.
 The method uses the augmented system formulation. These systems are solved
-using PyMa27 or PyMa57.
+using MA27 or MA57.
 
 D. Orban, Montreal 2009-2011.
 """
 try:                            # To solve augmented systems
     from hsl.solvers.pyma57 import PyMa57Solver as LBLContext
-except:
+except ImportError:
     from hsl.solvers.pyma27 import PyMa27Solver as LBLContext
 from hsl.scaling.mc29 import mc29ad
 from pykrylov.linop import PysparseLinearOperator
@@ -441,9 +441,9 @@ class PySparseSlackModel(SlackModel):
         rrangeB = np.array(range(nrangeB))
 
         # Insert contribution of slacks on general constraints
-        J.put(-1.0,      lowerC,  on + rlowerC)
-        J.put(-1.0,      upperC,  on + nlowerC + rupperC)
-        J.put(-1.0,      rangeC,  on + nlowerC + nupperC + rrangeC)
+        J.put(-1.0, lowerC, on + rlowerC)
+        J.put(-1.0, upperC, on + nlowerC + rupperC)
+        J.put(-1.0, rangeC, on + nlowerC + nupperC + rrangeC)
         J.put(-1.0, om + rrangeC, on + nlowerC + nupperC + nrangeC + rrangeC)
 
         if self.keep_variable_bounds:
@@ -486,11 +486,11 @@ class PySparseSlackModel(SlackModel):
 
 
 class RegQPInteriorPointSolver(object):
-    """Solve a QP with the primal-dual-regularized interior-point method.
+    u"""Solve a QP with the primal-dual-regularized interior-point method.
 
     Solve a convex quadratic program of the form::
 
-       minimize    c' x + 1/2 x' Q x
+       minimize    cᵀx + 1/2 xᵀ Q x
        subject to  A1 x + A2 s = b,                                 (QP)
                    s >= 0,
 
@@ -561,7 +561,7 @@ class RegQPInteriorPointSolver(object):
         if not isinstance(self.A, PysparseMatrix):
             self.A = PysparseMatrix(matrix=self.A)
 
-        m, n = self.A.shape
+        _, n = self.A.shape
         on = qp.original_n
         # Record number of slack variables in QP
         self.nSlacks = qp.n - on
@@ -648,8 +648,8 @@ class RegQPInteriorPointSolver(object):
     def initialize_kkt_matrix(self):
         u"""Create and initialize KKT matrix.
 
-        [ -(Q+ρI)      0             A1' ] [∆x]   [c + Q x - A1' y     ]
-        [  0      -(S^{-1} Z + ρI)   A2' ] [∆s] = [- A2' y - µ S^{-1} e]
+        [ -(Q+ρI)      0             A1ᵀ ] [∆x]   [c + Q x - A1ᵀ y     ]
+        [  0      -(S^{-1} Z + ρI)   A2ᵀ ] [∆s] = [- A2ᵀ y - µ S^{-1} e]
         [  A1          A2            δI  ] [∆y]   [b - A1 x - A2 s     ]
         """
         m, n = self.A.shape
@@ -673,7 +673,7 @@ class RegQPInteriorPointSolver(object):
 
     def set_affine_scaling_rhs(self, rhs, pFeas, dFeas, s, z):
         """Set rhs for affine-scaling step."""
-        m, n = self.A.shape
+        _, n = self.A.shape
         on = self.qp.original_n
         rhs[:n] = -dFeas
         rhs[on:n] += z
@@ -866,7 +866,6 @@ class RegQPInteriorPointSolver(object):
         check_infeasible = kwargs.get('check_infeasible', True)
 
         # Transfer pointers for convenience.
-        m, n = self.A.shape
         on = qp.original_n
         A = self.A
         b = self.b
@@ -1077,7 +1076,7 @@ class RegQPInteriorPointSolver(object):
                 # Compute affine-scaling step, i.e. with centering = 0.
                 self.set_affine_scaling_rhs(rhs, pFeas, dFeas, s, z)
 
-                (step, nres, neig) = self.solve_system(rhs)
+                (step, nres, _) = self.solve_system(rhs)
 
                 # Recover dx and dz.
                 dx, ds, dy, dz = self.get_affine_scaling_dxsyz(step,
@@ -1347,7 +1346,7 @@ class RegQPInteriorPointSolver(object):
         rhs[on:] = 0.0
         return
 
-    def update_linear_system(self, s, z, regpr, regdu, **kwargs):
+    def update_linear_system(self, s, z, regpr, regdu):
         """Update linear system for current iteration."""
         self.log.debug('Updating linear system for current iteration')
         qp = self.qp
@@ -1355,8 +1354,8 @@ class RegQPInteriorPointSolver(object):
         m = qp.m
         on = qp.original_n
         diagQ = self.diagQ
-        self.H.put(-diagQ - regpr,    range(on))
-        self.H.put(-z / s - regpr,  range(on, n))
+        self.H.put(-diagQ - regpr, range(on))
+        self.H.put(-z / s - regpr, range(on, n))
         if regdu > 0:
             self.H.put(regdu, range(n, n + m))
         return
@@ -1610,7 +1609,7 @@ class RegQPInteriorPointSolver3x3(RegQPInteriorPointSolver):
 
     def update_initial_guess_rhs(self, rhs):
         """Update right-hand side for initial guess."""
-        m, n = self.A.shape
+        _, n = self.A.shape
         on = self.qp.original_n
         rhs[:on] = self.c
         rhs[on:] = 0.0
