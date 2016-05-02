@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 PyMSWolfe: Jorge Nocedal's modified More and Thuente linesearch
 guaranteeing satisfaction of the strong Wolfe conditions.
@@ -5,6 +6,7 @@ guaranteeing satisfaction of the strong Wolfe conditions.
 
 import numpy as np
 from nlp.ls._modified_strong_wolfe_linesearch import mcsrch
+
 
 class StrongWolfeLineSearch:
     """
@@ -54,6 +56,7 @@ class StrongWolfeLineSearch:
     computed satisfies the Armijo condition and SWLS.curvature will
     be set to True if the step satisfies the curvature condition.
     """
+
     def __init__(self, f, x, g, d, obj, grad, **kwargs):
 
         # Mandatory arguments
@@ -63,14 +66,14 @@ class StrongWolfeLineSearch:
         self.d = d          # Direction along which to search
         self.n = self.g.shape[0]
 
-        self.obj  = obj   # To evaluate function value
+        self.obj = obj   # To evaluate function value
         self.grad = grad  # To evaluate function gradient
 
         # Optional arguments
-        self.ftol   = kwargs.get('ftol', 1.0e-4)
-        self.gtol   = kwargs.get('gtol', 0.9)
-        self.xtol   = kwargs.get('xtol', 1.0e-16)
-        self.stp    = kwargs.get('stp', 1.0)
+        self.ftol = kwargs.get('ftol', 1.0e-4)
+        self.gtol = kwargs.get('gtol', 0.9)
+        self.xtol = kwargs.get('xtol', 1.0e-16)
+        self.stp = kwargs.get('stp', 1.0)
         self.stpmin = kwargs.get('stpmin', 1.0e-20)
         self.stpmax = kwargs.get('stpmax', 1.0e+20)
         self.maxfev = kwargs.get('maxfev', 20)
@@ -86,19 +89,19 @@ class StrongWolfeLineSearch:
         isave = np.empty(2, dtype=np.int32)
         dsave = np.empty(21, dtype=np.double)
         self.x, self.f, self.g, self.stp, self.info, self.nfev, self.wa \
-                = mcsrch(self.n, self.x, self.f, self.g, self.d, self.stp,
-                         self.ftol, self.gtol, self.xtol, self.stpmin,
-                         self.stpmax, self.maxfev, self.info, self.nfev,
-                         isave, dsave, self.wa)
+            = mcsrch(self.n, self.x, self.f, self.g, self.d, self.stp,
+                     self.ftol, self.gtol, self.xtol, self.stpmin,
+                     self.stpmax, self.maxfev, self.info, self.nfev,
+                     isave, dsave, self.wa)
 
         while self.info == -1:
             self.f = self.obj(self.x)
             self.g = self.grad(self.x)
             self.x, self.f, self.g, self.stp, self.info, self.nfev, self.wa \
-                    = mcsrch(self.n, self.x, self.f, self.g, self.d, self.stp,
-                             self.ftol, self.gtol, self.xtol, self.stpmin,
-                             self.stpmax, self.maxfev, self.info, self.nfev,
-                             isave, dsave, self.wa)
+                = mcsrch(self.n, self.x, self.f, self.g, self.d, self.stp,
+                         self.ftol, self.gtol, self.xtol, self.stpmin,
+                         self.stpmax, self.maxfev, self.info, self.nfev,
+                         isave, dsave, self.wa)
 
         if self.info == 1:     # Strong Wolfe conditions satisfied
             self.armijo = True
@@ -128,12 +131,12 @@ if __name__ == '__main__':
     g = model.grad(model.x0)
     d = -g
     SWLS = StrongWolfeLineSearch(f,
-                                  model.x0,
-                                  g,
-                                  d,
-                                  lambda z: model.obj(z),
-                                  lambda z: model.grad(z),
-                                  stp = 1.0/sqrt(np.dot(g,g)))
+                                 model.x0,
+                                 g,
+                                 d,
+                                 lambda z: model.obj(z),
+                                 lambda z: model.grad(z),
+                                 stp=1.0 / sqrt(np.dot(g, g)))
     print ' Before search'
     print '   f = ', f
     print '   stpmax = ', SWLS.stpmax

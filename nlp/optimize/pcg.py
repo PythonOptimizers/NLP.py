@@ -111,11 +111,11 @@ class TruncatedCG(object):
           :prec:       a user-defined preconditioner.
         """
 
-        radius  = kwargs.get('radius', None)
-        abstol  = kwargs.get('absol', 1.0e-8)
-        reltol  = kwargs.get('reltol', 1.0e-6)
+        radius = kwargs.get('radius', None)
+        abstol = kwargs.get('absol', 1.0e-8)
+        reltol = kwargs.get('reltol', 1.0e-6)
         maxiter = kwargs.get('maxiter', 2 * self.n)
-        prec    = kwargs.get('prec', lambda v: v)
+        prec = kwargs.get('prec', lambda v: v)
 
         qp = self.qp
         n = qp.n
@@ -152,10 +152,10 @@ class TruncatedCG(object):
         self.log.info('-' * len(self.header))
 
         while not (exitOptimal or exitIter or exitUser) and \
-              not onBoundary and not infDescent:
+                not onBoundary and not infDescent:
 
             k += 1
-            Hp  = H * p
+            Hp = H * p
             pHp = np.dot(p, Hp)
 
             self.log.info(self.fmt % (k, ry, pHp))
@@ -179,7 +179,7 @@ class TruncatedCG(object):
             if radius is not None and (pHp <= 0 or alpha > sigma):
                 # p leads past the trust-region boundary. Move to the boundary.
                 s += sigma * p
-                snorm2 = radius*radius
+                snorm2 = radius * radius
                 self.status = 'trust-region boundary active'
                 onBoundary = True
                 continue
@@ -194,7 +194,8 @@ class TruncatedCG(object):
             y = prec(r)
             ry_next = np.dot(r, y)
             beta = ry_next / ry
-            p *= beta ; p -=y  # p = -y + beta * p
+            p *= beta
+            p -= y  # p = -y + beta * p
             ry = ry_next
 
             # Transfer useful quantities for post iteration.
@@ -217,7 +218,7 @@ class TruncatedCG(object):
                 self.status = 'usr'
                 exitUser = True
 
-            exitIter    = k >= maxiter
+            exitIter = k >= maxiter
             exitOptimal = sqrtry <= stop_tol
 
         # Output info about the last iteration.
