@@ -202,5 +202,5 @@ Example
 Inheritance Diagrams
 ====================
 
-.. inheritance-diagram:: nlp.model.nlpmodel nlp.model.amplmodel nlp.model.snlp nlp.model.adolcmodel nlp.model.cppadmodel nlp.model.algopymodel nlp.model.qnmodel nlp.model.augmented_lagrangian nlp.model.l1 nlp.model.linemodel nlp.model.pysparsemodel nlp.model.cysparsemodel nlp.model.scipymodel
+.. inheritance-diagram:: nlp.model.nlpmodel nlp.model.amplmodel nlp.model.snlp nlp.model.adolcmodel nlp.model.cppadmodel nlp.model.algopymodel nlp.model.qnmodel nlp.model.linemodel nlp.model.pysparsemodel nlp.model.cysparsemodel nlp.model.scipymodel
   :parts: 1
