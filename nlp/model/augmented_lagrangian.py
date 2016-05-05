@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """An augmented Lagrangian model."""
 
-from nlp.model import NLPModel, QuasiNewtonModel, SlackModel
+from nlp.model.nlpmodel import NLPModel
+from nlp.model.qnmodel import QuasiNewtonModel
+from nlp.model.snlp import SlackModel
 
 import numpy as np
 
@@ -38,7 +40,7 @@ class AugmentedLagrangian(NLPModel):
             self.model = SlackModel(model, keep_variable_bounds=True, **kwargs)
 
         super(AugmentedLagrangian, self).__init__(self.model.n, m=0,
-                                                  name='Al-'+self.model.name,
+                                                  name='Al-' + self.model.name,
                                                   Lvar=self.model.Lvar,
                                                   Uvar=self.model.Uvar)
 
