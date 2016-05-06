@@ -2,11 +2,11 @@
 
 import numpy as np
 
-from nlp.model.adolcmodel import BaseAdolcModel, SciPyAdolcModel, QNAdolcModel
+from nlp.model.adolcmodel import AdolcModel, SciPyAdolcModel, QNAdolcModel
 from pykrylov.linop import InverseLBFGSOperator
 
 
-class AdolcRosenbrock(BaseAdolcModel):
+class AdolcRosenbrock(AdolcModel):
     """The standard Rosenbrock function."""
 
     def obj(self, x, **kwargs):
