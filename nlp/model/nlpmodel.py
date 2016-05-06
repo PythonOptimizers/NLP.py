@@ -888,6 +888,18 @@ class BoundConstrainedNLPModel(NLPModel):
                                                        Uvar=Uvar,
                                                        **kwargs)
 
+    def cons(self, x):
+        """Evaluate the constraints at x."""
+        return np.zeros(self.m, dtype=np.float)
+
+    def jprod(self, x, v):
+        """Evaluate Jacobian-vector product at x with p."""
+        return np.zeros(self.m, dtype=np.float)
+
+    def jtprod(self, x, v):
+        """Evaluate transposed-Jacobian-vector product at x with p."""
+        return np.zeros(self.n, dtype=np.float)
+
 
 class UnconstrainedNLPModel(NLPModel):
     """Generic class to represent an unconstrained problem."""
