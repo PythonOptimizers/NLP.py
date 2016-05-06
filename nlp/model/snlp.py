@@ -1,35 +1,36 @@
+# -*- coding: utf-8 -*-
 """A slack framework for NLP.py."""
 
 
 import numpy as np
 from nlp.model.nlpmodel import NLPModel
-from pysparse.sparse.pysparseMatrix import PysparseMatrix as sp
 
 __docformat__ = 'restructuredtext'
 
 
 class SlackModel(NLPModel):
-    """
-    General framework for converting a nonlinear optimization problem to a
+    u"""General framework for converting a nonlinear optimization problem to a
     form using slack variables.
 
-    Original problem:
-         cL <= c(x)
-               c(x) <= cU
-        cRL <= c(x) <= cRU
-        c(x) = cE
-        l <= x <= u
+    Original problem::
 
-    is transformed to:
+         cᴸ ≤ c(x)
+              c(x) ≤ cᵁ
+        cᴿᴸ ≤ c(x) ≤ cᴿᵁ
+              c(x) = cᴱ
+          l ≤   x  ≤ u
 
-        c(x) - sL = 0
-        c(x) - sU = 0
-        c(x) - sR = 0
-        c(x) - cE = 0
-        cL  <= sL
-               sU <= cU
-        cRL <= sR <= cRU
-        l <= x <= u
+    is transformed to::
+
+        c(x) - sᴸ = 0
+        c(x) - sᵁ = 0
+        c(x) - sᴿ = 0
+        c(x) - cᴱ = 0
+
+         cᴸ ≤ sᴸ
+              sᵁ ≤ cᵁ
+        cᴿᴸ ≤ sᴿ ≤ cᴿᵁ
+          l ≤ x  ≤ u
 
     In the latter problem, the only inequality constraints are bounds on the
     slack and original variables. The other constraints are (typically)
@@ -39,13 +40,13 @@ class SlackModel(NLPModel):
 
     1. x, the original problem variables.
 
-    2. sL, the slack variables corresponding to general constraints with
+    2. sᴸ, the slack variables corresponding to general constraints with
        a lower bound only.
 
-    3. sU, the slack variables corresponding to general constraints with
+    3. sᵁ, the slack variables corresponding to general constraints with
        an upper bound only.
 
-    4. sR, the slack variables corresponding to general constraints with
+    4. sᴿ, the slack variables corresponding to general constraints with
        a lower bound and an upper bound.
 
     This framework initializes the slack variables sL and sU to
@@ -55,13 +56,16 @@ class SlackModel(NLPModel):
     such as the index set of constraints with an upper bound, etc., but
     rather performs the evaluations of the constraints for the updated
     model implicitly.
-
-    :parameters:
-        :model:  Original model to be transformed into a slack form.
-
     """
 
     def __init__(self, model, **kwargs):
+        """Initialize a slack form of an :class:`NLPModel`.
+
+        :parameters:
+
+            :model:  Original model to be transformed into a slack form.
+
+        """
         self.model = model
 
         # Save number of variables and constraints prior to transformation
