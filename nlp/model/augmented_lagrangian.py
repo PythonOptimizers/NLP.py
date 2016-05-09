@@ -37,10 +37,8 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
         if not isinstance(model, NLPModel):
             raise TypeError("model should be a subclass of NLPModel")
 
-        if model.m == model.nequalC:
-            self.model = model
-        else:
-            self.model = SlackModel(model, keep_variable_bounds=True, **kwargs)
+        if not isinstance(model, SlackModel):
+            self.model = SlackModel(model, **kwargs)
 
         super(AugmentedLagrangian, self).__init__(self.model.n,
                                                   name='Al-' + self.model.name,
