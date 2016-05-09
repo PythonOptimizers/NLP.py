@@ -46,7 +46,7 @@ class SciPyAmplModel(AmplModel):
         Useful to obtain constraint matrix when problem is a linear programming
         problem.
         """
-        vals, rows, cols = super(SciPyAmplModel. self).A(*args, **kwargs)
+        vals, rows, cols = super(SciPyAmplModel, self).A(*args, **kwargs)
         return sp.coo_matrix((vals, (rows, cols)),
                              shape=(self.ncon, self.nvar))
 
@@ -76,8 +76,8 @@ class SciPyAmplModel(AmplModel):
         u_vals = np.delete(l_vals, diag_idx)
 
         H = sp.coo_matrix((np.concatenate((l_vals, u_vals)),
-                          (np.concatenate((l_rows, u_rows)),
-                           np.concatenate((l_cols, u_cols)))),
+                           (np.concatenate((l_rows, u_rows)),
+                            np.concatenate((l_cols, u_cols)))),
                           shape=(self.nvar, self.nvar))
         return H
 
@@ -137,7 +137,7 @@ class SciPySlackModel(SlackModel):
         cols = np.concatenate((c_cols, on + rlowerC, on + nlowerC + rupperC,
                                on + nlowerC + nupperC + rrangeC))
         vals = np.concatenate((c_vals,
-                               -1.0*np.ones(nlowerC + nupperC + nrangeC)))
+                               -1.0 * np.ones(nlowerC + nupperC + nrangeC)))
 
         return sp.coo_matrix((vals, (rows, cols)),
                              shape=(self.ncon, self.nvar))
