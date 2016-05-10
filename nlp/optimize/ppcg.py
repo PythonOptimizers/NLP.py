@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """An implementation of the projected conjugate gradient algorithm.
 
 Described in
@@ -11,9 +12,11 @@ with the addition of an optional trust-region constraint.
 
 .. moduleauthor:: D. Orban <dominique.orban@gerad.ca>
 """
-import numpy as np
-from nlp.optimize.projKrylov import ProjectedKrylov
 from math import sqrt
+import numpy as np
+
+from nlp.optimize.projKrylov import ProjectedKrylov
+from nlp.tools.utils import to_boundary
 from nlp.tools.timing import cputime
 
 __docformat__ = 'restructuredtext'
@@ -23,9 +26,9 @@ class ProjectedCG(ProjectedKrylov):
     """A projected preconditioned conjugate-gradient algorithm."""
 
     def __init__(self, qp, **kwargs):
-        """Solve the equality-constrained quadratic programming problem.
+        u"""Solve the equality-constrained quadratic programming problem.
 
-            minimize     c'x + 1/2 x'Hx                           (1)
+            minimize     cᵀx + ½ xᵀHx                           (1)
             subject to   Ax = b
 
         using the projected preconditioned conjugate-gradient algorithm.
@@ -37,11 +40,11 @@ class ProjectedCG(ProjectedKrylov):
         This module may also be used to solve the equality-constrained
         trust-region subproblem
 
-            minimize     c'x + 1/2 x'Hx
+            minimize     cᵀx + ½ xᵀHx
             subject to   Ax = 0                                   (2)
-                         sqrt(x'Mx)  <=  radius,
+                         sqrt(xᵀMx) ≤ Δ,
 
-        where M is a symmetric positive definite scaling matrix and radius > 0
+        where M is a symmetric positive definite scaling matrix and Δ > 0
         is a given trust-region radius. Note that b = 0 in the latter problem.
         For the time being, only M = I is implemented, i.e., the Euclidian norm
         is used. Specifying M is equivalent to specifying a preconditioner. See
@@ -50,8 +53,8 @@ class ProjectedCG(ProjectedKrylov):
         Equivalently, this module is appropriate for solving saddle-point
         systems of the form
 
-            [ H   A^T ] [ x ] = [ -c ]                                      (3)
-            [ A    0  ] [ y ]   [  b ]
+            [ H   Aᵀ ] [ x ] = [ -c ]                                      (3)
+            [ A   0  ] [ y ]   [  b ]
 
         where H is a symmetric matrix. If H is positive definite on the
         nullspace of A, then (1) and (3) are equivalent. Otherwise, it is
@@ -74,8 +77,8 @@ class ProjectedCG(ProjectedKrylov):
         be an operator. The preconditioner G is used to assemble and factorize
         the symmetric indefinite projection matrix
 
-            [ G   A^T ]
-            [ A    0  ].
+            [ G   Aᵀ ]
+            [ A   0  ].
 
         The user should keep in mind that G must be relatively sparse and must
         be positive definite over the nullspace of A. If no preconditioner is
@@ -115,16 +118,16 @@ class ProjectedCG(ProjectedKrylov):
         enforce all conjugate gradient iterates to satisfy  sk >= btol.
         Typically, in an interior-point methods calling `ppcg()`, the step
         computed at iteration k must be such that
-                dk >= -tau xk
-        where 0 < tau < 1, so that
-                xk + dk >= (1-tau) xk,
+                dk ≥ - τ xₖ
+        where 0 < τ < 1, so that
+                xₖ + dₖ ≥ (1-τ) xₖ,
         which prevents the iterates from getting too close to the boundary of
         the nonnegative orthant. In this type of setting, btol should be set
         to
-                btol = tau
+                btol = τ
         and the vector cur_iter should be set to
-                cur_iter = xk.
-        This ensures that no copy of xk occurs and only a pointer to xk is
+                cur_iter = xₖ.
+        This ensures that no copy of xₖ occurs and only a pointer to xₖ is
         used.
 
         Upon completion, a few members of the instance are set so a status
@@ -177,9 +180,10 @@ class ProjectedCG(ProjectedKrylov):
         self.iter = self.n_matvec = 0
         self.inf_descent_dir = None
         self.inf_descent = False  # Direction of infinity descent
-        self.x_norm2 = 0.0        # Square norm of step, not counting x_feasible
+        self.x_norm2 = 0.0        # Squared step norm, not counting x_feasible
         self.step_norm = 0.0      # Shortcut for consistency with TruncatedCG
         self.on_boundary = False
+        self.status = None
 
         # Formats for display
         self.hd_fmt = ' %-5s  %9s  %8s'
@@ -187,58 +191,29 @@ class ProjectedCG(ProjectedKrylov):
         self.fmt1 = ' %-5d  %9.2e'
         self.fmt = ' %-5d  %9.2e  %8.2e'
 
-    def to_boundary(self, s, p, Delta, ss=None):
-        """Compute step length to boundary from s in direction p.
-
-        Given vectors `s` and `p` and a trust-region radius `Delta` > 0,
-        return the positive scalar sigma such that
-
-            || s + sigma * p || = Delta
-
-        in Euclidian norm. If known, supply optional argument `ss` whose value
-        should be the squared Euclidian norm of argument `s`.
-        """
-        if Delta is None:
-            raise ValueError('Radius value must be positive number.')
-        sp = np.dot(s, p)
-        pp = np.dot(p, p)
-        if ss is None:
-            ss = np.dot(s, s)
-        sigma = (-sp + sqrt(sp * sp + pp * (Delta * Delta - ss)))
-        sigma /= pp
-
-        if (self.btol is not None) and (self.cur_iter is not None):
-            sigma = min(sigma, self.ftb(s, p))
-
-        return sigma
-
     def ftb(self, s, p):
-        """Fraction to the boundary.
+        u"""Fraction to the boundary.
 
         If fraction-to-the-boundary rule is to be enforced, compute step
-        length to satisfy  s + t*p >= btol * cur_iter.
+        length to satisfy  s + t*p ≥ btol * cur_iter.
         """
         neg_idx = np.where(p < 0.0)[0]
-        stepLen = 1.0
+        step_len = 1.0
         for i in neg_idx:
-            stepLen = min(stepLen,
-                          -(self.btol * self.cur_iter[i] + s[i]) / p[i])
-        return stepLen
+            step_len = min(step_len,
+                           -(self.btol * self.cur_iter[i] + s[i]) / p[i])
+        return step_len
 
     def solve(self):
         """Solve."""
-        if self.qp.A is not None:
-            if self.factorize and not self.factorized:
-                self.perform_factorization()
-            if self.b is not None:
-                self.FindFeasible()
-
         n = self.n
-        x_norm2 = 0.0   # Squared norm of current iterate x, not counting x_feas
+        x_norm2 = 0.0  # Squared norm of current iterate x, not counting x_feas
 
         # Obtain initial projected residual
         self.t_solve = cputime()
         if self.qp.A is not None:
+            if self.factorize and not self.factorized:
+                self.perform_factorization()
             if self.b is not None:
                 self.rhs[:n] = self.qp.grad(self.x_feasible)
                 self.rhs[n:] = 0.0
@@ -266,7 +241,7 @@ class ProjectedCG(ProjectedKrylov):
 
         self.log.info(self.header)
         self.log.info('-' * len(self.header))
-        self.log.info(self.fmt1 % (iter, rg))
+        self.log.info(self.fmt1, iter, rg)
 
         while sqrt(rg) > threshold and iter < self.maxiter and not on_boundary:
 
@@ -274,11 +249,13 @@ class ProjectedCG(ProjectedKrylov):
             pHp = np.dot(p, Hp)
 
             # Display current iteration info
-            self.log.info(self.fmt % (iter, rg, pHp))
+            self.log.info(self.fmt, iter, rg, pHp)
 
             if self.radius is not None:
                 # Compute steplength to the boundary
-                sigma = self.to_boundary(self.x, p, self.radius, ss=x_norm2)
+                sigma = to_boundary(self.x, p, self.radius, xx=x_norm2)
+                if (self.btol is not None) and (self.cur_iter is not None):
+                    sigma = min(sigma, self.ftb(self.x, p))
             elif pHp <= 0.0:
                 self.log.error('Problem is not second-order sufficient')
                 status = 'problem not SOS'
@@ -294,7 +271,7 @@ class ProjectedCG(ProjectedKrylov):
                 # Move to boundary of trust-region
                 self.x += sigma * p
                 x_norm2 = self.radius * self.radius
-                status = 'on boundary (sigma = %g)' % sigma
+                status = u'on boundary (σ = %g)' % sigma
                 self.inf_descent = (pHp <= 0.0)
                 on_boundary = True
                 continue
@@ -345,7 +322,7 @@ class ProjectedCG(ProjectedKrylov):
 
         # Output info about the last iteration
         if iter > 0:
-            self.log.info(self.fmt % (iter, rg, pHp))
+            self.log.info(self.fmt, iter, rg, pHp)
 
         # Obtain final solution x
         self.x_norm2 = x_norm2
