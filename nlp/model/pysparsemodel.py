@@ -70,7 +70,10 @@ try:
             """Obtain Jacobian at x as a linear operator."""
             return PysparseLinearOperator(self.jac(*args, **kwargs))
 
-except ImportError:
+    class QnPySparseAmplModel(QuasiNewtonModel, PySparseAmplModel):
+        pass
+
+except:
     pass
 
 

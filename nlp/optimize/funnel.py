@@ -7,7 +7,7 @@ import logging
 from nlp.model.nlpmodel import UnconstrainedNLPModel, NLPModel, QPModel
 from nlp.model.linemodel import C1LineModel
 from nlp.ls.linesearch import ArmijoLineSearch
-from nlp.tools.exceptions import LineSearchFailure
+from nlp.tools.exceptions import UserExitRequest, LineSearchFailure
 from nlp.optimize.ppcg import ProjectedCG
 from nlp.tools.timing import cputime
 from pykrylov.lls.lsqr import LSQRFramework
@@ -21,7 +21,7 @@ class InfeasibilityModel(UnconstrainedNLPModel):
     def __init__(self, model, **kwargs):
         u"""Instantiate a :class:`InfeasibilityModel`.
 
-        Objective function of this model in the infeasibility measure defined
+        Objective function of this model is the infeasibility measure defined
         by
             Θ(x) = 1/2 ‖c(x)‖²
 
@@ -61,10 +61,10 @@ class Funnel(object):
             :radius_f: Initial trust-region radius for the objective model
             :radius_c: Initial trust-region radius for the constraints model
             :iterative_solver: solver used to find steps (0=gltr, 1=gmres)
-            :maxit: maximum number of iterations allowed
+            :maxiter: maximum number of iterations allowed
             :stop_p: required accuracy for ‖c‖
             :stop_d: required accuracy for ‖g+Jᵀy‖
-            :maxit_refine: maximum number of iterative refinements per solve
+            :maxiter_refine: maximum number of iterative refinements per solve
 
         iter type status : [f] or [c]
 
@@ -105,8 +105,8 @@ class Funnel(object):
         self.p_resid = self.d_resid = None
 
         # Members to memorize old and current Jacobian matrices if needed.
-        self.save_J = False
-        self.J = self.J_old = None
+        self.save_g = False
+        self.g = self.g_old = None
         self.step = None
         self.status = None
         self.optimal = False
@@ -119,10 +119,10 @@ class Funnel(object):
         self.radius_f_0 = self.radius_f = kwargs.get('radius_f', 1.0)
         self.radius_c_0 = self.radius_c = kwargs.get('radius_c', 1.0)
         self.iterative_solver = kwargs.get('iterative_solver', 0)
-        self.maxit = kwargs.get('maxit', 200)
+        self.maxiter = kwargs.get('maxiter', 200)
         self.stop_p = kwargs.get('stop_p', model.stop_p)
         self.stop_d = kwargs.get('stop_d', model.stop_d)
-        self.maxit_refine = kwargs.get('maxit_refine', 0)
+        self.maxiter_refine = kwargs.get('maxiter_refine', 0)
 
         self.hdr_fmt = '%4s   %2s %9s %8s %8s %8s %8s %6s %6s'
         self.hdr = self.hdr_fmt % ('iter', 'NT', 'f', u'‖c‖', u'‖g+Jᵀy‖',
@@ -241,10 +241,12 @@ class Funnel(object):
             :d_resid: Final dual residual
             :niter: Total number of iterations
             :tsolve: Solve time.
+
+        Warning: backtracking after rejected trust-region steps fails with a
+                 "Not a descent direction" flag.
         """
-        ny = kwargs.get('ny', True)
+        ny = kwargs.get('ny', False)
         reg = kwargs.get('reg', 0.0)
-        # ny = False
 
         tsolve = cputime()
 
@@ -321,7 +323,7 @@ class Funnel(object):
         self.log.debug('optimal: %s', repr(optimal))
 
         # Start of main iteration.
-        while not optimal and (self.iter < self.maxit):
+        while not optimal and (self.iter < self.maxiter):
 
             self.iter += 1
             radius = min(radius_f, radius_c)
@@ -396,7 +398,7 @@ class Funnel(object):
 
                     Hop = model.hop(x, -y_new)
 
-                    qp = QPModel(g_n, Hop, A=J.matrix if m > 0 else None)
+                    qp = QPModel(g_n, Hop, A=J.matrix)
                     # PPCG = ProjectedCG(g_n, Hop,
                     #                    A=J.matrix if m > 0 else None,
                     #                    radius=radius_within, dreg=reg)
@@ -538,7 +540,6 @@ class Funnel(object):
                                 # Backtracking linesearch a la Nocedal & Yuan.
                                 # Abandon SOC step. Backtrack from x+step.
                                 if ny:
-                                    print"here", x, f, f_trial, g, step
                                     (x, f, alpha) = self.nyf(x, f, f_trial,
                                                              g, step)
                                     # g = model.grad(x)
@@ -633,15 +634,19 @@ class Funnel(object):
 
             # Step 5. Book keeping.
             if ratio >= eta_1 or ny:
-                g = model.grad(x)
-                if self.save_J:
-                    self.J_old = J.copy()
-                    J = model.jac(x)
-                    self.J = J
+                if self.save_g:
+                    self.g_old = g.copy()
+                    g = model.grad(x)
+                    self.dgrad = g - self.g_old
                 else:
-                    J = model.jac(x)
+                    g = model.grad(x)
+                J = model.jac(x)
                 Jop = model.jop(x)
-                self.post_iteration()
+
+                try:
+                    self.post_iteration()
+                except UserExitRequest:
+                    self.status = "usr"
 
                 p_norm = c_norm = 0
                 if m > 0:
@@ -663,11 +668,14 @@ class Funnel(object):
 
         self.tsolve = cputime() - tsolve
 
-        if optimal:
-            self.status = 0  # Successful solve.
+        # Set final solver status.
+        if self.status == "usr":
+            pass
+        elif optimal:
+            self.status = "opt"  # Successful solve.
             self.log.info('Found an optimal solution! Yeah!')
-        else:
-            self.status = 1  # Refine this in the future.
+        else:  # self.iter > self.maxiter:
+            self.status = "itr"
 
         self.x = x
         self.f = f
@@ -676,3 +684,15 @@ class Funnel(object):
         self.d_resid = d_norm
 
         return
+
+
+class QNFunnel(Funnel):
+    """A variant of Funnel with quasi-Newton Hessian."""
+
+    def __init__(self, *args, **kwargs):
+        super(QNFunnel, self).__init__(*args, **kwargs)
+        self.save_g = True
+
+    def post_iteration(self, **kwargs):
+        # Update quasi-Newton approximation.
+        self.model.H.store(self.step, self.dgrad)
