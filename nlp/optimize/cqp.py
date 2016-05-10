@@ -490,9 +490,9 @@ class RegQPInteriorPointSolver(object):
 
     Solve a convex quadratic program of the form::
 
-       minimize    cᵀx + 1/2 xᵀ Q x
+       minimize    cᵀx + ½ xᵀ Q x
        subject to  A1 x + A2 s = b,                                 (QP)
-                   s >= 0,
+                   s ≥ 0,
 
     where Q is a symmetric positive semi-definite matrix, the variables
     x are the original problem variables and s are slack variables. Any
