@@ -75,20 +75,20 @@ def roots_quadratic(q2, q1, q0, tol=1.0e-8, nitref=1):
             else:
                 return []
         else:
-            roots = [-a0/a1]
+            roots = [-a0 / a1]
     else:
         # Case of a quadratic.
         rhs = tol * a1 * a1
-        if abs(a0*a2) > rhs:
+        if abs(a0 * a2) > rhs:
             rho = a1 * a1 - 4.0 * a2 * a0
             if rho < 0.0:
                 return []
             # There are two real roots.
             d = -0.5 * (a1 + copysign(sqrt(rho), a1))
-            roots = [d/a2, a0/d]
+            roots = [d / a2, a0 / d]
         else:
             # Ill-conditioned quadratic.
-            roots = [-a1/a2, 0.0]
+            roots = [-a1 / a2, 0.0]
 
     # Perform a few Newton iterations to improve accuracy.
     new_roots = []
@@ -99,7 +99,7 @@ def roots_quadratic(q2, q1, q0, tol=1.0e-8, nitref=1):
             if der == 0.0:
                 continue
             else:
-                root = root - val/der
+                root = root - val / der
         new_roots.append(root)
 
     return new_roots
@@ -114,7 +114,12 @@ def to_boundary(x, p, delta, xx=None):
     The code is only guaranteed to produce a non-negative solution
     if ‖x‖ ≤ Δ, and p != 0.
     If the trust region equation has no solution, σ is set to 0.
+
+    :keywords:
+        :xx: squared norm of argument `x`.
     """
+    if delta is None:
+        raise ValueError('`delta` value must be a positive number.')
     px = np.dot(p, x)
     pp = np.dot(p, p)
     if xx is None:
