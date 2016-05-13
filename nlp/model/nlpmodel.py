@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Abstract base classes to represent continuous optimization models."""
 
 import logging
@@ -5,11 +6,11 @@ import os
 import sys
 import numpy as np
 from nlp.model.kkt import KKTresidual
-from pykrylov.linop.linop import LinearOperator, DiagonalOperator, \
-                                 ReducedLinearOperator
-from pykrylov.linop.blkop import BlockLinearOperator
 from nlp.tools.decorators import deprecated, counter
 from nlp.tools.utils import where
+from pykrylov.linop.linop import LinearOperator, DiagonalOperator, \
+    ReducedLinearOperator
+from pykrylov.linop.blkop import BlockLinearOperator
 
 
 class NLPModel(object):
@@ -379,14 +380,14 @@ class NLPModel(object):
         nB = self.nbounds
         nrB = self.nrangeB
 
-        pFeas = np.empty(m+nrC+nB+nrB)
-        pFeas[:m+nrC] = -self.cons_pos(x) if c is None else -c
-        not_eC = [i for i in range(m+nrC) if i not in eC]
+        pFeas = np.empty(m + nrC + nB + nrB)
+        pFeas[:m + nrC] = -self.cons_pos(x) if c is None else -c
+        not_eC = [i for i in range(m + nrC) if i not in eC]
         pFeas[eC] = np.abs(pFeas[eC])
         pFeas[not_eC] = np.maximum(0, pFeas[not_eC])
-        pFeas[m:m+nrC] = np.maximum(0, pFeas[m:m+nrC])
-        pFeas[m+nrC:] = -self.get_bounds(x)
-        pFeas[m+nrC:] = np.maximum(0, pFeas[m+nrC:])
+        pFeas[m:m + nrC] = np.maximum(0, pFeas[m:m + nrC])
+        pFeas[m + nrC:] = -self.get_bounds(x)
+        pFeas[m + nrC:] = np.maximum(0, pFeas[m + nrC:])
 
         return pFeas
 
@@ -432,8 +433,8 @@ class NLPModel(object):
                 dFeas *= obj_weight
             dFeas -= J.T * y
         dFeas[lB] -= z[:nlB]
-        dFeas[uB] -= z[nlB:nlB+nuB]
-        dFeas[rB] -= z[nlB+nuB:nlB+nuB+nrB] - z[nlB+nuB+nrB:]
+        dFeas[uB] -= z[nlB:nlB + nuB]
+        dFeas[rB] -= z[nlB + nuB:nlB + nuB + nrB] - z[nlB + nuB + nrB:]
 
         return dFeas
 
@@ -456,7 +457,7 @@ class NLPModel(object):
         nuC = self.nupperC
         nrC = self.nrangeC
 
-        not_eC = lC + uC + rC + range(nlC+nuC+nrC, nlC+nuC+nrC+nrC)
+        not_eC = lC + uC + rC + range(nlC + nuC + nrC, nlC + nuC + nrC + nrC)
         if c is None:
             c = self.cons_pos(x)
 
@@ -489,7 +490,7 @@ class NLPModel(object):
         check = kwargs.get('check', True)
 
         if check:
-            not_eC = [i for i in range(m+nrC) if i not in eC]
+            not_eC = [i for i in range(m + nrC) if i not in eC]
             if len(where(y[not_eC] < 0)) > 0:
                 raise ValueError('Multipliers for inequalities must be >= 0.')
             if not np.all(z >= 0):
@@ -499,7 +500,7 @@ class NLPModel(object):
         dFeas = self.dual_feasibility(x, y, z, g=g, J=J)
         cy, xz = self.complementarity(x, y, z, c=c)
 
-        return KKTresidual(dFeas, pFeas[:m+nrC], pFeas[m+nrC:], cy, xz)
+        return KKTresidual(dFeas, pFeas[:m + nrC], pFeas[m + nrC:], cy, xz)
 
     def at_optimality(self, x, z, **kwargs):
         """Check whether the KKT residuals meet the stopping conditions."""
@@ -527,11 +528,11 @@ class NLPModel(object):
         Lvar = self.Lvar
         Uvar = self.Uvar
 
-        b = np.empty(nB+nrB, dtype=x.dtype)
+        b = np.empty(nB + nrB, dtype=x.dtype)
         b[:nlB] = x[lB] - Lvar[lB]
-        b[nlB:nlB+nuB] = Uvar[uB] - x[uB]
-        b[nlB+nuB:nlB+nuB+nrB] = x[rB] - Lvar[rB]
-        b[nlB+nuB+nrB:] = Uvar[rB] - x[rB]
+        b[nlB:nlB + nuB] = Uvar[uB] - x[uB]
+        b[nlB + nuB:nlB + nuB + nrB] = x[rB] - Lvar[rB]
+        b[nlB + nuB + nrB:] = Uvar[rB] - x[rB]
         return b
 
     def obj(self, x, **kwargs):
@@ -643,9 +644,9 @@ class NLPModel(object):
         # when passed empty arrays of objects (i.e., dtype = np.object).
         # This causes AD tools to error out.
         if self.m > 0:
-            l -= np.dot(z[:m+nrC], self.cons_pos(x))
+            l -= np.dot(z[:m + nrC], self.cons_pos(x))
         if self.nbounds > 0:
-            l -= np.dot(z[m+nrC:], self.bounds(x))
+            l -= np.dot(z[m + nrC:], self.bounds(x))
         return l
 
     def hess(self, x, z=None, **kwargs):
@@ -686,38 +687,38 @@ class NLPModel(object):
     def display_basic_info(self):
         """Display vital statistics about the current model."""
         write = self.logger.info
-        write('Problem Name: %s' % self.name)
-        write('Number of Variables: %d' % self.n)
-        write('Number of Bound Constraints: %d' % self.nbounds)
-        write(' (%d lower, %d upper, %d two-sided)' %
-              (self.nlowerB, self.nupperB, self.nrangeB))
+        write('Problem Name: %s', self.name)
+        write('Number of Variables: %d',  self.n)
+        write('Number of Bound Constraints: %d', self.nbounds)
+        write(' (%d lower, %d upper, %d two-sided)',
+              self.nlowerB, self.nupperB, self.nrangeB)
         if self.nlowerB > 0:
-            write('Lower bounds: %s' % repr(self.lowerB))
+            write('Lower bounds: %s', repr(self.lowerB))
         if self.nupperB > 0:
-            write('Upper bounds: %s' % repr(self.upperB))
+            write('Upper bounds: %s', repr(self.upperB))
         if self.nrangeB > 0:
-            write('Two-Sided bounds: %s' % repr(self.rangeB))
+            write('Two-Sided bounds: %s', repr(self.rangeB))
         if self.nlowerB + self.nupperB + self.nrangeB > 0:
-            write('Vector of lower bounds: %s' % repr(self.Lvar))
-            write('Vectof of upper bounds: %s' % repr(self.Uvar))
-            write('Number of General Constraints: %d' % self.m)
-            write(' (%d equality, %d lower, %d upper, %d range)' %
-                  (self.nequalC, self.nlowerC, self.nupperC, self.nrangeC))
+            write('Vector of lower bounds: %s', repr(self.Lvar))
+            write('Vectof of upper bounds: %s', repr(self.Uvar))
+            write('Number of General Constraints: %d', self.m)
+            write(' (%d equality, %d lower, %d upper, %d range)',
+                  self.nequalC, self.nlowerC, self.nupperC, self.nrangeC)
         if self.nequalC > 0:
-            write('Equality: %s' % repr(self.equalC))
+            write('Equality: %s', repr(self.equalC))
         if self.nlowerC > 0:
-            write('Lower   : %s' % repr(self.lowerC))
+            write('Lower   : %s', repr(self.lowerC))
         if self.nupperC > 0:
-            write('Upper   : %s' % repr(self.upperC))
+            write('Upper   : %s', repr(self.upperC))
         if self.nrangeC > 0:
-            write('Range   : %s' % repr(self.rangeC))
+            write('Range   : %s', repr(self.rangeC))
         if self.nequalC + self.nlowerC + self.nupperC + self.nrangeC > 0:
-            write('Vector of constraint lower bounds: %s' % repr(self.Lcon))
-            write('Vector of constraint upper bounds: %s' % repr(self.Ucon))
-            write('Number of Linear Constraints: %d' % self.nlin)
-            write('Number of Nonlinear Constraints: %d' % self.nnln)
-            write('Number of Network Constraints: %d' % self.nnet)
-        write('Initial Guess: %s' % repr(self.x0))
+            write('Vector of constraint lower bounds: %s', repr(self.Lcon))
+            write('Vector of constraint upper bounds: %s', repr(self.Ucon))
+            write('Number of Linear Constraints: %d', self.nlin)
+            write('Number of Nonlinear Constraints: %d', self.nnln)
+            write('Number of Network Constraints: %d', self.nnet)
+        write('Initial Guess: %s', repr(self.x0))
 
         return
 
@@ -728,11 +729,11 @@ class NLPModel(object):
 
 
 class QPModel(NLPModel):
-    """Generic class to represent a quadratic programming (QP) problem.
+    u"""Generic class to represent a quadratic programming (QP) problem.
 
-    minimize    c'x + 1/2 x'Hx
-    subject to  L <= A*x <= U
-                l <=  x  <= u.
+    minimize    cᵀx + 1/2 xᵀHx
+    subject to  L ≤ A x ≤ U
+                l ≤ x ≤ u.
     """
 
     def __init__(self, c, H, A=None, name='GenericQP', **kwargs):
@@ -831,11 +832,11 @@ class QPModel(NLPModel):
 
 
 class LPModel(QPModel):
-    """Generic class to represent a linear programming (LP) problem.
+    u"""Generic class to represent a linear programming (LP) problem.
 
-    minimize    c'x
-    subject to  L <= A*x <= U
-                l <=  x  <= u.
+    minimize    cᵀx
+    subject to  L ≤ A x ≤ U
+                l ≤ x ≤ u.
     """
 
     def __init__(self, c, A=None, name='GenericLP', **kwargs):
@@ -887,6 +888,18 @@ class BoundConstrainedNLPModel(NLPModel):
                                                        Uvar=Uvar,
                                                        **kwargs)
 
+    def cons(self, x):
+        """Evaluate the constraints at x."""
+        return np.zeros(self.m, dtype=np.float)
+
+    def jprod(self, x, v):
+        """Evaluate Jacobian-vector product at x with p."""
+        return np.zeros(self.m, dtype=np.float)
+
+    def jtprod(self, x, v):
+        """Evaluate transposed-Jacobian-vector product at x with p."""
+        return np.zeros(self.n, dtype=np.float)
+
 
 class UnconstrainedNLPModel(NLPModel):
     """Generic class to represent an unconstrained problem."""
@@ -904,3 +917,15 @@ class UnconstrainedNLPModel(NLPModel):
         kwargs.pop('Lvar', None)
         kwargs.pop('Uvar', None)
         super(UnconstrainedNLPModel, self).__init__(nvar, **kwargs)
+
+    def cons(self, x):
+        """Evaluate the constraints at x."""
+        return np.zeros(self.m, dtype=np.float)
+
+    def jprod(self, x, v):
+        """Evaluate Jacobian-vector product at x with p."""
+        return np.zeros(self.m, dtype=np.float)
+
+    def jtprod(self, x, v):
+        """Evaluate transposed-Jacobian-vector product at x with p."""
+        return np.zeros(self.n, dtype=np.float)

@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """An augmented Lagrangian model."""
 
-from nlp.model import NLPModel, QuasiNewtonModel, SlackModel
+from nlp.model.nlpmodel import NLPModel, BoundConstrainedNLPModel
+from nlp.model.qnmodel import QuasiNewtonModel
+from nlp.model.snlp import SlackModel
 
 import numpy as np
 
 
-class AugmentedLagrangian(NLPModel):
+class AugmentedLagrangian(BoundConstrainedNLPModel):
     u"""A bound-constrained augmented Lagrangian.
 
     In case the original NLP has general inequalities, slack variables are
@@ -14,14 +16,14 @@ class AugmentedLagrangian(NLPModel):
 
     The augmented Lagrangian is defined as:
 
-        L(x, π; ρ) := f(x) - π'c(x) + ½ ρ |c(x)|².
+        L(x, π; ρ) := f(x) - πᵀc(x) + ½ ρ ‖c(x)‖².
 
     where π are the current Lagrange multiplier estimates and ρ is the
     current penalty parameter.
     """
 
     def __init__(self, model, **kwargs):
-        """Instantiate an augmented Lagrangian model from an `NLPModel`.
+        """Initialize an augmented Lagrangian model from an `NLPModel`.
 
         :parameters:
 
@@ -32,13 +34,14 @@ class AugmentedLagrangian(NLPModel):
             :rho:  initial value for the penalty parameter (default: 10.)
             :pi:   vector of initial multipliers (default: all zero.)
         """
-        if model.m == model.nequalC:
-            self.model = model
-        else:
-            self.model = SlackModel(model, keep_variable_bounds=True, **kwargs)
+        if not isinstance(model, NLPModel):
+            raise TypeError("model should be a subclass of NLPModel")
 
-        super(AugmentedLagrangian, self).__init__(self.model.n, m=0,
-                                                  name='Al-'+self.model.name,
+        if not isinstance(model, SlackModel):
+            self.model = SlackModel(model, **kwargs)
+
+        super(AugmentedLagrangian, self).__init__(self.model.n,
+                                                  name='Al-' + self.model.name,
                                                   Lvar=self.model.Lvar,
                                                   Uvar=self.model.Uvar)
 
@@ -91,7 +94,7 @@ class AugmentedLagrangian(NLPModel):
         model = self.model
         cons = model.cons(x)
 
-        w = model.hprod(x, self.rho * cons - self.pi, v)
+        w = model.hprod(x, self.pi - self.rho * cons, v)
         J = model.jop(x)
         return w + self.rho * J.T * J * v
 
