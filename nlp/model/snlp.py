@@ -263,9 +263,6 @@ class SlackModel(NLPModel):
         Hv[:on] = model.hprod(x[:on], y, v[:on], **kwargs)
         return Hv
 
-    def hess(self, x, z=None, *args, **kwargs):
-        """Evaluate Lagrangian Hessian at (x, z)."""
-        raise NotImplementedError("Please subclass")
 
     def ghivprod(self, x, g, v, **kwargs):
         """Evaluate individual dot products (g, Hi(x)*v).
