@@ -4,7 +4,7 @@
 
 import logging
 import sys
-from nlp.model.amplmodel import AmplModel
+from nlp.model.pysparsemodel import PySparseAmplModel
 from nlp.optimize.auglag import Auglag
 from nlp.tools.logs import config_logger
 from nlp.optimize.tron import TRON
@@ -48,7 +48,10 @@ if nprobs > 1:
                 "time")
 
 for problem in sys.argv[1:]:
-    model = AmplModel(problem)
+    model = PySparseAmplModel(problem)
+    model.compute_scaling_obj()
+
+    print model.x0
     # model.compute_scaling_obj()
 
     auglag = Auglag(model, TRON, maxiter=100)
