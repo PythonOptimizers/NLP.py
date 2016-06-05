@@ -45,8 +45,7 @@ class RegSQPBFGSIterativeSolver(RegSQPSolver):
         self.rho = 0
 
         # System solve method.
-        self.iterative_outer_solver = LSMRFramework
-        self.iterative_inner_solver = RegLSMRFramework
+        self.iterative_solver = RegLSMRFramework
 
         self.HinvOp = InverseLBFGSOperator(model.n, npairs=kwargs.get(
             'qn_pairs', 6), scaling=True, **kwargs)
@@ -81,7 +80,7 @@ class RegSQPBFGSIterativeSolver(RegSQPSolver):
         shifted_rhs = self.shift_rhs(J, delta, rhs)
 
         self.log.debug('Solving linear system')
-        solver = self.iterative_inner_solver(J.T)
+        solver = self.iterative_solver(J.T)
         N = self.Im / delta
         dy_tilde, istop, itn, normr, normar, normA, condA, normx = solver.solve(-shifted_rhs, M=self.HinvOp, N=N, damp=1.0,
                                                                                 atol=itref_threshold, etol=itref_threshold,
