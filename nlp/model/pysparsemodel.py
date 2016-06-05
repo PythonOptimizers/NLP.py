@@ -56,8 +56,8 @@ try:
         def A(self, *args, **kwargs):
             """Evaluate sparse Jacobian of the linear part of the constraints.
 
-            Useful to obtain constraint matrix when problem is a linear programming
-            problem.
+            Useful to obtain constraint matrix when problem is a linear
+            programming problem.
             """
             vals, rows, cols = super(PySparseAmplModel,
                                      self).A(*args, **kwargs)
