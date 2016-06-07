@@ -9,30 +9,31 @@ import numpy as np
 
 
 class AugmentedLagrangian(BoundConstrainedNLPModel):
-    u"""A bound-constrained augmented Lagrangian.
+    u"""A bound-constrained proximal augmented Lagrangian.
 
     In case the original NLP has general inequalities, slack variables are
     introduced.
 
-    The augmented Lagrangian is defined as:
+    The proximal augmented Lagrangian is defined as:
 
-        L(x, π; ρ) := f(x) - πᵀc(x) + ½ ρ ‖c(x)‖².
+        L(x, π; ρ) := f(x) - πᵀc(x) + ½ δ ‖c(x)‖² + ½ ρ ‖x - xₖ‖²,
 
-    where π are the current Lagrange multiplier estimates and ρ is the
-    current penalty parameter.
+    where π are the current Lagrange multiplier estimates, δ is the
+    current penalty parameter, ρ is the current proximal parameter and xₖ is
+    a fixed vector.
     """
 
     def __init__(self, model, **kwargs):
-        """Initialize an augmented Lagrangian model from an `NLPModel`.
+        """Initialize a proximal augmented Lagrangian model from an `NLPModel`.
 
         :parameters:
-
             :model:   original NLPModel.
 
         :keywords:
-
-            :rho:  initial value for the penalty parameter (default: 10.)
-            :pi:   vector of initial multipliers (default: all zero.)
+            :penalty:  initial value for the penalty parameter (default: 10)
+            :prox:     initial value for the proximal parameter (default: 0)
+            :pi:       vector of initial multipliers (default: model.pi0)
+            :xk:       initial value of the proximal vector (default: all zero)
         """
         if not isinstance(model, NLPModel):
             raise TypeError("model should be a subclass of NLPModel")
@@ -45,21 +46,36 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
                                                   Lvar=self.model.Lvar,
                                                   Uvar=self.model.Uvar)
 
-        self.rho_init = kwargs.get('rho', 10.)
-        self._rho = self.rho_init
+        self.penalty_init = kwargs.get('penalty', 10.)
+        self._penalty = self.penalty_init
+
+        self.prox_init = kwargs.get("prox", 0.)
+        self._prox = self.prox_init
 
         self.pi0 = np.zeros(self.model.m)
         self.pi = self.pi0.copy()
         self.x0 = self.model.x0
 
-    @property
-    def rho(self):
-        """Current penalty parameter."""
-        return self._rho
+        self.xk = kwargs.get("xk",
+                             np.zeros(self.n) if self.prox_init > 0 else None)
 
-    @rho.setter
-    def rho(self, value):
-        self._rho = max(0, value)
+    @property
+    def penalty(self):
+        """Current penalty parameter."""
+        return self._penalty
+
+    @penalty.setter
+    def penalty(self, value):
+        self._penalty = max(0, value)
+
+    @property
+    def prox(self):
+        """Current proximal parameter."""
+        return self._prox
+
+    @prox.setter
+    def prox(self, value):
+        self._prox = max(0, value)
 
     def obj(self, x, **kwargs):
         """Evaluate augmented Lagrangian."""
@@ -67,7 +83,9 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
 
         alfunc = self.model.obj(x)
         alfunc -= np.dot(self.pi, cons)
-        alfunc += 0.5 * self.rho * np.dot(cons, cons)
+        alfunc += 0.5 * self.penalty * np.dot(cons, cons)
+        if self.prox > 0:
+            alfunc += 0.5 * self.prox * np.linalg.norm(x - self.xk)**2
         return alfunc
 
     def grad(self, x, **kwargs):
@@ -75,7 +93,9 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
         model = self.model
         J = model.jop(x)
         cons = model.cons(x)
-        algrad = model.grad(x) + J.T * (self.rho * cons - self.pi)
+        algrad = model.grad(x) + J.T * (self.penalty * cons - self.pi)
+        if self.prox > 0:
+            algrad += self.prox * (x - self.xk)
         return algrad
 
     def dual_feasibility(self, x, **kwargs):
@@ -94,9 +114,12 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
         model = self.model
         cons = model.cons(x)
 
-        w = model.hprod(x, self.pi - self.rho * cons, v)
+        w = model.hprod(x, self.pi - self.penalty * cons, v)
         J = model.jop(x)
-        return w + self.rho * J.T * J * v
+        Hv = w + self.penalty * J.T * J * v
+        if self.prox > 0:
+            Hv += self.prox * v
+        return Hv
 
     def hess(self, *args, **kwargs):
         """Obtain Lagrangian Hessian as a linear operator.
