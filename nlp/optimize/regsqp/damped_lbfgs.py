@@ -43,14 +43,16 @@ class DampedInverseLBFGSOperator(InverseLBFGSOperator):
         By = self.qn_matvec(new_y)
         yBy = np.dot(new_y, By)
         # print 'yBy:', yBy
-        if np.dot(new_y, new_s) >= self.eta * yBy:
+        # if np.dot(new_y, new_s) >= self.eta * yBy:
+        if ys >= self.eta * yBy:
             theta = 1.0
         else:
             theta = (1 - self.eta) * yBy / (yBy - ys)
 
         # print 'theta:', theta
         s = theta * new_s + (1 - theta) * By
-        ys = np.dot(s, new_y)
+        ys = theta * ys + (1 - theta) * yBy
+        # ys = np.dot(s, new_y)
         # print 'ys:', ys
 
         insert = self.insert
@@ -91,11 +93,11 @@ class DampedLBFGSOperator(LBFGSOperator):
         reached.
         """
         ys = np.dot(new_s, new_y)
-
         Bs = self.qn_matvec(new_s)
         sBs = np.dot(new_s, Bs)
         # print "sBs: ", sBs
-        if np.dot(new_y, new_s) >= self.eta * sBs:
+        # if np.dot(new_y, new_s) >= self.eta * sBs:
+        if ys >= self.eta * sBs:
             theta = 1.0
         else:
             theta = (1 - self.eta) * sBs / (sBs - ys)
@@ -103,7 +105,8 @@ class DampedLBFGSOperator(LBFGSOperator):
         # print 'theta: ', theta
 
         y = theta * new_y + (1 - theta) * Bs
-        ys = np.dot(new_s, y)
+        ys = theta * ys + (1 - theta) * sBs
+        # ys = np.dot(new_s, y)
 
         # print 'ys:', ys
 
