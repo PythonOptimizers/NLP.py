@@ -47,7 +47,6 @@ class RegSQPSolver(object):
         self.theta = kwargs.get('theta', 0.99)
         self.itermax = kwargs.get('maxiter', max(100, 10 * model.n))
         self.save_g = kwargs.get('save_g', False)
-        self.qn = kwargs.get('qn', False)
 
         # Max number of times regularization parameters are increased.
         self.bump_max = kwargs.get('bump_max', 5)
@@ -56,19 +55,10 @@ class RegSQPSolver(object):
         self.LBL = None
 
         # Set regularization parameters.
-        if self.qn:
-            self.rho = 0
-        else:
-            self.rho = kwargs.get('rho', 1.0)
         self.rho_min = 1.0e-8
-        self.delta = kwargs.get('delta', 1.0)
+        self.rho = max(self.rho_min, kwargs.get('rho', 1.0))
         self.delta_min = 1.0e-8
-
-        # Check input parameters.
-        if self.rho < 0.0:
-            self.rho = self.rho_min
-        if self.delta < 0.0:
-            self.delta = 0.0
+        self.delta = max(self.delta_min, kwargs.get('delta', 1.0))
 
         # Initialize format strings for display
         self.hformat = "%-5s  %8s  %7s  %7s  %6s  %8s  %8s"
@@ -86,17 +76,20 @@ class RegSQPSolver(object):
         return
 
     def update_linear_system(self, x, y, delta, return_H=False, **kwargs):
-        # [ H+ρI      J' ] [∆x] = [ -g + J'y ]
-        # [    J     -δI ] [∆y]    [ -c       ]
-        #
-        # For now H is the exact Hessian of the Lagrangian
+        """Assemble main saddle-point matrix.
+
+        [ H+ρI      J' ] [∆x] = [ -g + J'y ]
+        [    J     -δI ] [∆y]   [ -c       ]
+
+        For now H is the exact Hessian of the Lagrangian.
+        """
         self.log.debug('Entering Update Linear System')
 
         # Some shortcuts for convenience
         model = self.model
         n = model.n
         m = model.m
-        self.K = ps.PysparseMatrix(nrow=n + m, ncol=n + m, symmetric=True)
+        self.K = ps.PysparseMatrix(nrow=n+m, ncol=n+m, symmetric=True)
 
         # contribution of the Hessian
         H = model.hess(x, z=y, **kwargs)
@@ -110,7 +103,7 @@ class RegSQPSolver(object):
         # contribution of the Jacobian
         J = model.jac(x)
         (val, irow, jcol) = J.find()
-        self.K.put(val, (n + irow).tolist(), jcol.tolist())
+        self.K.put(val, (n + irow).tolist(), jcol.tolist())  # dpo: tolist() necessary?
 
         # dual regularization
         self.K.put(-delta * np.ones(m), range(n, n + m), range(n, m + n))
@@ -127,20 +120,19 @@ class RegSQPSolver(object):
 
     def update_rhs(self, rhs, g, J, y, c):
         n = self.model.n
-        rhs[:n] = -g + J.T * y
+        rhs[:n] = -g + J.T * y  # dpo: use in-place operations
         rhs[n:] = -c
         return
 
     def update_delta(self, delta, Fnorm):
-
         alpha = 0.9
-        gamma = 0.1
+        gamma = 1.1
         delta = max(
-            min(Fnorm, min(alpha * delta, delta**(1 + gamma))), self.delta_min)
-
+            min(Fnorm, min(alpha * delta, delta**gamma)), self.delta_min)
         return delta
 
     def phi(self, x, y, rho, delta, x0, f=None, c=None):
+        # dpo: this function should be in its own class as a merit function.
         model = self.model
         if f is None:
             f = model.obj(x)
@@ -148,6 +140,8 @@ class RegSQPSolver(object):
             c = model.cons(x) - model.Lcon
         phi = f - np.dot(c, y) + 0.5 / delta * \
             norm2(c)**2  # + 0.5 * rho * norm2(x - x0)**2
+            # dpo: rho is needed here! What is x0? It should be the current
+            # iterate. Is that self.x?
         return phi
 
     def dphi(self, x, y, rho, delta, x0, g=None, c=None, J=None,):
@@ -159,6 +153,7 @@ class RegSQPSolver(object):
         if J is None:
             J = model.jop(x)
         dphi = g - J.T * (y - c / delta)  # + rho * (x - x0)
+        # dpo: same comment about rho.
         return dphi
 
     def backtracking_linesearch(self, x, y, dx, delta,
