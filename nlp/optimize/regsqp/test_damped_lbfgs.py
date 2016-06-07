@@ -1,13 +1,13 @@
 """Test damped LBFGS linear operators."""
 
 from __future__ import division
-import unittest
+from unittest import TestCase
 import numpy as np
 from damped_lbfgs import DampedLBFGSOperator, DampedInverseLBFGSOperator
 from pykrylov.tools import check_symmetric, check_positive_definite
 
 
-class TestDampedLBFGSOperator(unittest.TestCase):
+class TestDampedLBFGSOperator(TestCase):
     """Test the damped LBFGS linear operators."""
 
     def setUp(self):
