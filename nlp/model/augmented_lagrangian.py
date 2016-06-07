@@ -67,6 +67,7 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
     @penalty.setter
     def penalty(self, value):
         self._penalty = max(0, value)
+        self.logger.debug("setting penalty parameter to %7.1e", self.penalty)
 
     @property
     def prox(self):
@@ -76,6 +77,7 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
     @prox.setter
     def prox(self, value):
         self._prox = max(0, value)
+        self.logger.debug("setting prox parameter to %7.1e", self.prox)
 
     def obj(self, x, **kwargs):
         """Evaluate augmented Lagrangian."""
