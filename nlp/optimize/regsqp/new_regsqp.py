@@ -7,7 +7,7 @@ try:
     from hsl.solvers.pyma57 import PyMa57Solver as LBLSolver
 except ImportError:
     from hsl.solvers.pyma27 import PyMa27Solver as LBLSolver
-
+from nlp.model.nlpmodel import UnconstrainedNLPModel
 from nlp.tools.exceptions import UserExitRequest
 import pysparse.sparse.pysparseMatrix as ps
 
@@ -16,6 +16,46 @@ import logging
 import sys
 
 np.set_printoptions(precision=16, formatter={'float': '{:0.8g}'.format})
+
+
+class AugmentedLagrangianMeritFunction(UnconstrainedNLPModel):
+
+    def __init__(self, model, **kwargs):
+        u"""Instantiate a :class:`InfeasibilityModel`.
+
+        :parameters:
+            :model: ```NLPModel```.
+        """
+        self.model = model
+        super(AugmentedLagrangianMeritFunction,
+              self).__init__(model.n, **kwargs)
+
+    def obj(self, x, y, rho, delta, x0, f=None, c=None):
+        u"""Evaluate ϕ(x, y; ρ, δ)."""
+        model = self.model
+        if f is None:
+            f = model.obj(x)
+        if c is None:
+            c = model.cons(x) - model.Lcon
+        phi = f - np.dot(c, y) + 0.5 / delta * \
+            norm2(c)**2  # + 0.5 * rho * norm2(x - x0)**2
+        return phi
+
+    def grad(self, x, y, rho, delta, x0, g=None, c=None, J=None):
+        u"""Evaluate ∇ ϕ(x, y; ρ, δ)."""
+        model = self.model
+        if g is None:
+            g = model.grad(x)
+        if c is None:
+            c = model.cons(x)
+            c -= model.Lcon
+        if J is None:
+            J = model.jop(x)
+        dphi = -c
+        dphi /= delta
+
+        dphi = g - J.T * (y - c / delta)  # + rho * (x - x0)
+        return dphi
 
 
 class RegSQPSolver(object):
@@ -31,7 +71,7 @@ class RegSQPSolver(object):
         :keywords:
             :model: `NLPModel` instance.
             :abstol: Absolute stopping tolerance
-            :reltol: relative required accuracy for ‖[g-J'y ; c]‖
+            :reltol: relative required accuracy for ‖[g-Jᵀy ; c]‖
             :theta: sufficient decrease condition for the inner iterations
             :itermax: maximum number of iterations allowed
             :bump_max: Max number of times regularization parameters are
@@ -52,6 +92,7 @@ class RegSQPSolver(object):
         # Max number of times regularization parameters are increased.
         self.bump_max = kwargs.get('bump_max', 5)
 
+        self.merit_function = AugmentedLagrangianMeritFunction(model)
         self.K = None
         self.LBL = None
 
@@ -85,7 +126,7 @@ class RegSQPSolver(object):
         self.log.propagate = False
         return
 
-    def update_linear_system(self, x, y, delta, return_H=False, **kwargs):
+    def assemble_linear_system(self, x, y, delta, return_H=False, **kwargs):
         # [ H+ρI      J' ] [∆x] = [ -g + J'y ]
         # [    J     -δI ] [∆y]    [ -c       ]
         #
@@ -127,7 +168,8 @@ class RegSQPSolver(object):
 
     def update_rhs(self, rhs, g, J, y, c):
         n = self.model.n
-        rhs[:n] = -g + J.T * y
+        rhs[:n] = -g
+        rhs[:n] += J.T * y
         rhs[n:] = -c
         return
 
@@ -139,27 +181,6 @@ class RegSQPSolver(object):
             min(Fnorm, min(alpha * delta, delta**(1 + gamma))), self.delta_min)
 
         return delta
-
-    def phi(self, x, y, rho, delta, x0, f=None, c=None):
-        model = self.model
-        if f is None:
-            f = model.obj(x)
-        if c is None:
-            c = model.cons(x) - model.Lcon
-        phi = f - np.dot(c, y) + 0.5 / delta * \
-            norm2(c)**2  # + 0.5 * rho * norm2(x - x0)**2
-        return phi
-
-    def dphi(self, x, y, rho, delta, x0, g=None, c=None, J=None,):
-        model = self.model
-        if g is None:
-            g = model.grad(x)
-        if c is None:
-            c = model.cons(x) - model.Lcon
-        if J is None:
-            J = model.jop(x)
-        dphi = g - J.T * (y - c / delta)  # + rho * (x - x0)
-        return dphi
 
     def backtracking_linesearch(self, x, y, dx, delta,
                                 f=None, g=None, c=None, J=None,
@@ -175,9 +196,10 @@ class RegSQPSolver(object):
         self.log.debug('Entering backtracking linesearch')
 
         x_trial = x + dx
-        phi = self.phi(x, y, self.rho, delta, x, f, c)
-        phi_trial = self.phi(x_trial, y, self.rho, delta, x_trial)
-        g = self.dphi(x, y, self.rho, delta, x, g, c, J)
+        phi = self.merit_function.obj(x, y, self.rho, delta, x, f, c)
+        phi_trial = self.merit_function.obj(x_trial, y, self.rho,
+                                            delta, x_trial)
+        g = self.merit_function.grad(x, y, self.rho, delta, x, g, c, J)
 
         slope = np.dot(g, dx)
         self.log.debug('    slope: %6.2e', slope)
@@ -192,7 +214,8 @@ class RegSQPSolver(object):
             bk = bk + 1
             alpha /= 1.2
             x_trial = x + alpha * dx
-            phi_trial = self.phi(x_trial, y, self.rho, delta, x_trial)
+            phi_trial = self.merit_function.obj(x_trial, y, self.rho,
+                                                delta, x_trial)
 
         self.log.debug('    alpha=%3.2e, phi0=%3.2e, phi=%3.2e',
                        alpha, phi, phi_trial)
@@ -203,7 +226,7 @@ class RegSQPSolver(object):
     def solve_linear_system(self, rhs, delta,
                             diagH=None, J=None,
                             itref_threshold=1.0e-10,
-                            nitrefmax=5, **kwargs):
+                            nitrefmax=5, check_inertia=False, **kwargs):
 
         self.log.debug('Solving linear system')
         n = self.model.n
@@ -214,7 +237,7 @@ class RegSQPSolver(object):
         factorized = False
         degenerate = False
         nb_bump = 0
-        if not self.LBL.isFullRank:
+        if self.LBL.inertia != (self.model.nvar, self.model.ncon, 0) and check_inertia:
             if diagH is None:
                 msg = 'A correction of inertia is needed, but diag_H is not '
                 msg += 'provided.'
@@ -225,9 +248,9 @@ class RegSQPSolver(object):
                 self.LBL = LBLSolver(self.K, factorize=True, sqd=True)
                 factorized = True
 
-                # If the augmented matrix does not have full rank, bump up the
-                # regularization parameters.
-                if not self.LBL.isFullRank:
+                # If the augmented matrix does not have correct inertia,
+                # bump up the regularization parameter ρ.
+                if self.LBL.inertia != (self.model.nvar, self.model.ncon, 0):
                     if self.rho > 0:
                         self.rho *= 100
                     else:
@@ -237,7 +260,7 @@ class RegSQPSolver(object):
                     factorized = False
 
         # Abandon if regularization is unsuccessful.
-        if not self.LBL.isFullRank and degenerate:
+        if self.LBL.inertia != (self.model.nvar, self.model.ncon, 0) and degenerate:
             status = '    Unable to regularize sufficiently.'
             short_status = 'degn'
             finished = True
@@ -300,7 +323,7 @@ class RegSQPSolver(object):
         Fnorm = Fnorm0 = np.sqrt(grad_L_norm**2 + cnorm**2)
 
         # Find a better initial point
-        self.update_linear_system(x, y, 0)
+        self.assemble_linear_system(x, y, 0)
         self.update_rhs(rhs, g, J, y, c)
 
         status, short_status, finished, nbumps, dx, dy = self.solve_linear_system(
@@ -349,11 +372,11 @@ class RegSQPSolver(object):
             # Step 2
             delta = self.update_delta(delta, Fnorm)
 
-            diagH, H = self.update_linear_system(x, y, delta, return_H=True)
+            diagH, H = self.assemble_linear_system(x, y, delta, return_H=True)
             self.update_rhs(rhs, g, J, y, c)
 
             status, short_status, finished, nbumps, dx, dy = self.solve_linear_system(
-                rhs, delta, diagH, J)
+                rhs, delta, diagH, J, check_inertia=True)
 
             # Step 3
             epsilon = 10 * delta  # a better way to set epsilon dynamically?
@@ -390,12 +413,12 @@ class RegSQPSolver(object):
                     self.gL_old = grad_L_trial.copy()
 
                     # Step 3: Compute a new direction p_j
-                    diagH, H = self.update_linear_system(x_trial, y_trial,
-                                                         delta, return_H=True)
+                    diagH, H = self.assemble_linear_system(x_trial, y_trial,
+                                                           delta, return_H=True)
                     self.update_rhs(rhs, g_trial, J_trial, y_trial, c_trial)
 
                     status, short_status, finished, nbumps, dx_trial, _ = self.solve_linear_system(
-                        rhs, delta, diagH, J, inner=True)
+                        rhs, delta, diagH, J, inner=True, check_inertia=True)
 
                     # Break inner iteration loop if inertia correction fails
                     # if finished:
