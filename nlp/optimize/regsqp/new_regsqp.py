@@ -1,14 +1,19 @@
 # -*- coding: utf-8 -*-
 
 from nlp.model.pysparsemodel import PySparseAmplModel
+from nlp.model.augmented_lagrangian import AugmentedLagrangian
+from nlp.model.linemodel import C1LineModel
+from nlp.ls import ArmijoLineSearch
+
+from nlp.tools.exceptions import UserExitRequest
 from nlp.tools.norms import norm2
 from nlp.tools.timing import cputime
+
 try:
     from hsl.solvers.pyma57 import PyMa57Solver as LBLSolver
 except ImportError:
     from hsl.solvers.pyma27 import PyMa27Solver as LBLSolver
 
-from nlp.tools.exceptions import UserExitRequest
 import pysparse.sparse.pysparseMatrix as ps
 
 import numpy as np
@@ -24,15 +29,15 @@ class RegSQPSolver(object):
     """
 
     def __init__(self, model, **kwargs):
-        u"""
-        Instantiate a regularized SQP framework for a given equality-constrained
-        problem.
+        u"""Regularized SQP framework for an equality-constrained problem.
 
         :keywords:
             :model: `NLPModel` instance.
             :abstol: Absolute stopping tolerance
             :reltol: relative required accuracy for ‖[g-J'y ; c]‖
             :theta: sufficient decrease condition for the inner iterations
+            :prox: initial proximal parameter
+            :penalty: initial penalty parameter
             :itermax: maximum number of iterations allowed
             :bump_max: Max number of times regularization parameters are
                        increased when a factorization fails (default 5).
@@ -55,10 +60,14 @@ class RegSQPSolver(object):
         self.LBL = None
 
         # Set regularization parameters.
-        self.rho_min = 1.0e-8
-        self.rho = max(self.rho_min, kwargs.get('rho', 1.0))
-        self.delta_min = 1.0e-8
-        self.delta = max(self.delta_min, kwargs.get('delta', 1.0))
+        self.prox_min = 1.0e-8
+        self.penalty_min = 1.0e-8
+        prox = max(self.prox_min, kwargs.get('prox', 1.0))
+        penalty = max(self.penalty_min, kwargs.get('penalty', 1.0))
+        self.merit = AugmentedLagrangian(model,
+                                         penalty=1./penalty,
+                                         prox=prox,
+                                         xk=model.x0.copy())
 
         # Initialize format strings for display
         self.hformat = "%-5s  %8s  %7s  %7s  %6s  %8s  %8s"
@@ -75,7 +84,7 @@ class RegSQPSolver(object):
         self.log.propagate = False
         return
 
-    def update_linear_system(self, x, y, delta, return_H=False, **kwargs):
+    def assemble_linear_system(self, x, y, delta, return_H=False, **kwargs):
         """Assemble main saddle-point matrix.
 
         [ H+ρI      J' ] [∆x] = [ -g + J'y ]
@@ -83,7 +92,7 @@ class RegSQPSolver(object):
 
         For now H is the exact Hessian of the Lagrangian.
         """
-        self.log.debug('Entering Update Linear System')
+        self.log.debug('assembling linear system')
 
         # Some shortcuts for convenience
         model = self.model
@@ -108,8 +117,6 @@ class RegSQPSolver(object):
         # dual regularization
         self.K.put(-delta * np.ones(m), range(n, n + m), range(n, m + n))
 
-        self.log.debug('Leaving Update Linear System')
-
         if return_H:
             return diagH, H
         else:
@@ -120,80 +127,81 @@ class RegSQPSolver(object):
 
     def update_rhs(self, rhs, g, J, y, c):
         n = self.model.n
-        rhs[:n] = -g + J.T * y  # dpo: use in-place operations
+        rhs[:n] = -g + J.T * y
         rhs[n:] = -c
         return
 
-    def update_delta(self, delta, Fnorm):
+    def new_penalty(self, penalty, Fnorm):
+        """Return updated penalty parameter value."""
         alpha = 0.9
         gamma = 1.1
-        delta = max(
-            min(Fnorm, min(alpha * delta, delta**gamma)), self.delta_min)
-        return delta
+        penalty = max(min(Fnorm, min(alpha * penalty, penalty**gamma)),
+                      self.penalty_min)
+        return penalty
 
-    def phi(self, x, y, rho, delta, x0, f=None, c=None):
-        # dpo: this function should be in its own class as a merit function.
-        model = self.model
-        if f is None:
-            f = model.obj(x)
-        if c is None:
-            c = model.cons(x) - model.Lcon
-        phi = f - np.dot(c, y) + 0.5 / delta * \
-            norm2(c)**2  # + 0.5 * rho * norm2(x - x0)**2
-            # dpo: rho is needed here! What is x0? It should be the current
-            # iterate. Is that self.x?
-        return phi
+    # def phi(self, x, y, rho, delta, x0, f=None, c=None):
+    #     # dpo: this function should be in its own class as a merit function.
+    #     model = self.model
+    #     if f is None:
+    #         f = model.obj(x)
+    #     if c is None:
+    #         c = model.cons(x) - model.Lcon
+    #     phi = f - np.dot(c, y) + 0.5 / delta * \
+    #         norm2(c)**2  # + 0.5 * rho * norm2(x - x0)**2
+    #         # dpo: rho is needed here! What is x0? It should be the current
+    #         # iterate. Is that self.x?
+    #     return phi
+    #
+    # def dphi(self, x, y, rho, delta, x0, g=None, c=None, J=None,):
+    #     model = self.model
+    #     if g is None:
+    #         g = model.grad(x)
+    #     if c is None:
+    #         c = model.cons(x) - model.Lcon
+    #     if J is None:
+    #         J = model.jop(x)
+    #     dphi = g - J.T * (y - c / delta)  # + rho * (x - x0)
+    #     # dpo: same comment about rho.
+    #     return dphi
 
-    def dphi(self, x, y, rho, delta, x0, g=None, c=None, J=None,):
-        model = self.model
-        if g is None:
-            g = model.grad(x)
-        if c is None:
-            c = model.cons(x) - model.Lcon
-        if J is None:
-            J = model.jop(x)
-        dphi = g - J.T * (y - c / delta)  # + rho * (x - x0)
-        # dpo: same comment about rho.
-        return dphi
-
-    def backtracking_linesearch(self, x, y, dx, delta,
-                                f=None, g=None, c=None, J=None,
-                                bkmax=50, armijo=1.0e-2):
-        """
-        Perform a simple backtracking linesearch on the merit function
-        from `x` along `step`.
-
-        Return (new_x, new_y, phi, steplength), where `new_x = x + steplength * step`
-        satisfies the Armijo condition and `phi` is the merit function value at
-        this new point.
-        """
-        self.log.debug('Entering backtracking linesearch')
-
-        x_trial = x + dx
-        phi = self.phi(x, y, self.rho, delta, x, f, c)
-        phi_trial = self.phi(x_trial, y, self.rho, delta, x_trial)
-        g = self.dphi(x, y, self.rho, delta, x, g, c, J)
-
-        slope = np.dot(g, dx)
-        self.log.debug('    slope: %6.2e', slope)
-
-        if slope >= 0:
-            raise ValueError('ERROR: negative slope')
-
-        bk = 0
-        alpha = 1.0
-        while bk < bkmax and \
-                phi_trial >= phi + armijo * alpha * slope:
-            bk = bk + 1
-            alpha /= 1.2
-            x_trial = x + alpha * dx
-            phi_trial = self.phi(x_trial, y, self.rho, delta, x_trial)
-
-        self.log.debug('    alpha=%3.2e, phi0=%3.2e, phi=%3.2e',
-                       alpha, phi, phi_trial)
-        self.log.debug('Leaving backtracking linesearch')
-
-        return (x_trial, phi_trial, alpha)
+    # def backtracking_linesearch(self, x, y, dx, delta,
+    #                             f=None, g=None, c=None, J=None,
+    #                             bkmax=50, armijo=1.0e-2):
+    #     """
+    #     Perform a simple backtracking linesearch on the merit function
+    #     from `x` along `step`.
+    #
+    #     Return (new_x, new_y, phi, steplength), where `new_x = x + steplength * step`
+    #     satisfies the Armijo condition and `phi` is the merit function value at
+    #     this new point.
+    #     """
+    #     self.log.debug('Entering backtracking linesearch')
+    #
+    #     x_trial = x + dx
+    #     phi = self.phi(x, y, self.rho, delta, x, f, c)
+    #     phi_trial = self.phi(x_trial, y, self.rho, delta, x_trial)
+    #     g = self.dphi(x, y, self.rho, delta, x, g, c, J)
+    #
+    #     slope = np.dot(g, dx)
+    #     self.log.debug('    slope: %6.2e', slope)
+    #
+    #     if slope >= 0:
+    #         raise ValueError('ERROR: negative slope')
+    #
+    #     bk = 0
+    #     alpha = 1.0
+    #     while bk < bkmax and \
+    #             phi_trial >= phi + armijo * alpha * slope:
+    #         bk = bk + 1
+    #         alpha /= 1.2
+    #         x_trial = x + alpha * dx
+    #         phi_trial = self.phi(x_trial, y, self.rho, delta, x_trial)
+    #
+    #     self.log.debug('    alpha=%3.2e, phi0=%3.2e, phi=%3.2e',
+    #                    alpha, phi, phi_trial)
+    #     self.log.debug('Leaving backtracking linesearch')
+    #
+    #     return (x_trial, phi_trial, alpha)
 
     def solve_linear_system(self, rhs, delta,
                             diagH=None, J=None,
@@ -201,14 +209,36 @@ class RegSQPSolver(object):
                             nitrefmax=5, **kwargs):
 
         self.log.debug('Solving linear system')
-        n = self.model.n
+        nvar = self.model.nvar
+        ncon = self.model.ncon
+        prox_factor = 10
+        penalty_factor = 10
 
-        self.rho = self.rho_min
-        # Perform sparsity pattern analysis on the system.
-        self.LBL = LBLSolver(self.K, factorize=True, sqd=True)
-        factorized = False
-        degenerate = False
+        self.LBL = LBLSolver(self.K, factorize=True)
+        second_order_sufficient = self.LBL.inertia == (nvar, ncon, 0)
+        full_rank = self.LBL.isFullRank
+
         nb_bump = 0
+        while not (second_order_sufficient and full_rank):
+            if not second_order_sufficient:
+                # further convexify
+                self.K.addAt(prox_factor * self.merit.prox * np.ones(nvar),
+                             range(nvar), range(nvar))
+                self.merit.prox *= prox_factor + 1
+
+            if not full_rank:
+                # further regularize; this isn't quite supported by theory
+                # the augmented Lagrangian uses 1/δ
+                self.K.addAt(-penalty_factor / self.merit.penalty * np.ones(ncon),
+                             range(nvar, nvar + ncon),
+                             range(nvar, nvar + ncon))
+                self.merit.penalty /= penalty_factor + 1
+
+            self.LBL = LBLSolver(self.K, factorize=True)
+            second_order_sufficient = self.LBL.inertia == (nvar, ncon, 0)
+            full_rank = self.LBL.isFullRank
+            nb_bump += 1
+
         if not self.LBL.isFullRank:
             if diagH is None:
                 msg = 'A correction of inertia is needed, but diag_H is not '
@@ -276,6 +306,8 @@ class RegSQPSolver(object):
         self.status = "fail"
         self.tsolve = 0
 
+        ls_fmt = "%7.1e  %8.1e"
+
         # Get initial objective value
         print 'x0: ', x
         self.f0 = model.obj(x)
@@ -295,7 +327,7 @@ class RegSQPSolver(object):
         Fnorm = Fnorm0 = np.sqrt(grad_L_norm**2 + cnorm**2)
 
         # Find a better initial point
-        self.update_linear_system(x, y, 0)
+        self.assemble_linear_system(x, y, 0)
         self.update_rhs(rhs, g, J, y, c)
 
         status, short_status, finished, nbumps, dx, dy = self.solve_linear_system(
@@ -342,9 +374,9 @@ class RegSQPSolver(object):
             self.gL_old = grad_L.copy()
 
             # Step 2
-            delta = self.update_delta(delta, Fnorm)
+            self.merit.penalty = 1 / self.new_penalty(delta, Fnorm)
 
-            diagH, H = self.update_linear_system(x, y, delta, return_H=True)
+            diagH, H = self.assemble_linear_system(x, y, delta, return_H=True)
             self.update_rhs(rhs, g, J, y, c)
 
             status, short_status, finished, nbumps, dx, dy = self.solve_linear_system(
@@ -385,7 +417,7 @@ class RegSQPSolver(object):
                     self.gL_old = grad_L_trial.copy()
 
                     # Step 3: Compute a new direction p_j
-                    diagH, H = self.update_linear_system(x_trial, y_trial,
+                    diagH, H = self.assemble_linear_system(x_trial, y_trial,
                                                          delta, return_H=True)
                     self.update_rhs(rhs, g_trial, J_trial, y_trial, c_trial)
 
@@ -396,7 +428,18 @@ class RegSQPSolver(object):
                     # if finished:
                     #     break
 
-                    # Step 4: Backtracking a la Armijo
+                    # Step 4: Armijo backtracking linesearch
+                    self.merit.pi = y_trial
+                    line_model = C1LineModel(self.merit, x_trial, dx_trial)
+                    ls = ArmijoLineSearch(line_model, bkmax=5, decr=1.75)
+
+                    try:
+                        for step in ls:
+                            self.log.debug(ls_fmt, step, ls.trial_value)
+
+                    except LineSearchFailure:
+                        step_status = "Rej"
+
                     (x_trial, phi_kj, alpha) = self.backtracking_linesearch(
                         x_trial, y_trial, dx_trial, delta)
 
