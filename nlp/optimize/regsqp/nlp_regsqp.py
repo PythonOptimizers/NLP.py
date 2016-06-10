@@ -12,20 +12,22 @@ from nlp.tools.logs import config_logger
 def regsqp_stats(regsqp):
     """Obtain RegSQP statistics and indicate failures with negatives."""
     if regsqp.short_status in ("opt"):
-        it = regsqp.iter
+        it = regsqp.itn
         fc, gc = regsqp.model.obj.ncalls, regsqp.model.grad.ncalls
+        hc = regsqp.model.hess.ncalls
         jprod = regsqp.model.jprod.ncalls + regsqp.model.jtprod.ncalls
         cn = regsqp.cnorm
-        gLn = regsqp.grad_L_norm
+        gLn = regsqp.gLnorm
         ts = regsqp.tsolve
     else:
-        it = -regsqp.iter
+        it = -regsqp.itn
         fc, gc = -regsqp.model.obj.ncalls, -regsqp.model.grad.ncalls
+        hc = -regsqp.model.hess.hcalls
         jprod = -(regsqp.model.jprod.ncalls + regsqp.model.jtprod.ncalls)
         cn = -1.0 if regsqp.cnorm is None else -regsqp.cnorm
-        gLn = -1.0 if regsqp.grad_L_norm is None else -regsqp.grad_L_norm
+        gLn = -1.0 if regsqp.gLnorm is None else -regsqp.gLnorm
         ts = -1.0 if regsqp.tsolve is None else -regsqp.tsolve
-    return (it, fc, gc, jprod, cn, gLn, ts)
+    return (it, fc, gc, hc, jprod, cn, gLn, ts)
 
 
 desc = "Regularized SQP method for equality-constrained problems based."
@@ -95,13 +97,11 @@ for problem in other:
     try:
         regsqp.solve()
         status = regsqp.short_status
-        niter, fcalls, gcalls, cnorm, jprod, gLn, tsolve = regsqp_stats(
-            regsqp)
+        niter, fcalls, gcalls, hcalls, cnorm, jprod, gLn, tsolve = regsqp_stats(regsqp)
     except:
         msg = sys.exc_info()[1].message
         status = msg if len(msg) > 0 else "xfail"  # unknown failure
-        niter, fcalls, gcalls, cnorm, jprod, gLn, tsolve = regsqp_stats(
-            regsqp)
+        niter, fcalls, gcalls, hcalls, cnorm, jprod, gLn, tsolve = regsqp_stats(regsqp)
 
     prob_name = os.path.basename(problem)
     if prob_name[-3:] == '.nl':
@@ -126,6 +126,11 @@ if nprobs == 1 and niter >= 0:
     log.info('  Number of iterations         : %-d', niter)
     log.info('  Number of function evals     : %-d', fcalls)
     log.info('  Number of gradient evals     : %-d', gcalls)
-    log.info('  Number of J prod             : %-d', jprod)
+    log.info('  Number of Jacobian evals     : %-d',
+        0 if args.quasi_newton else gcalls)
+    log.info('  Number of Jacobian products  : %-d',
+        jprod if args.quasi_newton else 0)
+    log.info('  Number of Hessian evals      : %-d',
+        0 if args.quasi_newton else hcalls)
     log.info('  Solve time                   : %-gs', tsolve)
     log.info('--------------------------------')
