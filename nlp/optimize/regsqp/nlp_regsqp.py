@@ -35,21 +35,21 @@ desc += "By default, exact second derivatives are used."
 parser = ArgumentParser(description=desc)
 
 parser.add_argument("-a", "--abstol", action="store", type=float,
-                    default=1.0e-6, dest="abstol",
+                    default=1.0e-7, dest="abstol",
                     help="Absolute stopping tolerance")
 parser.add_argument("-r", "--reltol", action="store", type=float,
-                    default=1.0e-8, dest="reltol",
+                    default=1.0e-6, dest="reltol",
                     help="Absolute stopping tolerance")
 parser.add_argument("-t", "--theta", action="store", type=float,
                     default=0.99, dest="theta",
-                    help="Sufficient decrease condition for the inner iterations")
+                    help="Sufficient improvement factor in outer iterations")
 parser.add_argument("-p", "--pairs", type=int,
                     default=6, dest="npairs", help="quasi-Newton memory")
 parser.add_argument("-q", "--quasi_newton", action="store_true",
                     default=False, dest="quasi_newton",
-                    help="use limited-memory BFGS approximation of Hessian of the Lagrangian")
+                    help="use L-BFGS approximations of second derivatives")
 parser.add_argument("-i", "--iter", action="store", type=int, default=1000,
-                    dest="maxiter",  help="maximum number of iterations")
+                    dest="maxiter", help="maximum number of iterations")
 
 # Parse command-line arguments
 (args, other) = parser.parse_known_args()
