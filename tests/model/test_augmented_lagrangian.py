@@ -16,7 +16,7 @@ this_path = os.path.dirname(os.path.realpath(__file__))
 
 @pytest.fixture(params=[2, 5, 10])
 def rosenbrock(request):
-    return AugmentedLagrangian(Rosenbrock(request.param))
+    return AugmentedLagrangian(Rosenbrock(request.param), prox=1.0)
 
 
 def test_rosenbrock(rosenbrock):
@@ -24,19 +24,20 @@ def test_rosenbrock(rosenbrock):
     x = np.zeros(model.nvar)
     assert (rosenbrock.nvar == model.nvar)
     assert (rosenbrock.ncon == 0)
-    assert np.allclose(rosenbrock.obj(x), model.obj(x))
+    assert np.allclose(rosenbrock.obj(x),
+                       model.obj(x) + 0.5 * np.linalg.norm(x)**2)
 
     assert np.allclose(rosenbrock.grad(x),
-                       model.grad(x))
+                       model.grad(x) + x)
 
     assert np.allclose(rosenbrock.hess(x, 0).to_array(),
-                       model.hop(x, 0).to_array())
+                       model.hop(x, 0).to_array() + np.eye(model.nvar))
 
 
 class test_augmented_lagrangian_simpleqp(TestCase):
 
     def setUp(self):
-        self.model = AugmentedLagrangian(SimpleQP())
+        self.model = AugmentedLagrangian(SimpleQP(), prox=1.0)
         self.model.pi = 3
         self.x = np.array([1, 2], dtype=np.float)
 
@@ -46,14 +47,16 @@ class test_augmented_lagrangian_simpleqp(TestCase):
         assert(self.model.pi == 3)
 
     def test_obj(self):
-        assert(self.model.obj(self.x) == 380.5)
+        assert self.model.obj(self.x) == 380.5 + 0.5 * np.linalg.norm(self.x)**2
 
     def test_grad(self):
-        assert np.allclose(self.model.grad(self.x), np.array([1, 1046]))
+        assert np.allclose(self.model.grad(self.x),
+                           np.array([1, 1046]) + self.x)
 
     def test_hess(self):
         assert np.allclose(self.model.hess(self.x).to_array(),
-                           np.array([[1., 0], [0, 2485]]))
+                           np.array([[1.,    0],
+                                     [0., 2485]]) + np.eye(2))
 
     def test_derivatives(self):
         log = config_logger("nlp.der",
@@ -71,20 +74,24 @@ class AugmentedLagrangianHS7(object):
         raise NotImplementedError("Please subclass.")
 
     def test_init(self):
-        assert(self.model.nvar == 2)
-        assert(self.model.ncon == 0)
-        assert(self.model.pi == 3)
-        assert(self.model.rho == 10)
+        assert self.model.nvar == 2
+        assert self.model.ncon == 0
+        assert self.model.pi == 3
+        assert self.model.penalty == 10
+        assert self.model.prox == 1
 
     def test_obj(self):
-        assert(np.allclose(self.model.obj(self.x), 3049.61))
+        assert np.allclose(self.model.obj(self.x),
+                           3049.61 + 0.5 * np.linalg.norm(self.x)**2)
 
     def test_grad(self):
-        assert np.allclose(self.model.grad(self.x), np.array([9880.8, 987]))
+        assert np.allclose(self.model.grad(self.x),
+                           np.array([9880.8, 987]) + self.x)
 
     def test_hop(self):
         assert np.allclose(self.model.hop(self.x).to_array(),
-                           np.array([[28843.8, 1600], [1600, 654]]))
+                           np.array([[28843.8, 1600],
+                                     [ 1600,    654]]) + np.eye(2))
 
     def test_derivatives(self):
         log = config_logger("nlp.der",
@@ -92,8 +99,8 @@ class AugmentedLagrangianHS7(object):
                             level=logging.DEBUG)
         dcheck = DerivativeChecker(self.model, self.x)
         dcheck.check(chess=False)
-        assert (len(dcheck.grad_errs) == 0)
-        assert (len(dcheck.hess_errs) == 0)
+        assert len(dcheck.grad_errs) == 0
+        assert len(dcheck.hess_errs) == 0
 
 
 class TestAugmentedLagrangianPySparseAmplModelHS7(AugmentedLagrangianHS7, TestCase):
@@ -102,7 +109,7 @@ class TestAugmentedLagrangianPySparseAmplModelHS7(AugmentedLagrangianHS7, TestCa
         pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("pysparse")
         model = os.path.join(this_path, 'hs007.nl')
-        self.model = AugmentedLagrangian(PySparseAmplModel(model))
+        self.model = AugmentedLagrangian(PySparseAmplModel(model), prox=1.0)
         self.model.pi = 3
         self.x = np.array([2, 2], dtype=np.float)
 
@@ -113,7 +120,7 @@ class TestAugmentedLagrangianCySparseAmplModelHS7(AugmentedLagrangianHS7, TestCa
         pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("cysparse")
         model = os.path.join(this_path, 'hs007.nl')
-        self.model = AugmentedLagrangian(CySparseAmplModel(model))
+        self.model = AugmentedLagrangian(CySparseAmplModel(model), prox=1.0)
         self.model.pi = 3
         self.x = np.array([2, 2], dtype=np.float)
 
@@ -124,7 +131,7 @@ class TestAugmentedLagrangianScipyAmplModelHS7(AugmentedLagrangianHS7, TestCase)
         pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("scipy")
         model = os.path.join(this_path, 'hs007.nl')
-        self.model = AugmentedLagrangian(SciPyAmplModel(model))
+        self.model = AugmentedLagrangian(SciPyAmplModel(model), prox=1.0)
         self.model.pi = 3
         self.x = np.array([2, 2], dtype=np.float)
 
@@ -135,21 +142,26 @@ class AugmentedLagrangianHS10(object):
         raise NotImplementedError("Please subclass.")
 
     def test_init(self):
-        assert(self.model.nvar == 3)
-        assert(self.model.ncon == 0)
-        assert(self.model.pi == 3)
-        assert(self.model.rho == 10)
-        assert(self.model.Lvar[2] == -1)
+        assert self.model.nvar == 3
+        assert self.model.ncon == 0
+        assert self.model.pi == 3
+        assert self.model.penalty == 10
+        assert self.model.prox == 1
+        assert self.model.Lvar[2] == -1
 
     def test_obj(self):
-        assert(np.allclose(self.model.obj(self.x), 432.))
+        assert np.allclose(self.model.obj(self.x),
+                           432. + 0.5 * np.linalg.norm(self.x)**2)
 
     def test_grad(self):
-        assert np.allclose(self.model.grad(self.x), np.array([745., -1, 93]))
+        assert np.allclose(self.model.grad(self.x),
+                           np.array([745., -1, 93]) + self.x)
 
     def test_hop(self):
         assert np.allclose(self.model.hop(self.x).to_array(),
-                           np.array([[1198, -186, 80], [-186, 186, 0], [80., 0., 10.]]))
+                           np.array([[1198, -186, 80],
+                                     [-186,  186,  0],
+                                     [  80,    0, 10]]) + np.eye(3))
 
     def test_derivatives(self):
         log = config_logger("nlp.der",
@@ -157,8 +169,8 @@ class AugmentedLagrangianHS10(object):
                             level=logging.DEBUG)
         dcheck = DerivativeChecker(self.model, self.x)
         dcheck.check(chess=False)
-        assert (len(dcheck.grad_errs) == 0)
-        assert (len(dcheck.hess_errs) == 0)
+        assert len(dcheck.grad_errs) == 0
+        assert len(dcheck.hess_errs) == 0
 
 
 class TestAugmentedLagrangianPySparseAmplModelHS10(AugmentedLagrangianHS10, TestCase):
@@ -167,7 +179,7 @@ class TestAugmentedLagrangianPySparseAmplModelHS10(AugmentedLagrangianHS10, Test
         pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("pysparse")
         model = os.path.join(this_path, 'hs010.nl')
-        self.model = AugmentedLagrangian(PySparseAmplModel(model))
+        self.model = AugmentedLagrangian(PySparseAmplModel(model), prox=1.0)
         self.model.pi = 3
         self.x = np.array([2, 2, 1], dtype=np.float)
 
@@ -178,7 +190,7 @@ class TestAugmentedLagrangianCySparseAmplModelHS10(AugmentedLagrangianHS10, Test
         pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("cysparse")
         model = os.path.join(this_path, 'hs010.nl')
-        self.model = AugmentedLagrangian(CySparseAmplModel(model))
+        self.model = AugmentedLagrangian(CySparseAmplModel(model), prox=1.0)
         self.model.pi = 3
         self.x = np.array([2, 2, 1], dtype=np.float)
 
@@ -189,6 +201,6 @@ class TestAugmentedLagrangianScipyAmplModelHS10(AugmentedLagrangianHS10, TestCas
         pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("scipy")
         model = os.path.join(this_path, 'hs010.nl')
-        self.model = AugmentedLagrangian(SciPyAmplModel(model))
+        self.model = AugmentedLagrangian(SciPyAmplModel(model), prox=1.0)
         self.model.pi = 3
         self.x = np.array([2, 2, 1], dtype=np.float)
