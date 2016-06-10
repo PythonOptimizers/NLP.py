@@ -65,6 +65,8 @@ class RegSQPSolver(object):
         self.short_status = "unknown"
         self.status = "unk"
         self.tsolve = 0.0
+        self.f0 = None
+        self.cnorm = None
 
         # Set regularization parameters.
         # This solver uses the proximal augmented Lagrangian formulation
@@ -78,7 +80,7 @@ class RegSQPSolver(object):
                                          penalty=1./penalty,
                                          prox=prox,
                                          xk=model.x0.copy())
-        self.epsilon = 10. / penalty
+        self.epsilon = 10. * penalty
         self.prox_factor = 10.  # increase factor during inertia correction
         self.penalty_factor = 10.  # increase factor during regularization
 
@@ -105,8 +107,9 @@ class RegSQPSolver(object):
         self.log.debug('assembling linear system')
 
         # Some shortcuts for convenience
-        n = self.model.n
-        m = self.model.m
+        model = self.model
+        n = model.n
+        m = model.m
         self.K = ps.PysparseMatrix(nrow=n+m, ncol=n+m,
                                    sizeHint=model.nnzh + model.nnzj + m,
                                    symmetric=True)
@@ -130,16 +133,16 @@ class RegSQPSolver(object):
                    range(n, n + m), range(n, m + n))
         return
 
-    def initialize_rhs(self):
-        """Allocate an empty vector to store the rhs of Newton systems."""
-        return np.empty(self.model.n + self.model.m)
-
-    def update_rhs(self, rhs, g, J, y, c):
-        """Set the rhs of Newton system according to current information."""
-        n = self.model.n
-        rhs[:n] = -g + J.T * y
-        rhs[n:] = -c
-        return
+    # def initialize_rhs(self):
+    #     """Allocate an empty vector to store the rhs of Newton systems."""
+    #     return np.empty(self.model.n + self.model.m)
+    #
+    # def update_rhs(self, rhs, g, J, y, c):
+    #     """Set the rhs of Newton system according to current information."""
+    #     n = self.model.n
+    #     rhs[:n] = -g + J.T * y
+    #     rhs[n:] = -c
+    #     return
 
     def assemble_rhs(self, g, J, y, c):
         """Set the rhs of Newton system according to current information."""
@@ -150,8 +153,8 @@ class RegSQPSolver(object):
         alpha = 0.9
         gamma = 1.1
         penalty = max(min(Fnorm,
-                          min(alpha * self.merit.penalty,
-                              self.merit.penalty**gamma)),
+                          min(alpha / self.merit.penalty,
+                              1.0 / self.merit.penalty**gamma)),
                       self.penalty_min)
         return penalty
 
@@ -174,6 +177,7 @@ class RegSQPSolver(object):
         self.LBL = LBLSolver(self.K, factorize=True)
         second_order_sufficient = self.LBL.inertia == (nvar, ncon, 0)
         full_rank = self.LBL.isFullRank
+        self.merit.prox = 0.0
 
         nb_bump = 0
         tired = nb_bump > self.bump_max
@@ -245,7 +249,8 @@ class RegSQPSolver(object):
         # dy = -step[n:]
         # return (dx, dy)
 
-    def solve_inner(self, Fnorm0, x, y, g, J, c, gL, Fnorm, gLnorm, cnorm):
+    def solve_inner(self, x, y, f, g, J, c, gL,
+                    Fnorm0, gLnorm0, cnorm0, Fnorm, gLnorm, cnorm):
         u"""Perform a sequence of inner iterations.
 
         The objective of the inner iterations is to identify an improved
@@ -256,14 +261,13 @@ class RegSQPSolver(object):
         """
         self.log.debug('starting inner iterations with target %7.1e',
                        self.theta * Fnorm0 + self.epsilon)
-        self.log.info(self.format, self.itn, Fnorm, gLnorm, cnorm,
+        self.log.info(self.format, self.itn, Fnorm, cnorm, gLnorm,
                       self.merit.prox, self.merit.penalty)
 
+        model = self.model
         ls_fmt = "%7.1e  %8.1e"
-        gLnorm0 = gLnorm
-        cnorm0 = cnorm
         failure = False
-        finished = Fnorm <= self.theta * Fnorm0 + self.epsilon
+        finished = False
         tired = self.itn > self.itermax
         while not (failure or finished or tired):
 
@@ -276,6 +280,7 @@ class RegSQPSolver(object):
             rhs = self.assemble_rhs(g, J, y, c)
 
             status, short_status, solved, dx, _ = self.solve_linear_system(rhs)
+            assert solved
 
             if not solved:
                 failure = True
@@ -284,6 +289,7 @@ class RegSQPSolver(object):
             # Step 4: Armijo backtracking linesearch
             self.merit.pi = y
             line_model = C1LineModel(self.merit, x, dx)
+            # TODO: pass ϕ(x) to ArmijoLineSearch
             ls = ArmijoLineSearch(line_model, bkmax=5, decr=1.75)
 
             try:
@@ -310,7 +316,7 @@ class RegSQPSolver(object):
                         self.merit.penalty *= 10
 
                 self.itn += 1
-                Fnorm = math.sqrt(gphi_norm**2 + cnorm**2)
+                Fnorm = gphi_norm + cnorm
                 finished = Fnorm <= self.theta * Fnorm0 + self.epsilon
                 tired = self.itn > self.itermax
 
@@ -329,7 +335,7 @@ class RegSQPSolver(object):
                 failure = True
 
         solved = Fnorm <= self.theta * Fnorm0 + self.epsilon
-        return x, y, g, J, c, gphi, gphi_norm, cnorm, solved
+        return x, y, f, g, J, c, gphi, gphi_norm, cnorm, Fnorm, solved
 
 
     def solve(self, **kwargs):
@@ -344,7 +350,7 @@ class RegSQPSolver(object):
 
         # Get initial objective value
         print 'x0: ', x
-        f = f0 = model.obj(x)
+        f = self.f0 = model.obj(x)
 
         # Initialize right-hand side and coefficient matrix
         # of linear systems
@@ -357,7 +363,7 @@ class RegSQPSolver(object):
 
         gL = g - J.T * y
         gLnorm = gLnorm0 = norm2(gL)
-        Fnorm = Fnorm0 = math.sqrt(gLnorm**2 + cnorm**2)
+        Fnorm = Fnorm0 = gLnorm + cnorm
 
         # Find a better initial point
         # self.assemble_linear_system(x, y, 0)
@@ -396,7 +402,7 @@ class RegSQPSolver(object):
         finished = optimal or tired
 
         self.log.info(self.header)
-        self.log.info(self.format, self.itn, f0, cnorm0, gLnorm0,
+        self.log.info(self.format, self.itn, self.f0, cnorm0, gLnorm0,
                       self.merit.prox, self.merit.penalty)
 
         self.itn = 0
@@ -419,6 +425,8 @@ class RegSQPSolver(object):
             status, short_status, solved, dx, dy = \
                 self.solve_linear_system(rhs, J)
 
+            assert solved
+
             # TODO: check that solved = True
 
             # check for acceptance of extrapolation step
@@ -432,12 +440,14 @@ class RegSQPSolver(object):
             c = model.cons(x) - model.Lcon
 
             gL = g - J.T * y
-            gLnorm = norm2(gL)
-            cnorm = norm2(c)
-            Fnorm_ext = math.sqrt(gLnorm**2 + cnorm**2)
+            gLnorm_ext = norm2(gL)
+            cnorm_ext = norm2(c)
+            Fnorm_ext = gLnorm_ext + cnorm_ext
 
             if Fnorm_ext <= self.theta * Fnorm + self.epsilon:
                 self.log.debug("extrapolation step accepted")
+                gLnorm = gLnorm_ext
+                cnorm = cnorm_ext
                 Fnorm = Fnorm_ext
 
                 try:
@@ -446,21 +456,23 @@ class RegSQPSolver(object):
                     self.status = "User exit"
                     short_status = 'user'
 
+                f = model.obj(x)  # only necessary for printing
+                self.itn += 1
+
             else:
                 # perform a sequence of inner iterations
                 # starting from the extrapolated step
-                x, y, g, J, c, gL, gLnorm, cnorm, solved = \
-                    self.solve_inner(Fnorm, x, y, g, J, c, gL,
-                                     Fnorm_ext, gLnorm, cnorm)
+                x, y, f, g, J, c, gL, gLnorm, cnorm, Fnorm, solved = \
+                    self.solve_inner(x, y, f, g, J, c, gL,
+                                     Fnorm, gLnorm, cnorm,
+                                     Fnorm_ext, gLnorm_ext, cnorm_ext)
 
-            self.itn += 1
             optimal = Fnorm <= tol
             tired = self.itn > self.itermax
             finished = optimal or tired
             if self.itn % 20 == 0:
                 self.log.info(self.header)
 
-            f = model.obj(x)
             self.log.info(self.format, self.itn, f, cnorm, gLnorm,
                           self.merit.prox, self.merit.penalty)
 
@@ -505,25 +517,25 @@ class RegSQPSolver(object):
         return None
 
 
-if __name__ == '__main__':
-
-    # Create root logger.
-    log = logging.getLogger('nlp.regsqp')
-    log.setLevel(logging.DEBUG)
-    fmt = logging.Formatter('%(name)-15s %(levelname)-8s %(message)s')
-    hndlr = logging.StreamHandler(sys.stdout)
-    hndlr.setFormatter(fmt)
-    log.addHandler(hndlr)
-
-    # Configure the solver logger.
-    sublogger = logging.getLogger('nlp.regsqp.solver')
-    sublogger.setLevel(logging.DEBUG)
-    sublogger.addHandler(hndlr)
-    sublogger.propagate = False
-
-    model = PySparseAmplModel("hs006.nl")         # Create a model
-    solver = RegSQPSolver(model)
-    solver.solve()
-    print 'x:', solver.x
-    print 'y:', solver.y
-    print solver.status
+# if __name__ == '__main__':
+#
+#     # Create root logger.
+#     log = logging.getLogger('nlp.regsqp')
+#     log.setLevel(logging.DEBUG)
+#     fmt = logging.Formatter('%(name)-15s %(levelname)-8s %(message)s')
+#     hndlr = logging.StreamHandler(sys.stdout)
+#     hndlr.setFormatter(fmt)
+#     log.addHandler(hndlr)
+#
+#     # Configure the solver logger.
+#     sublogger = logging.getLogger('nlp.regsqp.solver')
+#     sublogger.setLevel(logging.DEBUG)
+#     sublogger.addHandler(hndlr)
+#     sublogger.propagate = False
+#
+#     model = PySparseAmplModel("hs006.nl")         # Create a model
+#     solver = RegSQPSolver(model)
+#     solver.solve()
+#     print 'x:', solver.x
+#     print 'y:', solver.y
+#     print solver.status
