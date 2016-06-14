@@ -22,7 +22,7 @@ def regsqp_stats(regsqp):
     else:
         it = -regsqp.itn
         fc, gc = -regsqp.model.obj.ncalls, -regsqp.model.grad.ncalls
-        hc = -regsqp.model.hess.hcalls
+        hc = -regsqp.model.hess.ncalls
         jprod = -(regsqp.model.jprod.ncalls + regsqp.model.jtprod.ncalls)
         cn = -1.0 if regsqp.cnorm is None else -regsqp.cnorm
         gLn = -1.0 if regsqp.gLnorm is None else -regsqp.gLnorm
@@ -82,14 +82,20 @@ log.info('%12s %5s %5s %6s %8s %8s %8s %6s %6s %6s %5s %7s',
 
 # Solve each problem in turn.
 for problem in other:
+    verbose = True
 
     model = PySparseAmplModel(problem, **opts)
 
+    prob_name = os.path.basename(problem)
+    if prob_name[-3:] == '.nl':
+        prob_name = prob_name[:-3]
+
     # Check for equality-constrained problem.
     n_ineq = model.nlowerC + model.nupperC + model.nrangeC
-    if model.nbounds > 0 or n_ineq > 0:
+    if model.nbounds > 0 or n_ineq > 0 or model.nequalC == 0:
         msg = '%s has %d bounds and %d inequality constraints\n'
         log.error(msg, model.name, model.nbounds, n_ineq)
+        verbose = False
         continue
 
     regsqp = RegSQP(model, maxiter=args.maxiter, theta=args.theta)
@@ -97,22 +103,18 @@ for problem in other:
     try:
         regsqp.solve()
         status = regsqp.short_status
-        niter, fcalls, gcalls, hcalls, cnorm, jprod, gLn, tsolve = regsqp_stats(regsqp)
     except:
         msg = sys.exc_info()[1].message
         status = msg if len(msg) > 0 else "xfail"  # unknown failure
-        niter, fcalls, gcalls, hcalls, cnorm, jprod, gLn, tsolve = regsqp_stats(regsqp)
-
-    prob_name = os.path.basename(problem)
-    if prob_name[-3:] == '.nl':
-        prob_name = prob_name[:-3]
+    niter, fcalls, gcalls, hcalls, cnorm, jprod, gLn, tsolve = regsqp_stats(
+        regsqp)
 
     log.info("%12s %5d %5d %6d %8.1e %8.1e %8.1e %6d %6d %6d %5s %7.3f",
              model.name, model.nvar, model.m, niter, regsqp.f, cnorm, gLn,
              fcalls, gcalls, jprod, status, tsolve)
 
 
-if nprobs == 1 and niter >= 0:
+if nprobs == 1 and verbose:
 
     # Output final statistics
     log.info('--------------------------------')
@@ -127,10 +129,10 @@ if nprobs == 1 and niter >= 0:
     log.info('  Number of function evals     : %-d', fcalls)
     log.info('  Number of gradient evals     : %-d', gcalls)
     log.info('  Number of Jacobian evals     : %-d',
-        0 if args.quasi_newton else gcalls)
+             0 if args.quasi_newton else gcalls)
     log.info('  Number of Jacobian products  : %-d',
-        jprod if args.quasi_newton else 0)
+             jprod if args.quasi_newton else 0)
     log.info('  Number of Hessian evals      : %-d',
-        0 if args.quasi_newton else hcalls)
+             0 if args.quasi_newton else hcalls)
     log.info('  Solve time                   : %-gs', tsolve)
     log.info('--------------------------------')
