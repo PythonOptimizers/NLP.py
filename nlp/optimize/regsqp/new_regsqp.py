@@ -57,7 +57,7 @@ class RegSQPSolver(object):
         self.gL_old = None
 
         # Max number of times regularization parameters are increased.
-        self.bump_max = kwargs.get('bump_max', 5)
+        self.bump_max = kwargs.get('bump_max', 15)
 
         self.itn = 0
         self.K = None
@@ -77,7 +77,7 @@ class RegSQPSolver(object):
         prox = max(0.0, kwargs.get('prox', 0.0))
         penalty = max(self.penalty_min, kwargs.get('penalty', 1.0))
         self.merit = AugmentedLagrangian(model,
-                                         penalty=1./penalty,
+                                         penalty=1. / penalty,
                                          prox=prox,
                                          xk=model.x0.copy())
         self.epsilon = 10. * penalty
@@ -110,7 +110,7 @@ class RegSQPSolver(object):
         model = self.model
         n = model.n
         m = model.m
-        self.K = ps.PysparseMatrix(nrow=n+m, ncol=n+m,
+        self.K = ps.PysparseMatrix(nrow=n + m, ncol=n + m,
                                    sizeHint=model.nnzh + model.nnzj + m,
                                    symmetric=True)
 
@@ -156,6 +156,9 @@ class RegSQPSolver(object):
                           min(alpha / self.merit.penalty,
                               1.0 / self.merit.penalty**gamma)),
                       self.penalty_min)
+        # penalty = max(
+        # min(1.0 / self.merit.penalty / 10., 1.0 / self.merit.penalty**(1 +
+        # 0.8)), self.penalty_min)
         return penalty
 
     def solve_linear_system(self, rhs, itref_thresh=1.0e-7, nitref=1):
@@ -191,22 +194,26 @@ class RegSQPSolver(object):
                     self.K.addAt(self.merit.prox * np.ones(nvar),
                                  range(nvar), range(nvar))
                 else:
-                    self.merit.prox *= self.prox_factor + 1
                     self.K.addAt(
                         self.prox_factor * self.merit.prox * np.ones(nvar),
                         range(nvar), range(nvar))
+                    self.merit.prox *= self.prox_factor + 1
 
-            if not full_rank:
-                self.log.debug("further regularizing")
-                # further regularize; this isn't quite supported by theory
-                # the augmented Lagrangian uses 1/δ
-                self.K.addAt(
-                    -self.penalty_factor / self.merit.penalty * np.ones(ncon),
-                    range(nvar, nvar + ncon), range(nvar, nvar + ncon))
-                self.merit.penalty *= self.penalty_factor + 1
+            # if not full_rank:
+            #     self.log.debug("further regularizing")
+            #     # further regularize; this isn't quite supported by theory
+            #     # the augmented Lagrangian uses 1/δ
+            #     self.K.addAt(
+            #         -self.penalty_factor / self.merit.penalty * np.ones(ncon),
+            #         range(nvar, nvar + ncon), range(nvar, nvar + ncon))
+            #     self.merit.penalty *= self.penalty_factor + 1
 
             self.LBL = LBLSolver(self.K, factorize=True)
             second_order_sufficient = self.LBL.inertia == (nvar, ncon, 0)
+            inertia = self.LBL.inertia
+            self.log.debug("Inertia is now (%d,%d,%d) (should be (%d,%d,%d))",
+                           inertia[0], inertia[1], inertia[2],
+                           self.model.nvar, self.model.ncon, 0)
             full_rank = self.LBL.isFullRank
             nb_bump += 1
             tired = nb_bump > self.bump_max
@@ -244,10 +251,6 @@ class RegSQPSolver(object):
         Outputs are *references*, not copies.
         """
         return (step[:self.model.n], -step[self.model.n:])
-        # n = self.model.n
-        # dx = step[:n]
-        # dy = -step[n:]
-        # return (dx, dy)
 
     def solve_inner(self, x, y, f, g, J, c, gL,
                     Fnorm0, gLnorm0, cnorm0, Fnorm, gLnorm, cnorm):
@@ -274,12 +277,17 @@ class RegSQPSolver(object):
             self.x_old = x.copy()
             self.gL_old = gL.copy()
 
+            self.merit.xk = x.copy()
+
             # compute step
             self.assemble_linear_system(x, y)
             # self.update_rhs(self.rhs, g, J, y, c)
             rhs = self.assemble_rhs(g, J, y, c)
 
             status, short_status, solved, dx, _ = self.solve_linear_system(rhs)
+
+            # print "sufficient:", np.dot(self.K[:self.model.n, :self.model.n] *
+            # dx, dx) + self.merit.penalty * np.dot(dx, J.T * (J * dx))
             assert solved
 
             if not solved:
@@ -290,7 +298,7 @@ class RegSQPSolver(object):
             self.merit.pi = y
             line_model = C1LineModel(self.merit, x, dx)
             # TODO: pass ϕ(x) to ArmijoLineSearch
-            ls = ArmijoLineSearch(line_model, bkmax=5, decr=1.75)
+            ls = ArmijoLineSearch(line_model, bkmax=15, decr=1.75)
 
             try:
                 for step in ls:
@@ -337,7 +345,6 @@ class RegSQPSolver(object):
         solved = Fnorm <= self.theta * Fnorm0 + self.epsilon
         return x, y, f, g, J, c, gphi, gphi_norm, cnorm, Fnorm, solved
 
-
     def solve(self, **kwargs):
 
         # Transfer pointers for convenience.
@@ -350,7 +357,7 @@ class RegSQPSolver(object):
 
         # Get initial objective value
         print 'x0: ', x
-        f = self.f0 = model.obj(x)
+        self.f = self.f0 = f = model.obj(x)
 
         # Initialize right-hand side and coefficient matrix
         # of linear systems
@@ -359,18 +366,19 @@ class RegSQPSolver(object):
         g = model.grad(x)
         J = model.jop(x)
         c = model.cons(x) - model.Lcon
-        cnorm = cnorm0 = norm2(c)
+        self.cnorm = cnorm = cnorm0 = norm2(c)
 
         gL = g - J.T * y
-        gLnorm = gLnorm0 = norm2(gL)
+        self.gLnorm = gLnorm = gLnorm0 = norm2(gL)
+
         Fnorm = Fnorm0 = gLnorm + cnorm
 
         # Find a better initial point
-        # self.assemble_linear_system(x, y, 0)
-        # self.update_rhs(rhs, g, J, y, c)
+        # self.assemble_linear_system(x, y)
+        # rhs = self.assemble_rhs(g, J, y, c)
         #
-        # status, short_status, finished, nbumps, dx, dy = self.solve_linear_system(
-        #     rhs, delta, J=J)
+        # status, short_status, solved, dx, dy = \
+        #     self.solve_linear_system(rhs, J)
         #
         # xs = x + dx
         # ys = y + dy
@@ -378,7 +386,7 @@ class RegSQPSolver(object):
         # Js = model.jop(xs)
         # cs = model.cons(xs) - model.Lcon
         # grad_Ls = gs - Js.T * ys
-        # Fnorms = np.sqrt(norm2(grad_Ls)**2 + norm2(cs)**2)
+        # Fnorms = norm2(grad_Ls) + norm2(cs)
         # if Fnorms <= Fnorm0:
         #     x += dx
         #     y += dy
@@ -388,12 +396,14 @@ class RegSQPSolver(object):
         #     c = cs.copy()
 
         # Initialize penalty parameter
-        # delta = min(0.1, Fnorm0)
+        delta = min(0.1, Fnorm0)
 
         # set stopping tolerance
         tol = self.reltol * Fnorm0 + self.abstol
 
-        optimal = Fnorm <= tol
+        self.tsolve = 0
+
+        self.optimal = optimal = Fnorm <= tol
         if optimal:
             status = 'Optimal solution found'
             short_status = 'opt'
