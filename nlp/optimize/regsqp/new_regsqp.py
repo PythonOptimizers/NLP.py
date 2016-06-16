@@ -4,9 +4,10 @@ from nlp.model.pysparsemodel import PySparseAmplModel
 from nlp.model.augmented_lagrangian import AugmentedLagrangian
 from nlp.model.linemodel import C1LineModel
 from nlp.ls.linesearch import ArmijoLineSearch, LineSearchFailure
+from nlp.ls.wolfe import StrongWolfeLineSearch
 
 from nlp.tools.exceptions import UserExitRequest
-from nlp.tools.norms import norm2
+from nlp.tools.norms import norm2 as norm2
 from nlp.tools.timing import cputime
 
 try:
@@ -73,6 +74,8 @@ class RegSQPSolver(object):
         # ϕ(x;yₖ,ρ,δ) := f(x) - c(x)ᵀyₖ + ½ ρ ‖x-xₖ‖² + ½ δ⁻¹ ‖c(x)‖².
         # Note the δ⁻¹.
         self.prox_min = 1.0e-3  # used when increasing the prox parameter
+        self.prox_max = 1.0e40  # used in inertia
+        self.prox_last = 0.0
         self.penalty_min = 1.0e-8
         prox = max(0.0, kwargs.get('prox', 0.0))
         penalty = max(self.penalty_min, kwargs.get('penalty', 1.0))
@@ -96,7 +99,7 @@ class RegSQPSolver(object):
         self.log.propagate = False
         return
 
-    def assemble_linear_system(self, x, y):
+    def assemble_linear_system(self, x, y, dual_reg=True):
         u"""Assemble main saddle-point matrix.
 
         [ H+ρI      J' ] [∆x] = [ -g + J'y ]
@@ -129,8 +132,9 @@ class RegSQPSolver(object):
         self.K.put(val, (n + irow).tolist(), jcol.tolist())
 
         # dual regularization
-        self.K.put(-1. / self.merit.penalty * np.ones(m),
-                   range(n, n + m), range(n, m + n))
+        if dual_reg:
+            self.K.put(-1. / self.merit.penalty * np.ones(m),
+                       range(n, n + m), range(n, m + n))
         return
 
     # def initialize_rhs(self):
@@ -150,14 +154,14 @@ class RegSQPSolver(object):
 
     def new_penalty(self, Fnorm):
         """Return updated penalty parameter value."""
-        alpha = 0.9
-        gamma = 1.1
+        alpha = 0.1
+        gamma = 1.8
         penalty = max(min(Fnorm,
                           min(alpha / self.merit.penalty,
                               1.0 / self.merit.penalty**gamma)),
                       self.penalty_min)
         # penalty = max(
-        # min(1.0 / self.merit.penalty / 10., 1.0 / self.merit.penalty**(1 +
+        #     min(1.0 / self.merit.penalty / 10., 1.0 / self.merit.penalty**(1 +
         # 0.8)), self.penalty_min)
         return penalty
 
@@ -190,23 +194,31 @@ class RegSQPSolver(object):
                 self.log.debug("further convexifying model")
 
                 if self.merit.prox == 0.0:
-                    self.merit.prox = self.prox_min
+                    if self.prox_last == 0.0:
+                        self.merit.prox = self.prox_min
+                    else:
+                        self.merit.prox = max(self.prox_min,
+                                              0.3 * self.prox_last)
                     self.K.addAt(self.merit.prox * np.ones(nvar),
                                  range(nvar), range(nvar))
                 else:
+                    if self.prox_last == 0.0:
+                        factor = 100.
+                    else:
+                        factor = 8.
                     self.K.addAt(
-                        self.prox_factor * self.merit.prox * np.ones(nvar),
+                        factor * self.merit.prox * np.ones(nvar),
                         range(nvar), range(nvar))
-                    self.merit.prox *= self.prox_factor + 1
+                    self.merit.prox *= factor + 1
 
-            # if not full_rank:
-            #     self.log.debug("further regularizing")
-            #     # further regularize; this isn't quite supported by theory
-            #     # the augmented Lagrangian uses 1/δ
-            #     self.K.addAt(
-            #         -self.penalty_factor / self.merit.penalty * np.ones(ncon),
-            #         range(nvar, nvar + ncon), range(nvar, nvar + ncon))
-            #     self.merit.penalty *= self.penalty_factor + 1
+            if not full_rank:
+                self.log.debug("further regularizing")
+                # further regularize; this isn't quite supported by theory
+                # the augmented Lagrangian uses 1/δ
+                self.K.addAt(
+                    -self.penalty_factor / self.merit.penalty * np.ones(ncon),
+                    range(nvar, nvar + ncon), range(nvar, nvar + ncon))
+                self.merit.penalty *= self.penalty_factor + 1
 
             self.LBL = LBLSolver(self.K, factorize=True)
             second_order_sufficient = self.LBL.inertia == (nvar, ncon, 0)
@@ -236,6 +248,7 @@ class RegSQPSolver(object):
             dy = None
             return status, short_status, solved, dx, dy
 
+        self.prox_last = self.merit.prox
         self.LBL.solve(rhs)
         self.LBL.refine(rhs, nitref=nitref)
         (dx, dy) = self.get_dx_dy(self.LBL.x)
@@ -266,6 +279,10 @@ class RegSQPSolver(object):
                        self.theta * Fnorm0 + self.epsilon)
         self.log.info(self.format, self.itn, Fnorm, cnorm, gLnorm,
                       self.merit.prox, self.merit.penalty)
+
+        y_al = y - c * self.merit.penalty
+        phi = f - np.dot(y, c) + 0.5 * self.merit.penalty * cnorm**2
+        gphi = g - J.T * y_al
 
         model = self.model
         ls_fmt = "%7.1e  %8.1e"
@@ -298,12 +315,15 @@ class RegSQPSolver(object):
             self.merit.pi = y
             line_model = C1LineModel(self.merit, x, dx)
             # TODO: pass ϕ(x) to ArmijoLineSearch
-            ls = ArmijoLineSearch(line_model, bkmax=15, decr=1.75)
-
+            slope = np.dot(gphi, dx)
+            ls = ArmijoLineSearch(line_model, bkmax=15,
+                                  decr=1.75, value=phi, slope=slope)
+            # ls = StrongWolfeLineSearch(line_model, value=phi, slope=slope)
             try:
                 for step in ls:
                     self.log.debug(ls_fmt, step, ls.trial_value)
 
+                print 'step norm: ', norm2(x - ls.iterate)
                 x = ls.iterate
                 f = model.obj(x)
                 g = model.grad(x)
@@ -312,6 +332,7 @@ class RegSQPSolver(object):
                 cnorm = norm2(c)
                 gL = g - J.T * y
                 y_al = y - c * self.merit.penalty
+                phi = f - np.dot(y, c) + 0.5 * self.merit.penalty * cnorm**2
                 gphi = g - J.T * y_al
                 gphi_norm = norm2(gphi)
 
@@ -324,11 +345,12 @@ class RegSQPSolver(object):
                         self.merit.penalty *= 10
 
                 self.itn += 1
+                self.inner_itn += 1
                 Fnorm = gphi_norm + cnorm
                 finished = Fnorm <= self.theta * Fnorm0 + self.epsilon
                 tired = self.itn > self.itermax
 
-                self.log.info(self.format, self.itn, f, cnorm, gLnorm,
+                self.log.info(self.format, self.itn, f, cnorm, gphi_norm,
                               self.merit.prox, self.merit.penalty)
 
                 try:
@@ -339,7 +361,7 @@ class RegSQPSolver(object):
                     finished = True
 
             except LineSearchFailure:
-                step_status = "Rej"
+                self.status = "Linesearch failure"
                 failure = True
 
         solved = Fnorm <= self.theta * Fnorm0 + self.epsilon
@@ -354,6 +376,7 @@ class RegSQPSolver(object):
         self.short_status = "fail"
         self.status = "fail"
         self.tsolve = 0.0
+        self.inner_itn = 0
 
         # Get initial objective value
         print 'x0: ', x
@@ -374,29 +397,34 @@ class RegSQPSolver(object):
         Fnorm = Fnorm0 = gLnorm + cnorm
 
         # Find a better initial point
-        # self.assemble_linear_system(x, y)
-        # rhs = self.assemble_rhs(g, J, y, c)
-        #
-        # status, short_status, solved, dx, dy = \
-        #     self.solve_linear_system(rhs, J)
-        #
-        # xs = x + dx
-        # ys = y + dy
-        # gs = model.grad(xs)
-        # Js = model.jop(xs)
-        # cs = model.cons(xs) - model.Lcon
-        # grad_Ls = gs - Js.T * ys
-        # Fnorms = norm2(grad_Ls) + norm2(cs)
-        # if Fnorms <= Fnorm0:
-        #     x += dx
-        #     y += dy
-        #     Fnorm = Fnorm0 = Fnorms
-        #     g = gs.copy()
-        #     J = model.jop(x)
-        #     c = cs.copy()
+        self.assemble_linear_system(x, y, dual_reg=False)
+        rhs = self.assemble_rhs(g, J, y, c)
+
+        self.LBL = LBLSolver(self.K, factorize=True)
+        self.LBL.solve(rhs)
+        (dx, dy) = self.get_dx_dy(self.LBL.x)
+        self.log.debug("step accuracy: %3.2e", norm2(self.LBL.residual))
+
+        xs = x + dx
+        ys = y + dy
+        gs = model.grad(xs)
+        Js = model.jop(xs)
+        cs = model.cons(xs) - model.Lcon
+        gLs = gs - Js.T * ys
+        Fnorms = norm2(gLs) + norm2(cs)
+        if Fnorms <= Fnorm0:
+            x += dx
+            y += dy
+            Fnorm = Fnorm0 = Fnorms
+            g = gs.copy()
+            J = model.jop(x)
+            c = cs.copy()
+            self.f = f = model.obj(x)
+            self.cnorm = cnorm = norm2(c)
+            self.gLnorm = gLnorm = norm2(gLs)
 
         # Initialize penalty parameter
-        delta = min(0.1, Fnorm0)
+        # delta = min(0.1, Fnorm0)
 
         # set stopping tolerance
         tol = self.reltol * Fnorm0 + self.abstol
@@ -405,6 +433,7 @@ class RegSQPSolver(object):
 
         self.optimal = optimal = Fnorm <= tol
         if optimal:
+            print cnorm, gLnorm
             status = 'Optimal solution found'
             short_status = 'opt'
 
@@ -426,6 +455,7 @@ class RegSQPSolver(object):
 
             # update penalty parameter
             self.merit.penalty = 1.0 / self.new_penalty(Fnorm)
+            print 'penalty: ', self.merit.penalty
 
             # compute extrapolation step
             self.assemble_linear_system(x, y)
@@ -437,14 +467,13 @@ class RegSQPSolver(object):
 
             assert solved
 
-            # TODO: check that solved = True
-
             # check for acceptance of extrapolation step
             # if it is rejected, it will serve as a starting point in the
             # inner iterations
             self.epsilon = 10.0 / self.merit.penalty
             x += dx
             y += dy
+            f = model.obj(x)  # only necessary for printing
             g = model.grad(x)
             J = model.jop(x)
             c = model.cons(x) - model.Lcon
@@ -466,7 +495,6 @@ class RegSQPSolver(object):
                     self.status = "User exit"
                     short_status = 'user'
 
-                f = model.obj(x)  # only necessary for printing
                 self.itn += 1
 
             else:
@@ -476,6 +504,7 @@ class RegSQPSolver(object):
                     self.solve_inner(x, y, f, g, J, c, gL,
                                      Fnorm, gLnorm, cnorm,
                                      Fnorm_ext, gLnorm_ext, cnorm_ext)
+                print "end inner iteration: ", solved
 
             optimal = Fnorm <= tol
             tired = self.itn > self.itermax
