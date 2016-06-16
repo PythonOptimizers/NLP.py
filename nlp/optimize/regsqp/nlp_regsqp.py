@@ -106,13 +106,12 @@ for problem in other:
     except:
         msg = sys.exc_info()[1].message
         status = msg if len(msg) > 0 else "xfail"  # unknown failure
-    niter, fcalls, gcalls, hcalls, cnorm, jprod, gLn, tsolve = regsqp_stats(
+    niter, fcalls, gcalls, hcalls, jprod, cnorm, gLn, tsolve = regsqp_stats(
         regsqp)
 
     log.info("%12s %5d %5d %6d %8.1e %8.1e %8.1e %6d %6d %6d %5s %7.3f",
              model.name, model.nvar, model.m, niter, regsqp.f, cnorm, gLn,
              fcalls, gcalls, jprod, status, tsolve)
-
 
 if nprobs == 1 and verbose:
 
@@ -126,6 +125,8 @@ if nprobs == 1 and verbose:
              regsqp.model.m - regsqp.model.nlin)
     log.info('  Initial/Final Objective      : %-g/%-g', regsqp.f0, regsqp.f)
     log.info('  Number of iterations         : %-d', niter)
+
+    log.info('         inner iterations      : %-d', regsqp.inner_itn)
     log.info('  Number of function evals     : %-d', fcalls)
     log.info('  Number of gradient evals     : %-d', gcalls)
     log.info('  Number of Jacobian evals     : %-d',
