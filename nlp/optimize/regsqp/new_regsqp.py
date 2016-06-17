@@ -3,7 +3,7 @@
 from nlp.model.pysparsemodel import PySparseAmplModel
 from nlp.model.augmented_lagrangian import AugmentedLagrangian
 from nlp.model.linemodel import C1LineModel
-from nlp.ls.linesearch import ArmijoLineSearch, LineSearchFailure
+from nlp.ls.linesearch import ArmijoLineSearch, ArmijoWolfeLineSearch, LineSearchFailure
 from nlp.ls.wolfe import StrongWolfeLineSearch
 
 from nlp.tools.exceptions import UserExitRequest
@@ -277,7 +277,7 @@ class RegSQPSolver(object):
         """
         self.log.debug('starting inner iterations with target %7.1e',
                        self.theta * Fnorm0 + self.epsilon)
-        self.log.info(self.format, self.itn, Fnorm, cnorm, gLnorm,
+        self.log.info(self.format, self.itn, f, cnorm, gLnorm,
                       self.merit.prox, self.merit.penalty)
 
         y_al = y - c * self.merit.penalty
@@ -287,8 +287,23 @@ class RegSQPSolver(object):
         model = self.model
         ls_fmt = "%7.1e  %8.1e"
         failure = False
-        finished = False
+        # finished = False
+
+        # if infeasibility is large, immediately increase penalty
+        if cnorm > self.theta * cnorm0 + 0.5 * self.epsilon:
+            self.merit.penalty *= 10
+
+        gphi_norm = norm2(gphi)
+        if gphi_norm <= self.theta * gLnorm0 + 0.5 * self.epsilon:
+            self.log.debug('optimality improved sufficiently')
+            if cnorm <= self.theta * cnorm0 + 0.5 * self.epsilon:
+                self.log.debug('feasibility improved sufficiently')
+                y = y_al
+
+        Fnorm = gphi_norm + cnorm
+        finished = Fnorm <= self.theta * Fnorm0 + self.epsilon
         tired = self.itn > self.itermax
+
         while not (failure or finished or tired):
 
             self.x_old = x.copy()
@@ -316,11 +331,15 @@ class RegSQPSolver(object):
             line_model = C1LineModel(self.merit, x, dx)
             # TODO: pass ϕ(x) to ArmijoLineSearch
             slope = np.dot(gphi, dx)
-            ls = ArmijoLineSearch(line_model, bkmax=15,
-                                  decr=1.75, value=phi, slope=slope)
-            # ls = StrongWolfeLineSearch(line_model, value=phi, slope=slope)
+            # ls = ArmijoLineSearch(line_model, bkmax=10,
+            #                       decr=1.75, value=phi, slope=slope)
+            ls = ArmijoWolfeLineSearch(line_model, step=1.0, bkmax=10,
+                                       decr=1.75, value=phi, slope=slope)
+            # ls = StrongWolfeLineSearch(
+            #     line_model, value=phi, slope=slope, gtol=0.1)
             try:
                 for step in ls:
+                    # self.merit.xk = ls.iterate.copy()
                     self.log.debug(ls_fmt, step, ls.trial_value)
 
                 print 'step norm: ', norm2(x - ls.iterate)
@@ -396,6 +415,10 @@ class RegSQPSolver(object):
 
         Fnorm = Fnorm0 = gLnorm + cnorm
 
+        self.log.info(self.header)
+        self.log.info(self.format, self.itn, self.f0, cnorm0, gLnorm0,
+                      self.merit.prox, self.merit.penalty)
+
         # Find a better initial point
         self.assemble_linear_system(x, y, dual_reg=False)
         rhs = self.assemble_rhs(g, J, y, c)
@@ -412,7 +435,8 @@ class RegSQPSolver(object):
         cs = model.cons(xs) - model.Lcon
         gLs = gs - Js.T * ys
         Fnorms = norm2(gLs) + norm2(cs)
-        if Fnorms <= Fnorm0:
+        if Fnorms < Fnorm0:
+            self.log.debug("improved initial point accepted")
             x += dx
             y += dy
             Fnorm = Fnorm0 = Fnorms
@@ -422,6 +446,11 @@ class RegSQPSolver(object):
             self.f = f = model.obj(x)
             self.cnorm = cnorm = norm2(c)
             self.gLnorm = gLnorm = norm2(gLs)
+            # self.merit.penalty = 1. / Fnorm
+
+            self.log.info(self.format, self.itn,
+                          self.f, self.cnorm, self.gLnorm,
+                          self.merit.prox, self.merit.penalty)
 
         # Initialize penalty parameter
         # delta = min(0.1, Fnorm0)
@@ -439,10 +468,6 @@ class RegSQPSolver(object):
 
         tired = self.itn > self.itermax
         finished = optimal or tired
-
-        self.log.info(self.header)
-        self.log.info(self.format, self.itn, self.f0, cnorm0, gLnorm0,
-                      self.merit.prox, self.merit.penalty)
 
         self.itn = 0
         tick = cputime()
@@ -472,19 +497,22 @@ class RegSQPSolver(object):
             # inner iterations
             self.epsilon = 10.0 / self.merit.penalty
             x += dx
-            y += dy
+            # y += dy
+            yplus = y + dy
             f = model.obj(x)  # only necessary for printing
             g = model.grad(x)
             J = model.jop(x)
             c = model.cons(x) - model.Lcon
 
-            gL = g - J.T * y
-            gLnorm_ext = norm2(gL)
-            cnorm_ext = norm2(c)
-            Fnorm_ext = gLnorm_ext + cnorm_ext
+            gL_ext = g - J.T * yplus            # = ∇L(wk+)
+            gLnorm_ext = norm2(gL_ext)
+            cnorm_ext = norm2(c)                # = ‖c(xk+)‖
+            Fnorm_ext = gLnorm_ext + cnorm_ext  # = ‖F(wk+)‖
 
             if Fnorm_ext <= self.theta * Fnorm + self.epsilon:
                 self.log.debug("extrapolation step accepted")
+                y = yplus
+                gL = gL_ext
                 gLnorm = gLnorm_ext
                 cnorm = cnorm_ext
                 Fnorm = Fnorm_ext
@@ -499,11 +527,15 @@ class RegSQPSolver(object):
 
             else:
                 # perform a sequence of inner iterations
-                # starting from the extrapolated step
+                # starting from the extrapolated step in x and the old y
+                gL_inner = g - J.T * y
+                gLnorm_inner = norm2(gL_inner)
+                cnorm_inner = cnorm_ext
+                Fnorm_inner = gLnorm_inner + cnorm_inner
                 x, y, f, g, J, c, gL, gLnorm, cnorm, Fnorm, solved = \
-                    self.solve_inner(x, y, f, g, J, c, gL,
+                    self.solve_inner(x, y, f, g, J, c, gL_inner,
                                      Fnorm, gLnorm, cnorm,
-                                     Fnorm_ext, gLnorm_ext, cnorm_ext)
+                                     Fnorm_inner, gLnorm_inner, cnorm_inner)
                 print "end inner iteration: ", solved
 
             optimal = Fnorm <= tol
