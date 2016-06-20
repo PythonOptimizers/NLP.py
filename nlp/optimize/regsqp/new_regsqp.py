@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
 
 from nlp.model.pysparsemodel import PySparseAmplModel
+from nlp.model.nlpmodel import UnconstrainedNLPModel
 from nlp.model.augmented_lagrangian import AugmentedLagrangian
 from nlp.model.linemodel import C1LineModel
-from nlp.ls.linesearch import ArmijoLineSearch, ArmijoWolfeLineSearch, LineSearchFailure
+from nlp.model.snlp import SlackModel
+
+from nlp.ls.linesearch import LineSearch, ArmijoLineSearch
+from nlp.ls.linesearch import ArmijoWolfeLineSearch, LineSearchFailure
 from nlp.ls.wolfe import StrongWolfeLineSearch
 
 from nlp.tools.exceptions import UserExitRequest
@@ -22,7 +26,117 @@ import math
 import numpy as np
 import sys
 
+eps = np.finfo(np.double).eps
+sqeps = math.sqrt(eps)
 np.set_printoptions(precision=16, formatter={'float': '{:0.8g}'.format})
+ls_fmt = "%7.1e  %8.2e"
+
+
+class SimpleBacktrackingLineSearch(LineSearch):
+    """Simple backtracking linesearch."""
+
+    def __init__(self, *args, **kwargs):
+        """Instantiate a simple backtracking linesearch.
+
+        The search stops as soon as a step size t is found such that
+
+            ϕ(t) <= Θ ϕ(0) + ϵ
+
+        where 0 < Θ < 1 and ϵ>0.
+
+        :keywords:
+            :theta: constant used in condition (default: 0.99)
+            :decr: factor by which to reduce the steplength
+                   during the backtracking (default: 1.5).
+        """
+        name = kwargs.pop("name", "Backtracking linesearch")
+        super(SimpleBacktrackingLineSearch, self).__init__(
+            *args, name=name, **kwargs)
+        self.__theta = max(min(kwargs.get("theta", 0.99), 1 - sqeps), sqeps)
+        self.__epsilon = max(min(kwargs.get("epsilon", 1e-7), 1 - sqeps), sqeps)
+        self.__decr = max(min(kwargs.get("decr", 1.5), 100), 1.001)
+        return
+
+    @property
+    def epsilon(self):
+        return self.__epsilon
+
+    @property
+    def theta(self):
+        return self.__theta
+
+    @property
+    def decr(self):
+        return self.__decr
+
+    def next(self):
+        if self.trial_value <= self.theta * self.value + self.epsilon:
+            raise StopIteration()
+
+        step = self.step
+        self._step /= self.decr
+        if self.step < self.stepmin:
+            raise LineSearchFailure("linesearch step too small")
+
+        self._trial_iterate = self.linemodel.x + self.step * self.linemodel.d
+        self._trial_value = self.linemodel.obj(self.step, x=self.iterate)
+
+        return step  # return value of step just tested
+
+
+class FnormModel(UnconstrainedNLPModel):
+
+    def __init__(self, model, **kwargs):
+        u"""Instantiate a :class:`FnormModel`.
+
+        Objective function of this model is the norm of the KKT residual of
+        `model` at w:=(x,y) defined by
+
+            F(w) =  ‖∇L(w)‖ + ‖c(w)‖
+
+        :parameters:
+            :model: ```NLPModel```.
+        """
+        if not isinstance(model, SlackModel):
+            self.model = SlackModel(model, **kwargs)
+        super(FnormModel, self).__init__(model.n + model.m, **kwargs)
+
+    def obj(self, w, c=None, g=None, gL=None, cnorm=None, gLnorm=None):
+        u"""Evaluate F(w)."""
+        x = w[:self.model.n]
+        y = w[self.model.n:]
+        J = self.model.jop(x)
+
+        if cnorm is None:
+            if c is None:
+                c = self.model.cons(x)
+            cnorm = norm2(c)
+        if gLnorm is None:
+            if gL is None:
+                if g is None:
+                    g = self.model.grad(x)
+                gL = g - J.T * y
+            gLnorm = norm2(gL)
+        return gLnorm + cnorm
+
+    def grad(self, w, c=None, g=None, gL=None):
+        u"""Evaluate ∇ F(w)."""
+        x = w[:self.model.n]
+        y = w[self.model.n:]
+        J = self.model.jop(x)
+        H = self.model.hop(x, z=y)
+
+        if c is None:
+            c = self.model.cons(x)
+        if gL is None:
+            if g is None:
+                g = self.model.grad(x)
+            gL = g - J.T * y
+        gLnorm = norm2(gL)
+
+        u = H * gL / gLnorm + J.T * c / norm2(c)
+        v = -(J * gL) / gLnorm
+        return np.concatenate((u, v))
 
 
 class RegSQPSolver(object):
@@ -137,17 +251,6 @@ class RegSQPSolver(object):
                        range(n, n + m), range(n, m + n))
         return
 
-    # def initialize_rhs(self):
-    #     """Allocate an empty vector to store the rhs of Newton systems."""
-    #     return np.empty(self.model.n + self.model.m)
-    #
-    # def update_rhs(self, rhs, g, J, y, c):
-    #     """Set the rhs of Newton system according to current information."""
-    #     n = self.model.n
-    #     rhs[:n] = -g + J.T * y
-    #     rhs[n:] = -c
-    #     return
-
     def assemble_rhs(self, g, J, y, c):
         """Set the rhs of Newton system according to current information."""
         return np.concatenate((-g + J.T * y, -c))
@@ -165,7 +268,7 @@ class RegSQPSolver(object):
         # 0.8)), self.penalty_min)
         return penalty
 
-    def solve_linear_system(self, rhs, itref_thresh=1.0e-7, nitref=1):
+    def solve_linear_system(self, rhs, itref_thresh=1.0e-7, nitref=5):
         u"""Compute a step by solving Newton's equations.
 
         Use a direct method to solve the symmetric and indefinite system
@@ -252,6 +355,11 @@ class RegSQPSolver(object):
         self.LBL.solve(rhs)
         self.LBL.refine(rhs, nitref=nitref)
         (dx, dy) = self.get_dx_dy(self.LBL.x)
+
+        J = self.K[nvar:, :nvar]
+        Jt = self.K[:nvar, nvar:]
+        self.log.debug("sufficiently positive definite: %6.2e>=%6.2e", np.dot(self.K[:self.model.n, :self.model.n] *
+                                                                              dx, dx) + self.merit.penalty * np.dot(dx, Jt * (J * dx)), 1e-8 * np.dot(dx, dx))
         self.log.debug("step accuracy: %3.2e", norm2(self.LBL.residual))
         status = None
         short_status = None
@@ -278,16 +386,14 @@ class RegSQPSolver(object):
         self.log.debug('starting inner iterations with target %7.1e',
                        self.theta * Fnorm0 + self.epsilon)
         self.log.info(self.format, self.itn, f, cnorm, gLnorm,
-                      self.merit.prox, self.merit.penalty)
+                      self.merit.prox, 1.0 / self.merit.penalty)
 
         y_al = y - c * self.merit.penalty
         phi = f - np.dot(y, c) + 0.5 * self.merit.penalty * cnorm**2
         gphi = g - J.T * y_al
 
         model = self.model
-        ls_fmt = "%7.1e  %8.1e"
         failure = False
-        # finished = False
 
         # if infeasibility is large, immediately increase penalty
         if cnorm > self.theta * cnorm0 + 0.5 * self.epsilon:
@@ -313,13 +419,9 @@ class RegSQPSolver(object):
 
             # compute step
             self.assemble_linear_system(x, y)
-            # self.update_rhs(self.rhs, g, J, y, c)
             rhs = self.assemble_rhs(g, J, y, c)
 
             status, short_status, solved, dx, _ = self.solve_linear_system(rhs)
-
-            # print "sufficient:", np.dot(self.K[:self.model.n, :self.model.n] *
-            # dx, dx) + self.merit.penalty * np.dot(dx, J.T * (J * dx))
             assert solved
 
             if not solved:
@@ -329,20 +431,18 @@ class RegSQPSolver(object):
             # Step 4: Armijo backtracking linesearch
             self.merit.pi = y
             line_model = C1LineModel(self.merit, x, dx)
-            # TODO: pass ϕ(x) to ArmijoLineSearch
             slope = np.dot(gphi, dx)
-            # ls = ArmijoLineSearch(line_model, bkmax=10,
-            #                       decr=1.75, value=phi, slope=slope)
-            ls = ArmijoWolfeLineSearch(line_model, step=1.0, bkmax=10,
-                                       decr=1.75, value=phi, slope=slope)
+            ls = ArmijoLineSearch(line_model, bkmax=10,
+                                  decr=1.75, value=phi, slope=slope)
+            # ls = ArmijoWolfeLineSearch(line_model, step=1.0, bkmax=10,
+            #                            decr=1.75, value=phi, slope=slope)
             # ls = StrongWolfeLineSearch(
             #     line_model, value=phi, slope=slope, gtol=0.1)
             try:
                 for step in ls:
-                    # self.merit.xk = ls.iterate.copy()
                     self.log.debug(ls_fmt, step, ls.trial_value)
 
-                print 'step norm: ', norm2(x - ls.iterate)
+                self.log.debug('step norm: %6.2e', norm2(x - ls.iterate))
                 x = ls.iterate
                 f = model.obj(x)
                 g = model.grad(x)
@@ -370,7 +470,7 @@ class RegSQPSolver(object):
                 tired = self.itn > self.itermax
 
                 self.log.info(self.format, self.itn, f, cnorm, gphi_norm,
-                              self.merit.prox, self.merit.penalty)
+                              self.merit.prox, 1.0 / self.merit.penalty)
 
                 try:
                     self.post_inner_iteration(x, gL)
@@ -400,11 +500,6 @@ class RegSQPSolver(object):
         # Get initial objective value
         print 'x0: ', x
         self.f = self.f0 = f = model.obj(x)
-
-        # Initialize right-hand side and coefficient matrix
-        # of linear systems
-        # rhs = self.initialize_rhs()
-
         g = model.grad(x)
         J = model.jop(x)
         c = model.cons(x) - model.Lcon
@@ -417,7 +512,7 @@ class RegSQPSolver(object):
 
         self.log.info(self.header)
         self.log.info(self.format, self.itn, self.f0, cnorm0, gLnorm0,
-                      self.merit.prox, self.merit.penalty)
+                      self.merit.prox, 1.0 / self.merit.penalty)
 
         # Find a better initial point
         self.assemble_linear_system(x, y, dual_reg=False)
@@ -425,8 +520,10 @@ class RegSQPSolver(object):
 
         self.LBL = LBLSolver(self.K, factorize=True)
         self.LBL.solve(rhs)
+        self.LBL.refine(rhs, nitref=3)
         (dx, dy) = self.get_dx_dy(self.LBL.x)
         self.log.debug("step accuracy: %3.2e", norm2(self.LBL.residual))
+        self.log.debug("step norm: %6.2e", norm2(dx))
 
         xs = x + dx
         ys = y + dy
@@ -450,9 +547,10 @@ class RegSQPSolver(object):
 
             self.log.info(self.format, self.itn,
                           self.f, self.cnorm, self.gLnorm,
-                          self.merit.prox, self.merit.penalty)
+                          self.merit.prox, 1.0 / self.merit.penalty)
 
         # Initialize penalty parameter
+        self.merit.penalty = 1.0 / min(0.1, Fnorm)
         # delta = min(0.1, Fnorm0)
 
         # set stopping tolerance
@@ -462,7 +560,6 @@ class RegSQPSolver(object):
 
         self.optimal = optimal = Fnorm <= tol
         if optimal:
-            print cnorm, gLnorm
             status = 'Optimal solution found'
             short_status = 'opt'
 
@@ -480,7 +577,6 @@ class RegSQPSolver(object):
 
             # update penalty parameter
             self.merit.penalty = 1.0 / self.new_penalty(Fnorm)
-            print 'penalty: ', self.merit.penalty
 
             # compute extrapolation step
             self.assemble_linear_system(x, y)
@@ -489,20 +585,21 @@ class RegSQPSolver(object):
 
             status, short_status, solved, dx, dy = \
                 self.solve_linear_system(rhs, J)
-
             assert solved
+            self.log.debug("step norm: %6.2e", norm2(dx))
 
             # check for acceptance of extrapolation step
             # if it is rejected, it will serve as a starting point in the
             # inner iterations
             self.epsilon = 10.0 / self.merit.penalty
-            x += dx
+            # x += dx
             # y += dy
+            xplus = x + dx
             yplus = y + dy
-            f = model.obj(x)  # only necessary for printing
-            g = model.grad(x)
-            J = model.jop(x)
-            c = model.cons(x) - model.Lcon
+            f = model.obj(xplus)  # only necessary for printing
+            g = model.grad(xplus)
+            J = model.jop(xplus)
+            c = model.cons(xplus) - model.Lcon
 
             gL_ext = g - J.T * yplus            # = ∇L(wk+)
             gLnorm_ext = norm2(gL_ext)
@@ -511,6 +608,7 @@ class RegSQPSolver(object):
 
             if Fnorm_ext <= self.theta * Fnorm + self.epsilon:
                 self.log.debug("extrapolation step accepted")
+                x = xplus
                 y = yplus
                 gL = gL_ext
                 gLnorm = gLnorm_ext
@@ -528,15 +626,32 @@ class RegSQPSolver(object):
             else:
                 # perform a sequence of inner iterations
                 # starting from the extrapolated step in x and the old y
-                gL_inner = g - J.T * y
-                gLnorm_inner = norm2(gL_inner)
-                cnorm_inner = cnorm_ext
-                Fnorm_inner = gLnorm_inner + cnorm_inner
-                x, y, f, g, J, c, gL, gLnorm, cnorm, Fnorm, solved = \
-                    self.solve_inner(x, y, f, g, J, c, gL_inner,
+                print x
+                gL_in = g - J.T * y
+                gLnorm_in = norm2(gL_in)
+                cnorm_in = cnorm_ext
+                Fnorm_in = gLnorm_in + cnorm_in
+
+                (x_in, y_in, f_in, g_in, J_in, c_in, gL_in, gLnorm_in,
+                 cnorm_in, Fnorm_in, solved) = \
+                    self.solve_inner(xplus, y, f, g, J, c, gL_in,
                                      Fnorm, gLnorm, cnorm,
-                                     Fnorm_inner, gLnorm_inner, cnorm_inner)
-                print "end inner iteration: ", solved
+                                     Fnorm_in, gLnorm_in, cnorm_in)
+                if not solved:
+                    x, y, f, g, J, c, gL, gLnorm, cnorm, Fnorm = \
+                        self.emergency_backtrack(x, y, dx, dy,
+                                                 Fnorm, Fnorm_ext)
+                else:
+                    x = x_in
+                    y = y_in
+                    f = f_in
+                    g = g_in
+                    J = J_in
+                    c = c_in
+                    gL = gL_in
+                    gLnorm = gLnorm_in
+                    cnorm = cnorm_in
+                    Fnorm = Fnorm_in
 
             optimal = Fnorm <= tol
             tired = self.itn > self.itermax
@@ -545,7 +660,7 @@ class RegSQPSolver(object):
                 self.log.info(self.header)
 
             self.log.info(self.format, self.itn, f, cnorm, gLnorm,
-                          self.merit.prox, self.merit.penalty)
+                          self.merit.prox, 1.0 / self.merit.penalty)
 
             if optimal:
                 status = 'Optimal solution found'
@@ -570,6 +685,62 @@ class RegSQPSolver(object):
         self.status = status
         self.short_status = short_status
         return
+
+    def emergency_backtrack(self, x, y, dx, dy, Fnorm0, Fnorm_ext):
+        """Backtrack on ‖F(w)‖ starting from wk+."""
+        model = self.model
+
+        self.log.debug("Starting emergency backtrack with goal: %6.2e",
+                       self.theta * Fnorm0 + self.epsilon)
+        fnorm_model = FnormModel(model)
+
+        w = np.concatenate((x, y))
+        d = np.concatenate((dx, dy))
+        print "w:", w
+        print "d:", d
+        print "obj(w):", fnorm_model.obj(w), Fnorm0
+        line_model = C1LineModel(fnorm_model, w, d)
+
+        # TODO: reuse values of gL and c to compute gF
+        gF = fnorm_model.grad(w)
+        slope = np.dot(gF, d)
+        # ls = ArmijoLineSearch(line_model, decr=1.75,  bkmax=50, value=Fnorm0,
+        ls = SimpleBacktrackingLineSearch(line_model, decr=1.75, value=Fnorm0,
+                                          trial_value=Fnorm_ext, slope=slope,
+                                          theta=self.theta,
+                                          epsilon=self.epsilon)
+
+        try:
+            for step in ls:
+                self.log.debug(ls_fmt, step, ls.trial_value)
+
+            self.log.debug('step norm: %6.2e',
+                           norm2(w - ls.iterate))
+            w = ls.iterate
+            x = w[:model.n]
+            y = w[model.n:]
+            f = model.obj(x)
+            g = model.grad(x)
+            J = model.jop(x)
+            c = model.cons(x) - model.Lcon
+            cnorm = norm2(c)
+            gL = g - J.T * y
+            gLnorm = norm2(gL)
+            Fnorm = gLnorm + cnorm
+
+            self.log.info(self.format, self.itn, f, cnorm, gLnorm,
+                          self.merit.prox, 1.0 / self.merit.penalty)
+
+            try:
+                self.post_inner_iteration(x, gL)
+
+            except UserExitRequest:
+                self.status = "User exit"
+
+        except LineSearchFailure:
+            self.status = "Linesearch failure"
+
+        return x, y, f, g, J, c, gL, gLnorm, cnorm, Fnorm
 
     def post_iteration(self, x, g, **kwargs):
         """
