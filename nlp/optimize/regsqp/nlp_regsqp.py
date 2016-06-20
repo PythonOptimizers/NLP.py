@@ -98,6 +98,8 @@ for problem in other:
         verbose = False
         continue
 
+    # model.compute_scaling_cons()
+
     regsqp = RegSQP(model, maxiter=args.maxiter, theta=args.theta)
 
     try:
@@ -114,7 +116,7 @@ for problem in other:
              fcalls, gcalls, jprod, status, tsolve)
 
 if nprobs == 1 and verbose:
-
+    print regsqp.x
     # Output final statistics
     log.info('--------------------------------')
     log.info('regsqp: End of Execution')
