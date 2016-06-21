@@ -20,6 +20,7 @@ except ImportError:
     from hsl.solvers.pyma27 import PyMa27Solver as LBLSolver
 
 import pysparse.sparse.pysparseMatrix as ps
+from pykrylov.linop import IdentityOperator
 
 import logging
 import math
@@ -52,25 +53,16 @@ class SimpleBacktrackingLineSearch(LineSearch):
         name = kwargs.pop("name", "Backtracking linesearch")
         super(SimpleBacktrackingLineSearch, self).__init__(
             *args, name=name, **kwargs)
-        self.__theta = max(min(kwargs.get("theta", 0.99), 1 - sqeps), sqeps)
-        self.__epsilon = max(min(kwargs.get("epsilon", 1e-7), 1 - sqeps), sqeps)
+        self.__goal = max(kwargs.get("goal"), sqeps)
         self.__decr = max(min(kwargs.get("decr", 1.5), 100), 1.001)
         return
-
-    @property
-    def epsilon(self):
-        return self.__epsilon
-
-    @property
-    def theta(self):
-        return self.__theta
 
     @property
     def decr(self):
         return self.__decr
 
     def next(self):
-        if self.trial_value <= self.theta * self.value + self.epsilon:
+        if self.trial_value <= self.__goal:
             raise StopIteration()
 
         step = self.step
@@ -92,7 +84,7 @@ class FnormModel(UnconstrainedNLPModel):
         Objective function of this model is the norm of the KKT residual of
         `model` at w:=(x,y) defined by
 
-            F(w) =  ‖∇L(w)‖ + ‖c(w)‖
+            F(w) =  ‖∇L(w) + ρ(x-xₖ)‖ + ‖c(w) + δ(y-yₖ)‖
 
         :parameters:
             :model: ```NLPModel```.
@@ -101,22 +93,60 @@ class FnormModel(UnconstrainedNLPModel):
             self.model = SlackModel(model, **kwargs)
         super(FnormModel, self).__init__(model.n + model.m, **kwargs)
 
-    def obj(self, w, c=None, g=None, gL=None, cnorm=None, gLnorm=None):
+        self.penalty_init = kwargs.get('penalty', 10.)
+        self._penalty = self.penalty_init
+
+        self.prox_init = kwargs.get("prox", 0.)
+        self._prox = self.prox_init
+
+        self.pi0 = np.zeros(self.model.m)
+        self.pi = self.pi0.copy()
+        self.x0 = self.model.x0
+
+        self.xk = kwargs.get("xk",
+                             np.zeros(self.model.n) if self.prox_init > 0 else None)
+        self.yk = kwargs.get("yk",
+                             np.zeros(self.model.m) if self.penalty_init > 0 else None)
+
+    @property
+    def penalty(self):
+        """Current penalty parameter."""
+        return self._penalty
+
+    @penalty.setter
+    def penalty(self, value):
+        self._penalty = max(0, value)
+        self.logger.debug("setting penalty parameter to %7.1e", self.penalty)
+
+    @property
+    def prox(self):
+        """Current proximal parameter."""
+        return self._prox
+
+    @prox.setter
+    def prox(self, value):
+        self._prox = max(0, value)
+        self.logger.debug("setting prox parameter to %7.1e", self.prox)
+
+    def obj(self, w, c=None, g=None, gL=None):
         u"""Evaluate F(w)."""
         x = w[:self.model.n]
         y = w[self.model.n:]
         J = self.model.jop(x)
 
-        if cnorm is None:
-            if c is None:
-                c = self.model.cons(x)
-            cnorm = norm2(c)
-        if gLnorm is None:
-            if gL is None:
-                if g is None:
-                    g = self.model.grad(x)
-                gL = g - J.T * y
-            gLnorm = norm2(gL)
+        if c is None:
+            c = self.model.cons(x)
+        if self.penalty > 0:
+            c += self.penalty * (y - self.yk)
+        cnorm = norm2(c)
+
+        if gL is None:
+            if g is None:
+                g = self.model.grad(x)
+            gL = g - J.T * y
+        if self.prox > 0:
+            gL += self.prox * (x - self.xk)
+        gLnorm = norm2(gL)
         return gLnorm + cnorm
 
     def grad(self, w, c=None, g=None, gL=None):
@@ -128,14 +158,20 @@ class FnormModel(UnconstrainedNLPModel):
 
         if c is None:
             c = self.model.cons(x)
+        if self.penalty > 0:
+            c += self.penalty * (y - self.yk)
+        cnorm = norm2(c)
         if gL is None:
             if g is None:
                 g = self.model.grad(x)
             gL = g - J.T * y
+        if self.prox > 0:
+            gL += self.prox * (x - self.xk)
         gLnorm = norm2(gL)
 
-        u = H * gL / gLnorm + J.T * c / norm2(c)
-        v = -(J * gL) / gLnorm
+        u = (H + self.prox * IdentityOperator(self.model.n)) * gL / gLnorm + \
+            J.T * c / cnorm
+        v = -(J * gL) / gLnorm + self.penalty * c / cnorm
         return np.concatenate((u, v))
 
 
@@ -197,7 +233,7 @@ class RegSQPSolver(object):
                                          penalty=1. / penalty,
                                          prox=prox,
                                          xk=model.x0.copy())
-        self.epsilon = 10. * penalty
+        self.epsilon = (2 - self.theta) * penalty
         self.prox_factor = 10.  # increase factor during inertia correction
         self.penalty_factor = 10.  # increase factor during regularization
 
@@ -358,8 +394,10 @@ class RegSQPSolver(object):
 
         J = self.K[nvar:, :nvar]
         Jt = self.K[:nvar, nvar:]
-        self.log.debug("sufficiently positive definite: %6.2e>=%6.2e", np.dot(self.K[:self.model.n, :self.model.n] *
-                                                                              dx, dx) + self.merit.penalty * np.dot(dx, Jt * (J * dx)), 1e-8 * np.dot(dx, dx))
+        self.log.debug("sufficiently positive definite: %6.2e>=%6.2e",
+                       np.dot(self.K[:self.model.n, :self.model.n] * dx, dx) +
+                       self.merit.penalty * np.dot(dx, Jt * (J * dx)),
+                       1e-8 * np.dot(dx, dx))
         self.log.debug("step accuracy: %3.2e", norm2(self.LBL.residual))
         status = None
         short_status = None
@@ -383,14 +421,11 @@ class RegSQPSolver(object):
         The improved iterate is identified by minimizing the proximal augmented
         Lagrangian.
         """
+        # self.merit.penalty = 1. / Fnorm
         self.log.debug('starting inner iterations with target %7.1e',
                        self.theta * Fnorm0 + self.epsilon)
         self.log.info(self.format, self.itn, f, cnorm, gLnorm,
                       self.merit.prox, 1.0 / self.merit.penalty)
-
-        y_al = y - c * self.merit.penalty
-        phi = f - np.dot(y, c) + 0.5 * self.merit.penalty * cnorm**2
-        gphi = g - J.T * y_al
 
         model = self.model
         failure = False
@@ -399,7 +434,12 @@ class RegSQPSolver(object):
         if cnorm > self.theta * cnorm0 + 0.5 * self.epsilon:
             self.merit.penalty *= 10
 
+        y_al = y - c * self.merit.penalty
+        phi = f - np.dot(y, c) + 0.5 * self.merit.penalty * cnorm**2
+        gphi = g - J.T * y_al
         gphi_norm = norm2(gphi)
+        self.log.debug(u"‖∇L‖ = %6.2e, ‖∇ϕ‖ = %6.2e",
+                       norm2(g - J.T * y), gphi_norm)
         if gphi_norm <= self.theta * gLnorm0 + 0.5 * self.epsilon:
             self.log.debug('optimality improved sufficiently')
             if cnorm <= self.theta * cnorm0 + 0.5 * self.epsilon:
@@ -432,7 +472,8 @@ class RegSQPSolver(object):
             self.merit.pi = y
             line_model = C1LineModel(self.merit, x, dx)
             slope = np.dot(gphi, dx)
-            ls = ArmijoLineSearch(line_model, bkmax=10,
+            self.log.debug(u"ϕ(x) = %6.2e, ∇ϕᵀΔx = %6.2e", phi, slope)
+            ls = ArmijoLineSearch(line_model, bkmax=5,
                                   decr=1.75, value=phi, slope=slope)
             # ls = ArmijoWolfeLineSearch(line_model, step=1.0, bkmax=10,
             #                            decr=1.75, value=phi, slope=slope)
@@ -586,30 +627,36 @@ class RegSQPSolver(object):
             status, short_status, solved, dx, dy = \
                 self.solve_linear_system(rhs, J)
             assert solved
+            penalty_ext = self.merit.penalty
+            prox_ext = self.merit.prox
             self.log.debug("step norm: %6.2e", norm2(dx))
 
             # check for acceptance of extrapolation step
             # if it is rejected, it will serve as a starting point in the
             # inner iterations
-            self.epsilon = 10.0 / self.merit.penalty
+            self.epsilon = (2 - self.theta) * Fnorm  # 10./ self.merit.penalty
             # x += dx
             # y += dy
             xplus = x + dx
             yplus = y + dy
-            f = model.obj(xplus)  # only necessary for printing
-            g = model.grad(xplus)
-            J = model.jop(xplus)
-            c = model.cons(xplus) - model.Lcon
+            f_ext = model.obj(xplus)  # only necessary for printing
+            g_ext = model.grad(xplus)
+            J_ext = model.jop(xplus)
+            c_ext = model.cons(xplus) - model.Lcon
 
-            gL_ext = g - J.T * yplus            # = ∇L(wk+)
+            gL_ext = g_ext - J_ext.T * yplus            # = ∇L(wk+)
             gLnorm_ext = norm2(gL_ext)
-            cnorm_ext = norm2(c)                # = ‖c(xk+)‖
-            Fnorm_ext = gLnorm_ext + cnorm_ext  # = ‖F(wk+)‖
+            cnorm_ext = norm2(c_ext)                # = ‖c(xk+)‖
+            Fnorm_ext = gLnorm_ext + cnorm_ext      # = ‖F(wk+)‖
 
             if Fnorm_ext <= self.theta * Fnorm + self.epsilon:
                 self.log.debug("extrapolation step accepted")
                 x = xplus
                 y = yplus
+                f = f_ext
+                g = g_ext
+                J = J_ext
+                c = c_ext
                 gL = gL_ext
                 gLnorm = gLnorm_ext
                 cnorm = cnorm_ext
@@ -626,7 +673,6 @@ class RegSQPSolver(object):
             else:
                 # perform a sequence of inner iterations
                 # starting from the extrapolated step in x and the old y
-                print x
                 gL_in = g - J.T * y
                 gLnorm_in = norm2(gL_in)
                 cnorm_in = cnorm_ext
@@ -634,12 +680,24 @@ class RegSQPSolver(object):
 
                 (x_in, y_in, f_in, g_in, J_in, c_in, gL_in, gLnorm_in,
                  cnorm_in, Fnorm_in, solved) = \
-                    self.solve_inner(xplus, y, f, g, J, c, gL_in,
+                    self.solve_inner(x, y, f, g, J, c, gL,
                                      Fnorm, gLnorm, cnorm,
-                                     Fnorm_in, gLnorm_in, cnorm_in)
+                                     Fnorm, gLnorm, cnorm)
+                # x = x_in
+                # y = y_in
+                # f = f_in
+                # g = g_in
+                # J = J_in
+                # c = c_in
+                # gL = gL_in
+                # gLnorm = gLnorm_in
+                # cnorm = cnorm_in
+                # Fnorm = Fnorm_in
+
                 if not solved:
                     x, y, f, g, J, c, gL, gLnorm, cnorm, Fnorm = \
-                        self.emergency_backtrack(x, y, dx, dy,
+                        self.emergency_backtrack(x, y, dx, dy, prox_ext,
+                                                 penalty_ext,
                                                  Fnorm, Fnorm_ext)
                 else:
                     x = x_in
@@ -686,29 +744,35 @@ class RegSQPSolver(object):
         self.short_status = short_status
         return
 
-    def emergency_backtrack(self, x, y, dx, dy, Fnorm0, Fnorm_ext):
-        """Backtrack on ‖F(w)‖ starting from wk+."""
+    def emergency_backtrack(self, x, y, dx, dy, prox, penalty, Fnorm0, Fnorm_ext):
+        """Backtrack on ‖Fᵨδ(w)‖."""
         model = self.model
 
-        self.log.debug("Starting emergency backtrack with goal: %6.2e",
-                       self.theta * Fnorm0 + self.epsilon)
-        fnorm_model = FnormModel(model)
+        self.log.debug("Starting emergency backtrack with goal: %6.2e, %6.2e",
+                       self.theta * Fnorm0 + self.epsilon, 2 * Fnorm0)
+        fnorm_model = FnormModel(model, prox=prox,
+                                 penalty=1. / penalty,
+                                 xk=x.copy(), yk=y.copy())
 
         w = np.concatenate((x, y))
         d = np.concatenate((dx, dy))
-        print "w:", w
-        print "d:", d
-        print "obj(w):", fnorm_model.obj(w), Fnorm0
+
         line_model = C1LineModel(fnorm_model, w, d)
 
         # TODO: reuse values of gL and c to compute gF
         gF = fnorm_model.grad(w)
         slope = np.dot(gF, d)
+        step0 = 0.98 * min(1.,
+                           Fnorm0 / (norm2(d) * max(prox, 1. / penalty)))
+        self.log.debug("intial step length: %7.1e and initial value: %8.2e",
+                       step0, line_model.obj(step0))
         # ls = ArmijoLineSearch(line_model, decr=1.75,  bkmax=50, value=Fnorm0,
-        ls = SimpleBacktrackingLineSearch(line_model, decr=1.75, value=Fnorm0,
-                                          trial_value=Fnorm_ext, slope=slope,
-                                          theta=self.theta,
-                                          epsilon=self.epsilon)
+        ls = SimpleBacktrackingLineSearch(line_model, decr=1.75,
+                                          value=Fnorm0,
+                                          #   trial_value=Fnorm_ext,
+                                          slope=slope,
+                                          step=step0,
+                                          goal=self.theta * Fnorm0 + self.epsilon)
 
         try:
             for step in ls:
