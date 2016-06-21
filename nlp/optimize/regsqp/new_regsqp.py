@@ -37,29 +37,33 @@ class SimpleBacktrackingLineSearch(LineSearch):
     """Simple backtracking linesearch."""
 
     def __init__(self, *args, **kwargs):
-        """Instantiate a simple backtracking linesearch.
+        u"""Instantiate a simple backtracking linesearch.
 
         The search stops as soon as a step size t is found such that
 
             ϕ(t) <= Θ ϕ(0) + ϵ
 
-        where 0 < Θ < 1 and ϵ>0.
+        where 0 < Θ < 1 and ϵ > 0.
 
         :keywords:
-            :theta: constant used in condition (default: 0.99)
             :decr: factor by which to reduce the steplength
-                   during the backtracking (default: 1.5).
+                   during the backtracking (default: 1.5)
+            :goal: Θ ϕ(0) + ϵ (default: √ϵM).
         """
         name = kwargs.pop("name", "Backtracking linesearch")
         super(SimpleBacktrackingLineSearch, self).__init__(
             *args, name=name, **kwargs)
-        self.__goal = max(kwargs.get("goal"), sqeps)
+        self.__goal = max(kwargs.get("goal", 0), sqeps)
         self.__decr = max(min(kwargs.get("decr", 1.5), 100), 1.001)
         return
 
     @property
     def decr(self):
         return self.__decr
+
+    def check_slope(self, slope):
+        # Don't check slope
+        return
 
     def next(self):
         if self.trial_value <= self.__goal:
@@ -99,9 +103,7 @@ class FnormModel(UnconstrainedNLPModel):
         self.prox_init = kwargs.get("prox", 0.)
         self._prox = self.prox_init
 
-        self.pi0 = np.zeros(self.model.m)
-        self.pi = self.pi0.copy()
-        self.x0 = self.model.x0
+        self.x0 = np.concatenate((self.model.x0, self.model.pi0))
 
         self.xk = kwargs.get("xk",
                              np.zeros(self.model.n) if self.prox_init > 0 else None)
@@ -115,6 +117,7 @@ class FnormModel(UnconstrainedNLPModel):
 
     @penalty.setter
     def penalty(self, value):
+        """Assign value to penalty parameter."""
         self._penalty = max(0, value)
         self.logger.debug("setting penalty parameter to %7.1e", self.penalty)
 
@@ -125,6 +128,7 @@ class FnormModel(UnconstrainedNLPModel):
 
     @prox.setter
     def prox(self, value):
+        """Assign value to proximal parameter."""
         self._prox = max(0, value)
         self.logger.debug("setting prox parameter to %7.1e", self.prox)
 
@@ -169,10 +173,13 @@ class FnormModel(UnconstrainedNLPModel):
             gL += self.prox * (x - self.xk)
         gLnorm = norm2(gL)
 
-        u = (H + self.prox * IdentityOperator(self.model.n)) * gL / gLnorm + \
-            J.T * c / cnorm
-        v = -(J * gL) / gLnorm + self.penalty * c / cnorm
-        return np.concatenate((u, v))
+        if self.prox > 0:
+            H = H + self.prox * IdentityOperator(self.model.n)
+        dFdx = H * gL / gLnorm + J.T * c / cnorm
+        dFdy = -(J * gL) / gLnorm
+        if self.penalty > 0:
+            dFdy += self.penalty * c / cnorm
+        return np.concatenate((dFdx, dFdy))
 
 
 class RegSQPSolver(object):
@@ -195,7 +202,7 @@ class RegSQPSolver(object):
         """
         self.model = model
         self.x = model.x0.copy()
-        self.y = np.ones(model.m)
+        self.y = np.zeros(model.m)  # TODO: initialize properly
 
         self.abstol = kwargs.get('abstol', 1.0e-7)
         self.reltol = kwargs.get('reltol', 1.0e-6)
@@ -228,7 +235,7 @@ class RegSQPSolver(object):
         self.prox_last = 0.0
         self.penalty_min = 1.0e-8
         prox = max(0.0, kwargs.get('prox', 0.0))
-        penalty = max(self.penalty_min, kwargs.get('penalty', 1.0))
+        penalty = max(self.penalty_min, kwargs.get('penalty', 10.0))
         self.merit = AugmentedLagrangian(model,
                                          penalty=1. / penalty,
                                          prox=prox,
@@ -293,8 +300,8 @@ class RegSQPSolver(object):
 
     def new_penalty(self, Fnorm):
         """Return updated penalty parameter value."""
-        alpha = 0.1
-        gamma = 1.8
+        alpha = 0.9
+        gamma = 1.1
         penalty = max(min(Fnorm,
                           min(alpha / self.merit.penalty,
                               1.0 / self.merit.penalty**gamma)),
@@ -472,7 +479,8 @@ class RegSQPSolver(object):
             self.merit.pi = y
             line_model = C1LineModel(self.merit, x, dx)
             slope = np.dot(gphi, dx)
-            self.log.debug(u"ϕ(x) = %6.2e, ∇ϕᵀΔx = %6.2e", phi, slope)
+            self.log.debug(u"ϕ(x) = %9.2e, ∇ϕᵀΔx = %9.2e, ‖Δx‖ = %8.2e",
+                           phi, slope, norm2(dx))
             ls = ArmijoLineSearch(line_model, bkmax=5,
                                   decr=1.75, value=phi, slope=slope)
             # ls = ArmijoWolfeLineSearch(line_model, step=1.0, bkmax=10,
@@ -483,7 +491,7 @@ class RegSQPSolver(object):
                 for step in ls:
                     self.log.debug(ls_fmt, step, ls.trial_value)
 
-                self.log.debug('step norm: %6.2e', norm2(x - ls.iterate))
+                self.log.debug('step norm: %8.2e', norm2(x - ls.iterate))
                 x = ls.iterate
                 f = model.obj(x)
                 g = model.grad(x)
@@ -634,7 +642,8 @@ class RegSQPSolver(object):
             # check for acceptance of extrapolation step
             # if it is rejected, it will serve as a starting point in the
             # inner iterations
-            self.epsilon = (2 - self.theta) * Fnorm  # 10./ self.merit.penalty
+            # self.epsilon = (2 - self.theta) * Fnorm  # 10./ self.merit.penalty
+            self.epsilon = 10. / self.merit.penalty
             # x += dx
             # y += dy
             xplus = x + dx
@@ -672,11 +681,7 @@ class RegSQPSolver(object):
 
             else:
                 # perform a sequence of inner iterations
-                # starting from the extrapolated step in x and the old y
-                gL_in = g - J.T * y
-                gLnorm_in = norm2(gL_in)
-                cnorm_in = cnorm_ext
-                Fnorm_in = gLnorm_in + cnorm_in
+                # starting from the old x and the old y
 
                 (x_in, y_in, f_in, g_in, J_in, c_in, gL_in, gLnorm_in,
                  cnorm_in, Fnorm_in, solved) = \
@@ -695,6 +700,7 @@ class RegSQPSolver(object):
                 # Fnorm = Fnorm_in
 
                 if not solved:
+                    self.epsilon = (2 - self.theta) * Fnorm
                     x, y, f, g, J, c, gL, gLnorm, cnorm, Fnorm = \
                         self.emergency_backtrack(x, y, dx, dy, prox_ext,
                                                  penalty_ext,
@@ -745,33 +751,20 @@ class RegSQPSolver(object):
         return
 
     def emergency_backtrack(self, x, y, dx, dy, prox, penalty, Fnorm0, Fnorm_ext):
-        """Backtrack on ‖Fᵨδ(w)‖."""
+        """Backtrack on ‖F(w)‖."""
         model = self.model
 
         self.log.debug("Starting emergency backtrack with goal: %6.2e, %6.2e",
                        self.theta * Fnorm0 + self.epsilon, 2 * Fnorm0)
-        fnorm_model = FnormModel(model, prox=prox,
-                                 penalty=1. / penalty,
-                                 xk=x.copy(), yk=y.copy())
 
+        fnorm_model = FnormModel(model, prox=0, penalty=0)
         w = np.concatenate((x, y))
         d = np.concatenate((dx, dy))
 
         line_model = C1LineModel(fnorm_model, w, d)
-
-        # TODO: reuse values of gL and c to compute gF
-        gF = fnorm_model.grad(w)
-        slope = np.dot(gF, d)
-        step0 = 0.98 * min(1.,
-                           Fnorm0 / (norm2(d) * max(prox, 1. / penalty)))
-        self.log.debug("intial step length: %7.1e and initial value: %8.2e",
-                       step0, line_model.obj(step0))
-        # ls = ArmijoLineSearch(line_model, decr=1.75,  bkmax=50, value=Fnorm0,
         ls = SimpleBacktrackingLineSearch(line_model, decr=1.75,
                                           value=Fnorm0,
-                                          #   trial_value=Fnorm_ext,
-                                          slope=slope,
-                                          step=step0,
+                                          trial_value=Fnorm_ext,
                                           goal=self.theta * Fnorm0 + self.epsilon)
 
         try:
