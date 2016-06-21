@@ -98,6 +98,7 @@ for problem in other:
         verbose = False
         continue
 
+    # model.compute_scaling_obj()
     # model.compute_scaling_cons()
 
     regsqp = RegSQP(model, maxiter=args.maxiter, theta=args.theta)
