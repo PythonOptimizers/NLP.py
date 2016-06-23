@@ -68,13 +68,16 @@ nprobs = len(other)
 if nprobs == 0:
     raise ValueError("Please supply problem name as argument")
 
+
 # Create root logger.
 log = config_logger('nlp', '%(name)-3s %(levelname)-5s %(message)s')
 
 # Configure the solver logger.
 reg_logger = config_logger("nlp.regsqp",
                            "%(name)-8s %(levelname)-5s %(message)s",
+                           colored=True,
                            level=logging.WARN if nprobs > 1 else logging.DEBUG)
+
 
 log.info('%12s %5s %5s %6s %8s %8s %8s %6s %6s %6s %5s %7s',
          'name', 'nvar', 'ncons', 'iter', 'f', u'‖c‖', u'‖∇L‖',
