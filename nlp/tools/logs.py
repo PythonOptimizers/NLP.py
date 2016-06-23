@@ -2,10 +2,11 @@
 
 import sys
 import logging
+import colorlog
 
 
 def config_logger(name, format='%(message)s', datefmt=None,
-                  stream=sys.stdout, level=logging.INFO,
+                  stream=sys.stdout, colored=False, level=logging.INFO,
                   filename=None, filemode='w', filelevel=None,
                   propagate=False):
     """Basic configuration for the logging system.
@@ -25,6 +26,7 @@ def config_logger(name, format='%(message)s', datefmt=None,
         :datefmt:   handler date/time format specifier
         :stream:    initialize the StreamHandler using ``stream``
                     (None disables the stream, default=``sys.stdout``)
+        :colored:   colored handler
         :level:     logger level (default=``INFO``).
         :filename:  create FileHandler using ``filename`` (default=``None``)
         :filemode:  open ``filename`` with specified filemode (``w`` or ``a``)
@@ -42,7 +44,7 @@ def config_logger(name, format='%(message)s', datefmt=None,
 
     # Add handlers. Add NullHandler if no file or stream output so that
     # modules don't emit a warning about no handler.
-    if not (filename or stream):
+    if not (filename or stream or colored):
         logger.addHandler(logging.NullHandler())
 
     if filename:
@@ -55,7 +57,18 @@ def config_logger(name, format='%(message)s', datefmt=None,
         hdlr = logging.StreamHandler(stream)
         hdlr.setLevel(level)
 
-    hdlr.setFormatter(logging.Formatter(format))
+    if colored:
+        hdlr = colorlog.StreamHandler()
+        hdlr.setFormatter(colorlog.ColoredFormatter('%(log_color)s' + format,
+                                                    log_colors={
+                                                        'DEBUG':    'cyan',
+                                                        'INFO':     'green',
+                                                        'WARNING':  'yellow',
+                                                        'ERROR':    'red',
+                                                        'CRITICAL': 'bg_white',
+                                                    }))
+    else:
+        hdlr.setFormatter(logging.Formatter(format))
     logger.addHandler(hdlr)
 
     return logger
