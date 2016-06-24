@@ -20,8 +20,8 @@ before_install:
   - pip install -q virtualenv
   - virtualenv ~/.venv
   - source ~/.venv/bin/activate
-  - pip install numpy 
-  - pip install scipy
+  - pip install -q numpy 
+  - pip install -q scipy
   - pip install -q git+https://github.com/optimizers/pysparse.git
   - pip install -q git+https://github.com/PythonOptimizers/pykrylov.git@develop
   - pip install -q algopy
