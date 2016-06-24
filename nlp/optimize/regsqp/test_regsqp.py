@@ -5,7 +5,7 @@ import unittest
 import pytest
 
 import numpy as np
-from numpy.testing import *
+# from numpy.testing import *
 
 from new_regsqp import RegSQPSolver, FnormModel
 import pysparse.sparse.pysparseMatrix as ps
@@ -23,13 +23,29 @@ class TestFnormModel(unittest.TestCase):
         pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("pysparse")
         self.model = PySparseAmplModel('hs007.nl')
-        self.fnormmodel = FnormModel(self.model)
 
-    def test_derivatives(self):
+    def test_derivatives_noprox_nopenalty(self):
+        fnormmodel = FnormModel(self.model, penalty=0, prox=0)
+
         log = config_logger("nlp.der",
                             "%(name)-10s %(levelname)-8s %(message)s",
                             level=logging.DEBUG)
-        dcheck = DerivativeChecker(self.fnormmodel,
+        dcheck = DerivativeChecker(fnormmodel,
+                                   np.concatenate((self.model.x0,
+                                                   np.ones(self.model.m))))
+        dcheck.check(hess=False, chess=False)
+        assert len(dcheck.grad_errs) == 0
+
+    def test_derivatives_prox_penalty(self):
+        n = self.model.n
+        m = self.model.m
+        fnormmodel = FnormModel(self.model, penalty=1, prox=1,
+                                xk=np.random.rand(n), yk=np.random.rand(m))
+
+        log = config_logger("nlp.der",
+                            "%(name)-10s %(levelname)-8s %(message)s",
+                            level=logging.DEBUG)
+        dcheck = DerivativeChecker(fnormmodel,
                                    np.concatenate((self.model.x0,
                                                    np.ones(self.model.m))))
         dcheck.check(hess=False, chess=False)
