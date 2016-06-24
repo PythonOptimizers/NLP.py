@@ -17,7 +17,7 @@ class QuadraticCubicLineSearch(LineSearch):
     """
 
     def __init__(self, *args, **kwargs):
-        u"""Instantiate an Armijo backtracking linesearch.
+        u"""Instantiate a linesearch using quadratic or cubic interpolants.
 
         The search stops as soon as a step size t is found such that
 
