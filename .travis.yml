@@ -20,7 +20,7 @@ before_install:
   - pip install -q virtualenv
   - virtualenv ~/.venv
   - source ~/.venv/bin/activate
-  - pip install -q numpy 
+  - pip install -q numpy
   - travis_wait pip install -q scipy
   - pip install -q git+https://github.com/optimizers/pysparse.git
   - pip install -q git+https://github.com/PythonOptimizers/pykrylov.git@develop
