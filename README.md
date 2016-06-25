@@ -1,6 +1,7 @@
 # NLP.py
 
 [![Build Status](https://travis-ci.com/PythonOptimizers/NLP.py.svg?token=MZezWHtArpsrWZ3Yyqzx&branch=develop)](https://travis-ci.com/PythonOptimizers/NLP.py)
+[![Coverage Status](https://coveralls.io/repos/github/PythonOptimizers/NLP.py/badge.svg?branch=develop)](https://coveralls.io/github/PythonOptimizers/NLP.py?branch=develop)
 
 `NLP.py` is a Python package for modeling and solving continuous optimization problems.
 
