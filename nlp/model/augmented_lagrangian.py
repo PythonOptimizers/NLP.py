@@ -46,6 +46,7 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
                                                   Lvar=self.model.Lvar,
                                                   Uvar=self.model.Uvar)
 
+
         self.penalty_init = kwargs.get('penalty', 10.)
         self._penalty = self.penalty_init
 
