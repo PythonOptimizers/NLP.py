@@ -43,5 +43,6 @@ script:
   - nlp_tron.py examples/rosenbr.nl
   - coverage run --source nlp setup.py test
   - coverage report
+
 after_success:
   - coveralls
