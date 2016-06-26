@@ -90,8 +90,9 @@ class Auglag(object):
         self.eta0 = 0.1258925
         self.omega0 = 1.
         self.omega_init = kwargs.get(
-            'omega_init', self.omega0 * 0.1)  # rho_init**-1
-        self.eta_init = kwargs.get('eta_init', self.eta0**0.1)  # rho_init**-0.1
+            'omega_init', self.omega0 * 0.1)  # penalty_init**-1
+        self.eta_init = kwargs.get(
+            'eta_init', self.eta0**0.1)  # penalty_init**-0.1
         self.a_omega = kwargs.get('a_omega', 1.)
         self.b_omega = kwargs.get('b_omega', 1.)
         self.a_eta = kwargs.get('a_eta', 0.1)
@@ -154,7 +155,7 @@ class Auglag(object):
         slack_model = self.model.model
         on = slack_model.original_n
         m_step = np.zeros(al_model.n)
-        m_step[on:] = -g[on:] / al_model.rho
+        m_step[on:] = -g[on:] / al_model.penalty
         # Assuming slack variables are restricted to [0,+inf) interval
         m_step[on:] = np.where(-m_step[on:] > x[on:], -x[on:], m_step[on:])
         return m_step
@@ -206,7 +207,7 @@ class Auglag(object):
         """
         al_model = self.model
         slack_model = self.model.model
-        al_model.pi -= al_model.rho * convals
+        al_model.pi -= al_model.penalty * convals
         if slack_model.m != 0:
             self.log.debug('New multipliers = %g, %g' %
                            (max(al_model.pi), min(al_model.pi)))
@@ -215,8 +216,8 @@ class Auglag(object):
             # Safeguard: tighten tolerances only if desired optimality
             # is reached to prevent rapid decay of the tolerances from failed
             # inner loops
-            self.eta /= al_model.rho**self.b_eta
-            self.omega /= al_model.rho**self.b_omega
+            self.eta /= al_model.penalty**self.b_eta
+            self.omega /= al_model.penalty**self.b_omega
             self.inner_fail_count = 0
         else:
             self.inner_fail_count += 1
@@ -224,13 +225,13 @@ class Auglag(object):
 
     def update_penalty_parameter(self):
         """
-        Large infeasibility; increase rho and reset tolerances
-        based on new rho.
+        Large infeasibility; increase penalty parameter and reset tolerances
+        based on new penalty value.
         """
         al_model = self.model
-        al_model.rho /= self.tau
-        self.eta = self.eta0 * al_model.rho**-self.a_eta
-        self.omega = self.omega0 * al_model.rho**-self.a_omega
+        al_model.penalty /= self.tau
+        self.eta = self.eta0 * al_model.penalty**-self.a_eta
+        self.omega = self.omega0 * al_model.penalty**-self.a_omega
         return
 
     def post_iteration(self, **kwargs):
@@ -318,7 +319,8 @@ class Auglag(object):
         if self.iter % 20 == 0:
             self.log.info(self.header)
             self.log.info(self.format0, self.iter, self.f, self.pg0,
-                          self.cons0, al_model.rho, "", "", self.omega, self.eta)
+                          self.cons0, al_model.penalty, "", "", self.omega,
+                          self.eta)
 
         while not (exitOptimal or exitIter):
             self.iter += 1
@@ -349,7 +351,7 @@ class Auglag(object):
 
             self.log.info(self.format % (self.iter, self.f,
                                          self.pgnorm, max_cons_new,
-                                         al_model.rho,
+                                         al_model.penalty,
                                          bc_solver.iter, bc_solver.status,
                                          self.omega, self.eta))
 
