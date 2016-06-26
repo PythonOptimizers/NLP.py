@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """A general linesearch framework."""
 
 from math import sqrt

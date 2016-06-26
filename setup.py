@@ -8,15 +8,30 @@ D. Orban     <dominique.orban@gerad.ca>
 S. Arreckx   <sylvain.arreckx@gmail.com>
 """
 import os
+import sys
 import glob
 
 from setuptools import setup   # enables 'python setup.py develop'
+from setuptools.command.test import test as TestCommand
 from distutils.extension import Extension
 import ConfigParser
 
 import numpy as np
 
 DOCLINES = __doc__.split("\n")
+
+
+# This is a plug-in for setuptools that will invoke py.test
+# when you run python setup.py test
+class PyTest(TestCommand):
+    def finalize_options(self):
+        TestCommand.finalize_options(self)
+        self.test_args = []
+        self.test_suite = True
+
+    def run_tests(self):
+        import pytest  # import here, because outside the required eggs aren't loaded yet
+        sys.exit(pytest.main(self.test_args))
 
 nlp_config = ConfigParser.SafeConfigParser()
 nlp_config.read('site.cfg')
@@ -114,5 +129,7 @@ setup(
     package_dir={"nlp": "nlp"},
     packages=packages_list,
     scripts=scripts_list,
+    tests_require=['pytest'],
+    setup_requires=['pytest-runner'],
     zip_safe=False
 )
