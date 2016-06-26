@@ -92,7 +92,7 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
         model = self.model
         J = model.jop(x)
         cons = model.cons(x)
-        algrad = model.grad(x) - J.T * (self.pi - self.rho * cons)
+        algrad = model.grad(x) - J.T * (self.pi - self.penalty * cons)
         if self.prox > 0:
             algrad += self.prox * (x - self.xk)
         return algrad
@@ -110,11 +110,11 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
         Compute the Hessian-vector product of the Hessian of the augmented
         Lagrangian with a vector v.
         """
-        # model = self.model
+        model = self.model
         cons = self.model.cons(x)
-        #
+
         w = model.hprod(x, self.pi - self.penalty * cons, v)
-        # J = model.jop(x)
+        J = model.jop(x)
         Hv = w + self.penalty * J.T * J * v
         if self.prox > 0:
             Hv += self.prox * v
