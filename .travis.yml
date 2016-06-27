@@ -20,7 +20,7 @@ before_install:
   - pip install -q virtualenv
   - virtualenv ~/.venv
   - source ~/.venv/bin/activate
-  - pip install -q numpy 
+  - pip install -q numpy
   - travis_wait pip install -q scipy
   - pip install -q git+https://github.com/optimizers/pysparse.git
   - pip install -q git+https://github.com/PythonOptimizers/pykrylov.git@develop
@@ -28,7 +28,8 @@ before_install:
   - pip install -q git+https://github.com/b45ch1/pycppad.git
   - cd $HOME && git clone https://github.com/b45ch1/pyadolc.git
   - cd pyadolc && { echo '\n' | python setup.py install; } && cd $TRAVIS_BUILD_DIR
-  - pip install -q pytest-cov
+  - pip install -q pytest
+  - pip install -q coveralls
 
 install:
   - echo "[ASL]" > site.cfg
@@ -40,9 +41,8 @@ script:
   - nlp_trunk.py examples/rosenbr.nl
   - nlp_dercheck.py examples/rosenbr.nl
   - nlp_tron.py examples/rosenbr.nl
-  # - py.test -v --cov-report= --cov=nlp tests/  # when repository goes public
-  - py.test -v --cov=nlp tests/
+  - coverage run --source nlp setup.py test
+  - coverage report
 
-# Uncomment when repository goes public
-# after_success:
-#   coveralls
+after_success:
+  - coveralls

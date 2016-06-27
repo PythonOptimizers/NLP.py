@@ -91,9 +91,7 @@ packages_list = ['nlp',
                  'nlp.ls',
                  'nlp.optimize',
                  'nlp.tools',
-                 'nlp.tr',
-                 'tests',
-                 'tests.model']
+                 'nlp.tr']
 
 scripts_list = glob.glob(os.path.join('nlp', 'drivers', 'nlp_*.py'))
 
@@ -116,5 +114,7 @@ setup(
     package_dir={"nlp": "nlp"},
     packages=packages_list,
     scripts=scripts_list,
+    tests_require=['pytest'],
+    setup_requires=['pytest-runner'],
     zip_safe=False
 )
