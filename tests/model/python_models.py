@@ -89,3 +89,63 @@ class SimpleQP(NLPModel):
         hv[0] = v[0]
         hv[1] = (1 - 6 * z * x[1]) * v[1]
         return hv
+
+
+class SimpleCubicProb(UnconstrainedNLPModel):
+
+    def __init__(self, **kwargs):
+        super(SimpleCubicProb, self).__init__(2, **kwargs)
+
+    def obj(self, x):
+        return x[0]**3 + x[1]**3
+
+    def grad(self, x):
+        n = self.nvar
+        g = np.empty(n)
+        g[0] = 3 * x[0]**2
+        g[1] = 3 * x[1]**2
+        return g
+
+    def hess(self, x, z=None, *args, **kwargs):
+
+        if z is None:
+            z = np.zeros(self.m)
+        H = np.empty([self.n, self.n])
+        H[0, 0] = 6. * x[0]
+        H[0, 1] = H[1, 0] = 0
+        H[1, 1] = 6. * x[1]
+        return H
+
+
+class LineSearchProblem(UnconstrainedNLPModel):
+
+    def __init__(self, **kwargs):
+        super(LineSearchProblem, self).__init__(1, **kwargs)
+
+    def obj(self, x):
+        return (x - 3) * x**3 * (x - 6)**4
+
+    def grad(self, x):
+        g = (-6 + x)**3 * x**2 * (54 - 45 * x + 8 * x**2)
+        return g
+
+    def hess(self, x, z=None, *args, **kwargs):
+        H = 2 * (-6 + x)**2 * x * (-324 + 540 * x - 231 * x**2 + 28 * x**3)
+        return H
+
+
+class LineSearchProblem2(UnconstrainedNLPModel):
+
+    def __init__(self, **kwargs):
+        super(LineSearchProblem2, self).__init__(1, **kwargs)
+
+    def obj(self, x):
+        return (x**2 - 1) * x**2 * (x**2 - 16) + 200
+
+    def grad(self, x):
+        g = 32 * x - 68 * x**3 + 6 * x**5
+        return g
+
+    def hess(self, x, z=None, *args, **kwargs):
+        H = 32 - 204 * x**2 + 30 * x**4
+        return H
