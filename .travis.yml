@@ -17,6 +17,9 @@ before_install:
   - brew install cppad --with-adol-c
   - brew install asl
   - brew install metis
+  - wget http://ampl.com/demo/ampl.macosx64.tgz -O /tmp/ampl.macosx64.tgz
+  - tar -xvf /tmp/ampl.macosx64.tgz
+  - export PATH=$PATH:$PWD/ampl.macosx64
   - pip install -q virtualenv
   - virtualenv ~/.venv
   - source ~/.venv/bin/activate

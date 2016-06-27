@@ -47,5 +47,5 @@ class Test_norm(TestCase):
         U, s, V = np.linalg.svd(self.A, full_matrices=True)
         np.testing.assert_approx_equal(normest(Aop)[0], max(s))
 
-        print normest(Aop)
-        np.testing.assert_raises(Warning, normest, Aop, maxits=1)
+        with pytest.raises(Warning):
+            v = normest(Aop, maxits=1)

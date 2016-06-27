@@ -107,8 +107,8 @@ class Test_PySparseSlackHS7(TestCase, GenericTest):
 
     def test_init(self):
         model = os.path.join(this_path, 'hs007.nl')
-        np.testing.assert_raises(TypeError,
-                                 PySparseSlackModel, AmplModel(model))
+        with pytest.raises(TypeError):
+            model = PySparseSlackModel(AmplModel(model))
 
 
 class Test_PySparseSlackHS9(TestCase, GenericTest):
@@ -218,13 +218,6 @@ class Test_SciPySlackHS7(TestCase, GenericTest):
         self.model = SciPySlackModel(SciPyAmplModel(model))
         self.model.pi0 = np.ones(1)
 
-    # No exception should be raised because SciPySlackModel isn't a subclass
-    # of SciPyNLPModel.
-    # def test_init(self):
-    #     model = os.path.join(this_path, 'hs007.nl')
-    #     np.testing.assert_raises(TypeError,
-    #                              SciPySlackModel, AmplModel(model))
-
 
 class Test_SciPySlackHS9(TestCase, GenericTest):
 
@@ -273,7 +266,8 @@ class Test_GenTemplate(TestCase):
     def test_template_creation(self):
         model = AmplModel(self.model_name)
         assert model.name == "hs007"
-        np.testing.assert_raises(ValueError, AmplModel, "sylvain.nl")
+        with pytest.raises(ValueError):
+            model = AmplModel("sylvain.nl")
 
     def test_obj_scaling(self):
         model = AmplModel(self.model_name)
