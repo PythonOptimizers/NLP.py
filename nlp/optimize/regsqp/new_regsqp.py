@@ -9,6 +9,7 @@ from nlp.model.snlp import SlackModel
 from nlp.ls.linesearch import LineSearch, ArmijoLineSearch
 from nlp.ls.linesearch import ArmijoWolfeLineSearch, LineSearchFailure
 from nlp.ls.wolfe import StrongWolfeLineSearch
+from nlp.ls.quad_cub import QuadraticCubicLineSearch
 
 from nlp.tools.exceptions import UserExitRequest
 from nlp.tools.norms import norm2 as norm2
@@ -504,6 +505,8 @@ class RegSQPSolver(object):
             #                            decr=1.75, value=phi, slope=slope)
             # ls = StrongWolfeLineSearch(
             #     line_model, value=phi, slope=slope, gtol=0.1)
+            # ls = QuadraticCubicLineSearch(line_model, bkmax=5,
+            #                               value=phi, slope=slope)
             try:
                 for step in ls:
                     self.log.debug(ls_fmt, step, ls.trial_value)
