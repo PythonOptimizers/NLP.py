@@ -14,6 +14,10 @@ from nlp.tools.dercheck import DerivativeChecker
 from nlp.tools.logs import config_logger
 import logging
 
+import os
+
+this_path = os.path.dirname(os.path.realpath(__file__))
+
 
 class TestFnormModel(unittest.TestCase):
     """Test FnormModel."""
@@ -22,7 +26,7 @@ class TestFnormModel(unittest.TestCase):
         """Initialize."""
         pytest.importorskip("nlp.model.amplmodel")
         pytest.importorskip("pysparse")
-        self.model = PySparseAmplModel('hs007.nl')
+        self.model = PySparseAmplModel(os.path.join(this_path, 'hs007.nl'))
 
     def test_derivatives_noprox_nopenalty(self):
         fnormmodel = FnormModel(self.model, penalty=0, prox=0)
@@ -59,5 +63,5 @@ class TestRegSQP(unittest.TestCase):
         """Initialize."""
         self.n = 10
         self.npairs = 5
-        model = PySparseAmplModel('hs007.nl')
+        model = PySparseAmplModel(os.path.join(this_path, 'hs007.nl'))
         self.solver = RegSQPSolver(model)
