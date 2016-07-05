@@ -60,7 +60,7 @@ try:
             problem.
             """
             vals, rows, cols = super(PySparseNLPModel,
-                                    self).A(*args, **kwargs)
+                                     self).A(*args, **kwargs)
             A = psp(nrow=self.ncon, ncol=self.nvar,
                     sizeHint=vals.size, symmetric=False)
             A.put(vals, rows, cols)
@@ -70,8 +70,9 @@ try:
             """Obtain Jacobian at x as a linear operator."""
             return PysparseLinearOperator(self.jac(*args, **kwargs))
 
-except:
+except ImportError:
     pass
+
 
 class PySparseSlackModel(SlackModel):
     """SlackModel in wich matrices are PySparse matrices.
