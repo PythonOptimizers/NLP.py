@@ -82,8 +82,10 @@ class CppADModel(NLPModel):
         self._cppad_adfun_obj.forward(0, x)
         return self._cppad_adfun_obj.reverse(1, np.array([1.]))
 
-    def hess(self, x, z, **kwargs):
+    def hess(self, x, z=None, **kwargs):
         """Return the Hessian of the Lagrangian at (x,z)."""
+        if z is None:
+            z = np.zeros(self.ncon)
         xz = np.concatenate((x, z))
         H = self._cppad_adfun_lag.hessian(xz, np.array([1.]))
         return H[:self.nvar, :self.nvar]
