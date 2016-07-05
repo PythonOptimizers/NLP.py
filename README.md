@@ -63,3 +63,8 @@ Only matrix-free methods are available without one of the above factorizations.
     python setup.py build
     python setup.py install [--prefix=...]
     ```
+
+
+## Licensing
+
+[![LGPLv3.0](https://www.gnu.org/graphics/lgplv3-147x51.png)](https://www.gnu.org/licenses/lgpl-3.0.html)
