@@ -1,4 +1,4 @@
-g9 0 1 0 1 20130530 0 4 0 240	# problem hs007
+g9 0 1 0 1 20150422 0 4 0 240	# problem hs007
  2 1 1 0 1	# vars, constraints, objectives, ranges, eqns
  1 1	# nonlinear constraints, objectives
  0 0	# network constraints: nonlinear, linear
