@@ -294,7 +294,7 @@ class NLPModel(object):
         # Remove scaling if requested
         if reset:
             self.scale_obj = None
-            self.pi0 = self.model.get_pi0()  # get original multipliers
+            # self.pi0 = self.get_pi0()  # get original multipliers
             return
 
         # Quick return if the problem is already scaled
@@ -308,7 +308,7 @@ class NLPModel(object):
         self.scale_obj = g_max / max(g_max, gNorm)  # <= 1 always
 
         # Rescale the Lagrange multiplier
-        self.pi0 *= self.scale_obj
+        # self.pi0 *= self.scale_obj
 
         return gNorm
 
@@ -343,12 +343,12 @@ class NLPModel(object):
         J = self.jop(x)
 
         # Find inf-norm of each row of J
-        gmaxNorm = 0            # holds the maxiumum row-norm of J
+        gmaxNorm = 0            # holds the maximum row-norm of J
         imaxNorm = 0            # holds the corresponding index
         e = np.zeros(self.ncon)
         for i in xrange(m):
             e[i] = 1
-            giNorm = np.linalg.norm(J.T * e, 1)  # Matrix 1-norm (max abs col)
+            giNorm = np.linalg.norm(J.T * e, np.inf)
             e[i] = 0
             d_c[i] = g_max / max(g_max, giNorm)  # <= 1 always
             if giNorm > gmaxNorm:

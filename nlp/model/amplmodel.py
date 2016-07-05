@@ -5,7 +5,7 @@
 """
 try:
     from nlp.model import _amplmodel
-except:
+except ImportError:
     raise
 
 import numpy as np
@@ -125,6 +125,9 @@ class AmplModel(NLPModel):
     def writesol(self, x, z, msg):
         """Write primal-dual solution and message msg to `stub.sol`."""
         return self.model.ampl_sol(x, z, msg)
+
+    def get_pi0(self):
+        return self.model.pi0()
 
     def obj(self, x, obj_num=0):
         """Evaluate objective function value at x.
@@ -347,9 +350,15 @@ class AmplModel(NLPModel):
         store_zeros = 1 if store_zeros else 0
         if z is None:
             z = np.zeros(self.m)
-        vals, rows, cols = self.model.eval_H(x, z, obj_weight, store_zeros)
+
         if self.scale_obj:
-            vals *= self.scale_obj
+            obj_weight *= self.scale_obj
+        if self.scale_con:
+            z = z.copy()
+            z *= self.scale_con
+
+        vals, rows, cols = self.model.eval_H(x, z, obj_weight, store_zeros)
+
         if not self.minimize:
             vals *= -1
         return (vals, rows, cols)
@@ -375,9 +384,14 @@ class AmplModel(NLPModel):
         obj_weight = kwargs.get('obj_weight', 1.0)
         if z is None:
             z = np.zeros(self.m)
-        Hv = self.model.H_prod(z, v, obj_weight)
+
         if self.scale_obj:
-            Hv *= self.scale_obj
+            obj_weight *= self.scale_obj
+        if self.scale_con:
+            z = z.copy()
+            z *= self.scale_con
+
+        Hv = self.model.H_prod(z, v, obj_weight)
         if not self.minimize:
             Hv *= -1
         return Hv
