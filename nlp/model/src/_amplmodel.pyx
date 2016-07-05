@@ -442,7 +442,7 @@ cdef class ampl:
                 # a_icol.data[cg.goff] = cg.varno  # broken.
                 a_irow[cg.goff] = i
                 a_icol[cg.goff] = cg.varno
-                A.data[cg.goff] = cg.coef
+                A[cg.goff] = cg.coef
                 cg = cg.next
 
         return (A, a_irow, a_icol)
