@@ -87,7 +87,7 @@ class SciPyAmplModel(AmplModel):
 
 
 class SciPySlackModel(SlackModel):
-    """`SlackModel` with sparse matrices n SciPy coordinate (COO) format.
+    """`SlackModel` with sparse matrices in SciPy coordinate (COO) format.
 
     :keywords:
         :model:  Original model to be transformed into a slack form.
@@ -96,7 +96,7 @@ class SciPySlackModel(SlackModel):
 
     def __init__(self, model, **kwargs):
         if not isinstance(model, NLPModel):
-            raise TypeError("The model in `model` should be a `SciPyNLPModel`"
+            raise TypeError("The model in `model` should be a `NLPModel`"
                             "or a derived class of it.")
         super(SciPySlackModel, self).__init__(model)
 
