@@ -35,7 +35,7 @@ class QuadraticCubicLineSearch(LineSearch):
                                                        **kwargs)
         self.__ftol = max(min(kwargs.get("ftol", 1.0e-4), 1 - sqeps), sqeps)
         self.__bkmax = max(kwargs.get("bkmax", 20), 0)
-        self.__eps1 = self.__eps2 = sqrt(eps) / 100
+        self.__eps1 = self.__eps2 = sqrt(eps) * 100
         self._bk = 0
         self._last_step = None
         self._last_trial_value = None
@@ -69,7 +69,6 @@ class QuadraticCubicLineSearch(LineSearch):
             step = -self.slope * self._last_step**2
             step /= 2 * (self.trial_value -
                          self.value - self.slope * self._last_step)
-            self._step = step
         else:
             # cubic interpolation
             a0 = self._last_step
@@ -87,10 +86,11 @@ class QuadraticCubicLineSearch(LineSearch):
 
             self._last_step = self.step
             self._last_trial_value = self.trial_value
-            if abs(step - self._step) < self.__eps1 or abs(step) < self.__eps2:
-                self._step = self.step / 2
-            else:
-                self._step = step
+
+        if abs(step - self._step) < self.__eps1 or abs(step) < self.__eps2:
+            self._step = self.step / 2
+        else:
+            self._step = step
 
         if self.step < self.stepmin:
             raise LineSearchFailure("linesearch step too small")
