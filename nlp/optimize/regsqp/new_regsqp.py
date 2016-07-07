@@ -26,8 +26,6 @@ from pykrylov.linop import IdentityOperator
 import logging
 import math
 import numpy as np
-import sys
-import ipdb
 
 
 eps = np.finfo(np.double).eps
@@ -244,7 +242,7 @@ class RegSQPSolver(object):
                                          penalty=1. / penalty,
                                          prox=prox,
                                          xk=model.x0.copy())
-        self.epsilon = (2 - self.theta) * penalty
+        # self.epsilon = (2 - self.theta) * penalty
         self.prox_factor = 10.  # increase factor during inertia correction
         self.penalty_factor = 10.  # increase factor during regularization
 
@@ -279,7 +277,7 @@ class RegSQPSolver(object):
                                    symmetric=True)
 
         # contribution of the Hessian
-        print "x: ", x, " y: ", y
+        # print "x: ", x, " y: ", y
         f = model.obj(x)
         g = model.grad(x)
         J = model.jop(x)
@@ -305,6 +303,7 @@ class RegSQPSolver(object):
 
     def assemble_rhs(self, g, J, y, c):
         """Set the rhs of Newton system according to current information."""
+        # print g, J.to_array(), y, c
         return np.concatenate((-g + J.T * y, -c))
 
     def new_penalty(self, Fnorm):
@@ -332,7 +331,8 @@ class RegSQPSolver(object):
         definite on the nullspace of J and increase δ in case the matrix is
         singular because the rank deficiency in J.
         """
-        self.log.debug('solving linear system')
+        self.log.debug('solving linear system, δ = %18.10e',
+                       1. / self.merit.penalty)
         nvar = self.model.nvar
         ncon = self.model.ncon
 
@@ -488,7 +488,7 @@ class RegSQPSolver(object):
             rhs = self.assemble_rhs(g, J, y, c)
 
             status, short_status, solved, dx, _ = self.solve_linear_system(rhs)
-            print x, y, dx
+            # print x, y, dx
             assert solved
 
             if not solved:
@@ -498,17 +498,19 @@ class RegSQPSolver(object):
             # Step 4: Armijo backtracking linesearch
             line_model = C1LineModel(self.merit, x, dx)
             slope = np.dot(gphi, dx)
+
             self.log.debug(u"ϕ(x) = %9.2e, ∇ϕᵀΔx = %9.2e", phi, slope)
-            ls = ArmijoLineSearch(line_model, bkmax=5,
+            ls = ArmijoLineSearch(line_model, bkmax=50,
                                   decr=1.75, value=phi, slope=slope)
             # ls = ArmijoWolfeLineSearch(line_model, step=1.0, bkmax=10,
             #                            decr=1.75, value=phi, slope=slope)
             # ls = StrongWolfeLineSearch(
             #     line_model, value=phi, slope=slope, gtol=0.1)
-            # ls = QuadraticCubicLineSearch(line_model, bkmax=5,
+            # ls = QuadraticCubicLineSearch(line_model, bkmax=50,
             #                               value=phi, slope=slope)
+
             try:
-                for step in ls:
+                for k, step in enumerate(ls):
                     self.log.debug(ls_fmt, step, ls.trial_value)
 
                 self.log.debug('step norm: %8.2e', norm2(x - ls.iterate))
@@ -551,7 +553,8 @@ class RegSQPSolver(object):
             except LineSearchFailure:
                 self.status = "Linesearch failure"
                 failure = True
-
+            # plt.scatter(x_p, y_p)
+            # ipdb.set_trace()
         solved = Fnorm <= self.theta * Fnorm0 + self.epsilon
         return x, y, f, g, J, c, gphi, gphi_norm, cnorm, Fnorm, solved
 
@@ -602,7 +605,7 @@ class RegSQPSolver(object):
         self.inner_itn = 0
 
         # Get initial objective value
-        print 'x0: ', x
+        # print 'x0: ', x
         self.f = self.f0 = f = model.obj(x)
 
         c = model.cons(x) - model.Lcon
@@ -616,6 +619,7 @@ class RegSQPSolver(object):
         y = self.least_squares_multipliers(g, model.jac(x))
 
         J = model.jop(x)
+        # print J.to_array()
         gL = g - J.T * y
         self.gLnorm = gLnorm = gLnorm0 = norm2(gL)
         Fnorm = Fnorm0 = gLnorm + cnorm
@@ -625,12 +629,13 @@ class RegSQPSolver(object):
                       self.merit.prox, 1.0 / self.merit.penalty)
 
         # Find a better initial point
-        x, y, f, c, g, J, cnorm, gLnorm, Fnorm = \
-            self.find_better_starting_point(x, y, f, c, g, J,
-                                            cnorm0, gLnorm0, Fnorm0)
+        # x, y, f, c, g, J, cnorm, gLnorm, Fnorm = \
+        #     self.find_better_starting_point(x, y, f, c, g, J,
+        #                                     cnorm0, gLnorm0, Fnorm0)
 
         # Initialize penalty parameter
         self.merit.penalty = 1.0 / min(0.1, Fnorm)
+        # self.merit.penalty = 1. / Fnorm
         # delta = min(0.1, Fnorm0)
 
         # set stopping tolerance
@@ -665,7 +670,7 @@ class RegSQPSolver(object):
 
             status, short_status, solved, dx, dy = self.solve_linear_system(
                 rhs, J)
-            print 'dx_ext: ', dx
+            # print 'dx_ext: ', dx
             assert solved
             penalty_ext = self.merit.penalty
             prox_ext = self.merit.prox
@@ -889,27 +894,3 @@ class RegSQPSolver(object):
         approximate Hessian.
         """
         return None
-
-
-# if __name__ == '__main__':
-#
-#     # Create root logger.
-#     log = logging.getLogger('nlp.regsqp')
-#     log.setLevel(logging.DEBUG)
-#     fmt = logging.Formatter('%(name)-15s %(levelname)-8s %(message)s')
-#     hndlr = logging.StreamHandler(sys.stdout)
-#     hndlr.setFormatter(fmt)
-#     log.addHandler(hndlr)
-#
-#     # Configure the solver logger.
-#     sublogger = logging.getLogger('nlp.regsqp.solver')
-#     sublogger.setLevel(logging.DEBUG)
-#     sublogger.addHandler(hndlr)
-#     sublogger.propagate = False
-#
-#     model = PySparseAmplModel("hs006.nl")         # Create a model
-#     solver = RegSQPSolver(model)
-#     solver.solve()
-#     print 'x:', solver.x
-#     print 'y:', solver.y
-#     print solver.status
