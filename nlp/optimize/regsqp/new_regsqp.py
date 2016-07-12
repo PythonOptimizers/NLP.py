@@ -749,6 +749,8 @@ class RegSQPSolver(object):
             finished = optimal or tired
             if self.itn % 20 == 0:
                 self.log.info(self.header)
+            else:
+                self.log.debug(self.header)
 
             self.log.info(self.format, self.itn, f, cnorm, gLnorm,
                           self.merit.prox, 1.0 / self.merit.penalty)
