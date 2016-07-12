@@ -14,6 +14,8 @@ from nlp.optimize.pcg import TruncatedCG
 from nlp.tools.exceptions import UserExitRequest
 from nlp.tools.utils import project, where
 from nlp.tools.timing import cputime
+# from nlp.tools.norms import norm_infty as norm
+from nlp.tools.norms import norm2 as norm
 
 from pykrylov.lls.lsqr import LSQRFramework as LSQRSolver
 from pykrylov.linop import ReducedLinearOperator as ReducedJacobian
@@ -35,7 +37,7 @@ class Auglag(object):
 
         The augmented Lagrangian is defined as:
 
-            L(x, π; ρ) := f(x) - π'c(x) + ½ ρ |c(x)|².
+            L(x, π; ρ) := f(x) - π'c(x) + ½ ρ ‖c(x)‖².
         where π are the current Lagrange multiplier estimates and ρ is the
         current penalty parameter.
 
@@ -59,6 +61,12 @@ class Auglag(object):
             :nbk:              max number of backtracking steps in Nocedal/Yuan
                                linesearch                      (5)
             :monotone:         use monotone descent strategy   (False)
+
+            :penalty:  initial value for the penalty parameter (default: 10)
+            :prox:     initial value for the proximal parameter (default: 0)
+            :pi:       vector of initial multipliers (default: model.pi0)
+            :xk:       initial value of the proximal vector (default: all zero)
+
             :n_iter_non_mono:  number of iterations for which non-strict
                                descent can be tolerated if monotone = False
                                                                (25)
@@ -74,9 +82,10 @@ class Auglag(object):
             :stal:   Not making sufficient progress
             :time:   Time limit exceeded
         """
-        self.model = AugmentedLagrangian(model, **kwargs)
-        print self.model
-        print self.model.model
+        penalty = kwargs.get("penalty", 10)
+        kwargs.pop("penalty")
+
+        self.model = AugmentedLagrangian(model, penalty=penalty, **kwargs)
 
         self.x = kwargs.get('x0', self.model.x0.copy())
 
@@ -104,9 +113,9 @@ class Auglag(object):
 
         self.f0 = self.f = None
 
-        # Maximum number of total inner iterations
-        self.max_inner_iter = kwargs.get('max_inner_iter',
-                                         100 * self.model.model.original_n)
+        # Maximum number of total iterations
+        self.max_iter = kwargs.get('maxiter',
+                                   100 * self.model.model.original_n)
 
         self.update_on_rejected_step = False
 
@@ -118,7 +127,7 @@ class Auglag(object):
         self.header = self.hformat % ("iter", "f", u"‖P∇L‖", u"‖c‖", u"ρ",
                                       "inner", "stat", u"ω", u"η")
         self.format = "%-5d  %8.1e  %8.1e  %8.1e  %8.1e  %5d  %4s  %8.1e  %8.1e"
-        self.format0 = '%-5d  %8.1e  %8.1e  %8s  %8s  %5s  %4s  %8.1e  %8.1e'
+        self.format0 = '%-5d  %8.1e  %8.1e  %8.1e  %8.1e  %5s  %4s  %8.1e  %8.1e'
 
         # Initialize some counters for counting number of Hprod used in
         # BQP linesearch and CG.
@@ -197,7 +206,7 @@ class Auglag(object):
         lsqr = LSQRSolver(Jred.T)
         lsqr.solve(g[free_vars], itnlim=lim)
         if lsqr.optimal:
-            self.pi = lsqr.x.copy()
+            self.model.pi = lsqr.x.copy()
         return
 
     def update_multipliers(self, convals, status):
@@ -251,6 +260,16 @@ class Auglag(object):
         """Check if bound-constrained solver successfuly exited."""
         return "opt" if status in ['gtol'] else ""
 
+    def check_convergence(self, PdL_norm, cons_norm):
+        """Convergence check."""
+        exitOptimal = (PdL_norm <= self.omega_opt and
+                       cons_norm <= self.eta_opt)
+        if self.iter == 0:
+            exitOptimal = False
+        if exitOptimal:
+            self.status = "opt"
+        return exitOptimal
+
     def solve(self, **kwargs):
         """Solve method.
 
@@ -261,6 +280,8 @@ class Auglag(object):
         slack_model = self.model.model
 
         on = slack_model.original_n
+
+        self.log.info(u"δ = %8.1e, ρ = %8.1e", al_model.penalty, al_model.prox)
 
         # Move starting point into the feasible box
         self.x = project(self.x, al_model.Lvar, al_model.Uvar)
@@ -284,23 +305,28 @@ class Auglag(object):
         self.f = self.f0 = self.model.model.model.obj(self.x[:on])
 
         PdL = self.project_gradient(self.x, dL)
-        Pmax = np.max(np.abs(PdL))
-        self.pg0 = self.pgnorm = Pmax
+        PdL_norm = norm(PdL)
+        self.pg0 = self.pgnorm = PdL_norm
 
         # Specific handling for the case where the original NLP is
         # unconstrained
         if slack_model.m == 0:
-            max_cons = 0.
+            cons_norm = 0.
         else:
-            max_cons = np.max(np.abs(slack_model.cons(self.x)))
-            cons_norm_ref = max_cons
+            cons_norm = norm(slack_model.cons(self.x))
+            cons_norm_ref = cons_norm
 
-        self.cons0 = max_cons
+        self.cons0 = cons_norm
 
         self.omega = self.omega_init
         self.eta = self.eta_init
-        self.omega_opt = self.omega_rel * self.pg0 + self.omega_abs
-        self.eta_opt = self.eta_rel * max_cons + self.eta_abs
+
+        self.omega_opt = kwargs.get("omega_opt",
+                                    self.omega_rel * self.pg0 + self.omega_abs)
+        self.eta_opt = kwargs.get("eta_opt",
+                                  self.eta_rel * cons_norm + self.eta_abs)
+        self.log.info(u"ηₒₚₜ = %8.1e, ωₒₚₜ = %8.1e",
+                      self.eta_opt, self.omega_opt)
 
         self.iter = 0
         self.inner_fail_count = 0
@@ -308,10 +334,8 @@ class Auglag(object):
         infeas_iter = 0
 
         exitIter = False
-        # Convergence check
-        exitOptimal = (Pmax <= self.omega_opt and max_cons <= self.eta_opt)
-        if exitOptimal:
-            self.status = "opt"
+
+        exitOptimal = self.check_convergence(PdL_norm, cons_norm)
 
         tick = cputime()
 
@@ -329,45 +353,45 @@ class Auglag(object):
             bc_solver = self.setup_bc_solver()
             bc_solver.solve()
             self.x = bc_solver.x.copy()  # may not be useful.
+            self.niter_total += bc_solver.iter + 1
 
             dL = al_model.dual_feasibility(self.x)
             PdL = self.project_gradient(self.x, dL)
-            Pmax_new = np.max(np.abs(PdL))
+            PdL_norm_new = norm(PdL)
             convals_new = slack_model.cons(self.x)
 
             # Specific handling for the case where the original NLP is
             # unconstrained
             if slack_model.m == 0:
-                max_cons_new = 0.
+                cons_norm_new = 0.
             else:
-                max_cons_new = np.max(np.abs(convals_new))
+                cons_norm_new = norm(convals_new)
 
             self.f = self.model.model.model.obj(self.x[:on])
-            self.pgnorm = Pmax_new
+            self.pgnorm = PdL_norm_new
 
             # Print out header, say, every 20 iterations.
             if self.iter % 20 == 0:
                 self.log.info(self.header)
 
-            self.log.info(self.format % (self.iter, self.f,
-                                         self.pgnorm, max_cons_new,
-                                         al_model.penalty,
-                                         bc_solver.iter, bc_solver.status,
-                                         self.omega, self.eta))
+            self.log.info(self.format, self.iter, self.f, self.pgnorm,
+                          cons_norm_new, al_model.penalty, bc_solver.iter,
+                          bc_solver.status, self.omega, self.eta)
 
             # Update penalty parameter or multipliers based on result
-            if max_cons_new <= np.maximum(self.eta, self.eta_opt):
-
-                # Update convergence check
-                if max_cons_new <= self.eta_opt and Pmax_new <= self.omega_opt:
-                    exitOptimal = True
-                    break
+            if cons_norm_new <= np.maximum(self.eta, self.eta_opt):
 
                 bc_solver_status = self.check_bc_solver_status(bc_solver.status)
                 self.update_multipliers(convals_new, bc_solver_status)
 
+                # Update convergence check
+                exitOptimal = self.check_convergence(PdL_norm_new,
+                                                     cons_norm_new)
+                if exitOptimal:
+                    break
+
                 # Update reference constraint norm on successful reduction
-                cons_norm_ref = max_cons_new
+                cons_norm_ref = cons_norm_new
                 infeas_iter = 0
 
                 # If optimality of the inner loop is not achieved within 10
@@ -378,19 +402,19 @@ class Auglag(object):
                         'Current point could not be improved, exiting ... \n')
                     break
 
-                self.log.debug(
+                self.log.info(
                     '******  Updating multipliers estimates  ******\n')
 
             else:
 
                 self.update_penalty_parameter()
-                self.log.debug(
+                self.log.info(
                     '******  Keeping current multipliers estimates  ******\n')
 
-                if max_cons_new > 0.99 * cons_norm_ref and self.iter != 1:
+                if cons_norm_new > 0.99 * cons_norm_ref and self.iter != 1:
                     infeas_iter += 1
                 else:
-                    cons_norm_ref = max_cons_new
+                    cons_norm_ref = cons_norm_new
                     infeas_iter = 0
 
                 if infeas_iter == 10:
@@ -412,15 +436,15 @@ class Auglag(object):
             except UserExitRequest:
                 self.status = "usr"
 
-            exitIter = self.niter_total > self.max_inner_iter
+            exitIter = self.niter_total > self.max_iter
 
         self.tsolve = cputime() - tick    # Solve time
         if slack_model.m != 0:
-            self.pi_max = np.max(np.abs(al_model.pi))
-            self.cons_max = np.max(np.abs(slack_model.cons(self.x)))
+            self.pi_norm = norm(al_model.pi)
+            self.cons_norm = norm(slack_model.cons(self.x))
         else:
-            self.pi_max = None
-            self.cons_max = None
+            self.pi_norm = None
+            self.cons_norm = None
 
         # Solution output, etc.
         if exitOptimal:
@@ -430,7 +454,14 @@ class Auglag(object):
             self.status = "iter"
             self.log.debug('Maximum number of iterations reached \n')
 
-        self.log.info('f = %12.8g' % self.f)
-        if slack_model.m != 0:
-            self.log.info('pi_max = %12.8g' % np.max(al_model.pi))
-            self.log.info('max infeas. = %12.8g' % max_cons_new)
+        # self.log.info('f = %12.8g' % self.f)
+        # if slack_model.m != 0:
+        #     self.log.info(u'‖π‖ = %12.8g', norm(al_model.pi))
+        #     self.log.info(u'‖c‖ = %12.8g', self.cons_norm)
+
+
+class AuglagSolver(Auglag):
+
+    def post_iteration(self):
+        """Blabla."""
+        return Fnorm <= self.theta * Fnorm0 + self.epsilon

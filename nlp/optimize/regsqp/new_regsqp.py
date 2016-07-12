@@ -634,8 +634,8 @@ class RegSQPSolver(object):
         #                                     cnorm0, gLnorm0, Fnorm0)
 
         # Initialize penalty parameter
-        self.merit.penalty = 1.0 / min(0.1, Fnorm)
-        # self.merit.penalty = 1. / Fnorm
+        # self.merit.penalty = 1.0 / min(0.1, Fnorm)
+        self.merit.penalty = 1. / Fnorm
         # delta = min(0.1, Fnorm0)
 
         # set stopping tolerance
@@ -723,16 +723,6 @@ class RegSQPSolver(object):
                  cnorm_in, Fnorm_in, solved) = self.solve_inner(x, y, f, g, J, c, gL,
                                                                 Fnorm, gLnorm, cnorm,
                                                                 Fnorm, gLnorm, cnorm)
-                # x = x_in
-                # y = y_in
-                # f = f_in
-                # g = g_in
-                # J = J_in
-                # c = c_in
-                # gL = gL_in
-                # gLnorm = gLnorm_in
-                # cnorm = cnorm_in
-                # Fnorm = Fnorm_in
 
                 if not solved:
                     self.merit.penalty = penalty_ext
@@ -894,3 +884,57 @@ class RegSQPSolver(object):
         approximate Hessian.
         """
         return None
+
+from nlp.optimize.auglag import Auglag
+from nlp.optimize.tron import TRON
+
+
+class AuglagRegSQPSolver(RegSQPSolver):
+
+    def solve_inner(self, x, y, f, g, J, c, gL,
+                    Fnorm0, gLnorm0, cnorm0, Fnorm, gLnorm, cnorm):
+        u"""Perform a sequence of inner iterations.
+
+        The objective of the inner iterations is to identify an improved
+        iterate w+ = (x+, y+) such that the optimality residual satisfies
+        ‖F(w+)‖ ≤ Θ ‖F(w)‖ + ϵ.
+        The improved iterate is identified by minimizing the proximal augmented
+        Lagrangian.
+        """
+        # self.merit.penalty = 1. / Fnorm
+        self.log.debug('starting inner iterations with target %7.1e',
+                       self.theta * Fnorm0 + self.epsilon)
+        self.log.info(self.format, self.itn, f, cnorm, gLnorm,
+                      self.merit.prox, 1.0 / self.merit.penalty)
+
+        model = self.model
+        self.log.debug(u"δ = %8.1e, ρ = %8.1e, ϵ = %8.1e",
+                       self.merit.penalty, self.merit.prox, self.epsilon)
+
+        auglag = Auglag(model, TRON, maxiter=100,
+                        least_squares_pi=False, penalty=self.merit.penalty)
+        auglag.x = x.copy()
+
+        auglag.model.pi = y.copy()
+        auglag.solve(omega_opt=self.theta * gLnorm + 0.5 * self.epsilon,
+                     eta_opt=self.theta * cnorm + 0.5 * self.epsilon)
+
+        self.log.debug("Auglag status: %s", auglag.status)
+
+        self.itn += auglag.iter
+        self.inner_itn += auglag.iter
+
+        x = auglag.x
+        y = auglag.model.pi
+        f = model.obj(x)
+        g = model.grad(x)
+        J = model.jop(x)
+        c = model.cons(x) - model.Lcon
+        cnorm = norm2(c)
+        gL = g - J.T * y
+        gLnorm = norm2(gL)
+        Fnorm = gLnorm + cnorm
+
+        solved = Fnorm <= self.theta * Fnorm0 + self.epsilon
+        self.log.debug(u'ending inner iterations -- solved: %s', solved)
+        return x, y, f, g, J, c, gL, gLnorm, cnorm, Fnorm, solved

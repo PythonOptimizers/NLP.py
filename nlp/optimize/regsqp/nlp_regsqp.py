@@ -52,6 +52,8 @@ parser.add_argument("-q", "--quasi_newton", action="store_true",
                     help="use L-BFGS approximations of second derivatives")
 parser.add_argument("-i", "--iter", action="store", type=int, default=1000,
                     dest="maxiter", help="maximum number of iterations")
+parser.add_argument("--al", action="store_true", default=False,
+                    dest="auglag", help="auglag in inner iterations")
 
 # Parse command-line arguments
 (args, other) = parser.parse_known_args()
@@ -59,10 +61,13 @@ parser.add_argument("-i", "--iter", action="store", type=int, default=1000,
 # Translate options to input arguments.
 opts = {}
 
-if args.quasi_newton:
-    from new_regsqp_BFGS import RegSQPBFGSIterativeSolver as RegSQP
+if args.auglag:
+    from new_regsqp import AuglagRegSQPSolver as RegSQP
 else:
-    from new_regsqp import RegSQPSolver as RegSQP
+    if args.quasi_newton:
+        from new_regsqp_BFGS import RegSQPBFGSIterativeSolver as RegSQP
+    else:
+        from new_regsqp import RegSQPSolver as RegSQP
 
 nprobs = len(other)
 if nprobs == 0:
