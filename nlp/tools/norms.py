@@ -46,29 +46,28 @@ def normest(A, tol=1.0e-6, maxits=100):
     # Compute an estimate of the abs-val column sums.
     v = np.ones(m)
     v[np.random.randn(m) < 0] = -1
-    x = abs(A.T*v)
+    x = abs(A.T * v)
 
     # Normalize the starting vector.
     e = norm(x)
     if e == 0:
         return e, itn
-    x = x/e
+    x = x / e
     e0 = 0
-    while abs(e-e0) > tol*e:
+    while abs(e - e0) > tol * e:
         e0 = e
-        Ax = A*x
+        Ax = A * x
         normAx = norm(Ax)
         if normAx == 0:
             Ax = np.random.rand(m)
             normAx = norm(Ax)
-        x = A.T*Ax
+        x = A.T * Ax
         normx = norm(x)
         e = normx / normAx
         x = x / normx
         itn += 1
         if itn > maxits:
-            print "Warning: normest didn't converge!"
-            break
+            raise Warning("normest didn't converge!")
     return e, itn
 
 
@@ -80,7 +79,7 @@ if __name__ == '__main__':
 
     print "Unsymmetric matrices"
     for n in xrange(1, 100):
-        m = n/2 + 1
+        m = n / 2 + 1
         A = np.random.randn(n, m)
         Aop = LinearOperator(A.shape[1], A.shape[0],
                              lambda v: np.dot(A, v),
@@ -89,14 +88,14 @@ if __name__ == '__main__':
         normA = np.linalg.norm(A, 2)
         normAop, _ = normest(Aop, tol=tol, maxits=maxits)
         error = abs(normA - normAop) / max(1, normA)
-        if error > tol*100:
+        if error > tol * 100:
             print "Error in normest = %8.1e" % error
 
     print
     print "Symmetric matrices"
     for n in xrange(1, 100):
         A = np.random.rand(n, n)
-        A = .5*(A.T + A)
+        A = .5 * (A.T + A)
         Aop = LinearOperator(A.shape[1], A.shape[0],
                              lambda v: np.dot(A, v),
                              symmetric=True)
@@ -107,5 +106,5 @@ if __name__ == '__main__':
         normA = np.linalg.norm(A, 2)
         normAop, _ = normest(Aop, tol=tol, maxits=maxits)
         error = abs(normA - normAop) / max(1, normA)
-        if error > tol*100:
+        if error > tol * 100:
             print "Error in normest = %8.1e" % error

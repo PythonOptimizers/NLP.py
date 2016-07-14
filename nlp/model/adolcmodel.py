@@ -175,10 +175,15 @@ class SparseAdolcModel(AdolcModel):
         super(SparseAdolcModel, self).__init__(*args, **kwargs)
         self.__first_sparse_hess_eval = True
         self.__first_sparse_jac_eval = True
+        self.hess_rind = None
+        self.hess_cind = None
+        self.hess_values = None
+        self.nnzH = 0
 
     def hess(self, x, z=None, **kwargs):
         """Return the Hessian of the objective at x in sparse format."""
         options = np.zeros(2, dtype=int)
+        options[1] = 1  # bug in adol-c?
         if z is None:
             z = np.zeros(self.ncon)
         xz = np.concatenate((x, z))

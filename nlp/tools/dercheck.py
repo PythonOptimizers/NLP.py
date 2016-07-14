@@ -81,7 +81,7 @@ class DerivativeChecker(object):
         jac = kwargs.get('jac', True) if self.model.ncon > 0 else False
         chess = kwargs.get('chess', True) if self.model.ncon > 0 else False
         cheap = kwargs.get('cheap_check', False)
-
+        self.log.debug('Tolerance: %8.2e', self.tol)
         self.log.debug('Gradient checking')
 
         if grad:
@@ -116,8 +116,8 @@ class DerivativeChecker(object):
         xph += self.step * dx
         dfdx = (self.model.obj(xph) - fx) / self.step  # estimate
         gtdx = np.dot(gx, dx)                        # expected
-        err = max(abs(dfdx - gtdx)/(1 + abs(gtdx)),
-                  abs(dfdx - gtdx)/(1 + abs(dfdx)))
+        err = max(abs(dfdx - gtdx) / (1 + abs(gtdx)),
+                  abs(dfdx - gtdx) / (1 + abs(dfdx)))
 
         self.log.debug('Objective directional derivative')
         self.log.debug(self.head3)
@@ -153,7 +153,7 @@ class DerivativeChecker(object):
             xph[i] += self.step
             xmh[i] -= self.step
             dfdxi = (model.obj(xph) - model.obj(xmh)) / (2 * self.step)
-            err = abs(gx[i] - dfdxi)/max(1, abs(dfdxi))
+            err = abs(gx[i] - dfdxi) / max(1, abs(dfdxi))
             xph[i] = xmh[i] = self.x[i]
 
             line = self.d1fmt % (0, i, gx[i], dfdxi, err)
@@ -210,7 +210,7 @@ class DerivativeChecker(object):
                     Hxij = np.dot(ei, Hx * ej)
                     ej[j] = 0
 
-                err = abs(Hxij - dgjdxi)/max(1, abs(dgjdxi))
+                err = abs(Hxij - dgjdxi) / max(1, abs(dgjdxi))
 
                 line = self.d2fmt % (0, i, j, Hxij, dgjdxi, err)
                 if err > self.tol:
@@ -304,7 +304,6 @@ class DerivativeChecker(object):
         for k in xrange(m):
             y[k] = -1
             Hk = self.model.hess(self.x, y, obj_weight=0)
-            y[k] = 0
             errs[k] = {}
 
             if isinstance(Hk, tuple):
@@ -323,6 +322,10 @@ class DerivativeChecker(object):
                 dgdx = (self.model.igrad(k, xph) -
                         self.model.igrad(k, xmh)) / (2 * self.step)
                 xph[i] = xmh[i] = self.x[i]
+
+                if not hasattr(Hk, "__getitem__"):
+                    ei[i] = 1
+
                 for j in xrange(i + 1):
                     dgjdxi = dgdx[j]
 
@@ -345,5 +348,7 @@ class DerivativeChecker(object):
                 if not hasattr(Hk, "__getitem__"):
                     # Restore ei before the next iteration.
                     ei[i] = 0
+            # Restore y before the next iteration.
+            y[k] = 0
 
         return errs

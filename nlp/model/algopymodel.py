@@ -120,13 +120,15 @@ class AlgopyModel(NLPModel):
         # when passed empty arrays of objects (i.e., dtype = np.object).
         # This causes AD tools to error out.
         if self.m > 0:
-            l -= algopy.dot(z[:m+nrC], self.cons(x))
+            l -= algopy.dot(z[:m + nrC], self.cons(x))
         if self.nbounds > 0:
-            l -= algopy.dot(z[m+nrC:], self.bounds(x))
+            l -= algopy.dot(z[m + nrC:], self.bounds(x))
         return l
 
-    def hess(self, x, z, **kwargs):
+    def hess(self, x, z=None, **kwargs):
         """Return the Hessian of the objective at x."""
+        if z is None:
+            z = np.zeros(self.ncon)
         xz = np.concatenate((x, z))
         return self._cg_lag.hessian(xz)[:self.nvar, :self.nvar]
 

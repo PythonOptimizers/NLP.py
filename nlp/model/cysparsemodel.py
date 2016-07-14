@@ -58,10 +58,10 @@ try:
             constraints. Useful to obtain constraint matrix
             when problem is a linear programming problem.
             """
-            vals, rows, cols = super(CySparseAmplModel. self).A(*args, **kwargs)
+            vals, rows, cols = super(CySparseAmplModel, self).A(*args, **kwargs)
             A = LLSparseMatrix(nrow=self.ncon, ncol=self.nvar,
-                            size_hint=vals.size, store_symmetric=False,
-                            type=types.INT64_T, dtype=types.FLOAT64_T)
+                               size_hint=vals.size, store_symmetric=False,
+                               type=types.INT64_T, dtype=types.FLOAT64_T)
             A.put_triplet(rows, cols, vals)
             return A
 
@@ -69,7 +69,7 @@ try:
             """Obtain Jacobian at x as a linear operator."""
             return CysparseLinearOperator(self.jac(*args, **kwargs))
 
-except:
+except ImportError:
     pass
 
 
@@ -87,20 +87,20 @@ class CySparseSlackModel(SlackModel):
     def __init__(self, model, **kwargs):
 
         if not isinstance(model, CySparseNLPModel):
-            raise TypeError("The model in `model` should be a CySparseNLPModel"
-                            "or a derived class of it.")
+            msg = "The model in `model` should be a CySparseNLPModel"
+            msg += " or a derived class of it."
+            raise TypeError(msg)
         super(CySparseSlackModel, self).__init__(model)
 
     def _jac(self, x, lp=False):
-        """
-        Helper method to assemble the Jacobian matrix.
+        """Helper method to assemble the Jacobian matrix.
+
         See the documentation of :meth:`jac` for more information.
 
         The positional argument `lp` should be set to `True` only if the
         problem is known to be a linear program. In this case, the evaluation
         of the constraint matrix is cheaper and the argument `x` is ignored.
         """
-        n = self.n
         m = self.m
         model = self.model
         on = self.original_n
@@ -131,11 +131,11 @@ class CySparseSlackModel(SlackModel):
 
         # Insert contribution of slacks on general constraints
         J.put_triplet(lowerC, on + rlowerC,
-                      -1.0*np.ones(nlowerC, dtype=np.float64))
+                      -1.0 * np.ones(nlowerC, dtype=np.float64))
         J.put_triplet(upperC, on + nlowerC + rupperC,
-                      -1.0*np.ones(nupperC, dtype=np.float64))
+                      -1.0 * np.ones(nupperC, dtype=np.float64))
         J.put_triplet(rangeC, on + nlowerC + nupperC + rrangeC,
-                      -1.0*np.ones(nrangeC, dtype=np.float64))
+                      -1.0 * np.ones(nrangeC, dtype=np.float64))
 
         return J
 
