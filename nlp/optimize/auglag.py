@@ -83,7 +83,8 @@ class Auglag(object):
             :time:   Time limit exceeded
         """
         penalty = kwargs.get("penalty", 10)
-        kwargs.pop("penalty")
+        if "penalty" in kwargs:
+            kwargs.pop("penalty")
 
         self.model = AugmentedLagrangian(model, penalty=penalty, **kwargs)
 
