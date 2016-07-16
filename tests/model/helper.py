@@ -69,6 +69,7 @@ class Hs7Data(object):
                                     [0., 0.]])
         v = np.arange(1, self.expected_H_lag.shape[0] + 1, dtype=np.float)
         self.expected_Hv = np.dot(self.expected_H_lag, v)
+        self.expected_gHiv = np.array([-60])  # g = -v
         self.expected_J = np.array([[40., 4.]])
         self.expected_Jv = np.dot(self.expected_J, v)
         w = 2 * np.ones(self.expected_J.shape[0])
@@ -96,6 +97,7 @@ class Hs9Data(object):
                                     [-0.00968672, -0.00978653]])
         v = np.arange(1, self.expected_H_lag.shape[0] + 1, dtype=np.float)
         self.expected_Hv = np.dot(self.expected_H_lag, v)
+        self.expected_gHiv = np.array([0.])  # g = -v
         self.expected_J = np.array([[4., -3.]])
         self.expected_A = np.array([[4., -3.]])
         self.expected_Jv = np.dot(self.expected_J, v)
@@ -119,6 +121,7 @@ class Hs10Data(object):
                                         [-2., 2.]])
         v = np.arange(1, self.expected_H_lag.shape[0] + 1, dtype=np.float)
         self.expected_Hv = np.dot(self.expected_H_lag, v)
+        self.expected_gHiv = np.array([5.])  # g = -v
         self.expected_J = np.array([[2., -2.]])
         self.expected_Jv = np.dot(self.expected_J, v)
         w = 2 * np.ones(self.expected_J.shape[0])
@@ -138,6 +141,7 @@ class Hs10SlackData(object):
                                         [0., 0., 0.]])
         v = np.arange(1, self.expected_H_lag.shape[0] + 1, dtype=np.float)
         self.expected_Hv = np.dot(self.expected_H_lag, v)
+        self.expected_gHiv = np.array([6.])  # g = -v
         self.expected_J = np.array([[2., -2., -1]])
         self.expected_Jv = np.dot(self.expected_J, v)
         w = 2 * np.ones(self.expected_J.shape[0])
@@ -155,6 +159,7 @@ class MaxProfitData(object):
         self.expected_H_lag = np.zeros([2, 2])
         v = np.arange(1, self.expected_H_lag.shape[0] + 1, dtype=np.float)
         self.expected_Hv = np.dot(self.expected_H_lag, v)
+        self.expected_gHiv = np.array([0.])  # g = -v
         self.expected_J = np.array([[1. / 200, 1. / 140]])
         self.expected_Jv = np.dot(self.expected_J, v)
         w = 2 * np.ones(self.expected_J.shape[0])
@@ -183,11 +188,15 @@ class GenericTest(object):
 
         if self.model.m > 0:
             if self.model.nlin > 0:
-                (g, H_lag, H, Hv, J, Jv, JTw, A) = self.get_derivatives(self.model)
+                (g, H_lag, H, Hv, gHiv, J, Jv, JTw, A) = \
+                    self.get_derivatives(self.model)
                 assert(np.allclose(A, data.expected_A))
             else:
-                (g, H_lag, H, Hv, J, Jv, JTw) = self.get_derivatives(self.model)
+                (g, H_lag, H, Hv, gHiv, J, Jv, JTw) = \
+                    self.get_derivatives(self.model)
 
+            if gHiv is not None:
+                assert(np.allclose(gHiv, data.expected_gHiv))
             assert(np.allclose(J, data.expected_J))
             assert(np.allclose(Jv, data.expected_Jv))
             assert(np.allclose(JTw, data.expected_JTw))
@@ -196,8 +205,6 @@ class GenericTest(object):
 
         assert(np.allclose(g, data.expected_g))
         assert(np.allclose(H_lag, data.expected_H_lag))
-        print H
-        print data.expected_H
         assert(np.allclose(H, data.expected_H))
         assert(np.allclose(Hv, data.expected_Hv))
 
@@ -243,6 +250,10 @@ def get_derivatives_plain(model):
     v = np.arange(1, model.nvar + 1, dtype=np.float)
     Hv = model.hprod(model.x0, model.pi0, v)
     if model.m > 0:
+        try:
+            gHiv = model.ghivprod(model.x0, -v, v)
+        except NotImplementedError:
+            gHiv = None
         J = model.jac(model.x0)
         Jop = model.jop(model.x0)
         Jv = Jop * v
@@ -250,8 +261,8 @@ def get_derivatives_plain(model):
         JTw = Jop.T * w
         if model.nlin > 0:
             A = model.A()
-            return (g, H_lag, H, Hv, J, Jv, JTw, A)
-        return (g, H_lag, H, Hv, J, Jv, JTw)
+            return (g, H_lag, H, Hv, gHiv, J, Jv, JTw, A)
+        return (g, H_lag, H, Hv, gHiv, J, Jv, JTw)
     else:
         return (g, H_lag, H, Hv)
 
@@ -260,14 +271,21 @@ def get_derivatives_coord(model):
     g = model.grad(model.x0)
 
     H_lag = ndarray_from_coord(model.nvar, model.nvar,
-                               *model.hess(model.x0, model.pi0), symmetric=True)
+                               *model.hess(model.x0, model.pi0),
+                               symmetric=True)
     H = ndarray_from_coord(model.nvar, model.nvar,
-                           *model.hess(model.x0), symmetric=True)
+                           *model.hess(model.x0),
+                           symmetric=True)
     v = np.arange(1, model.nvar + 1, dtype=np.float)
     Hv = model.hprod(model.x0, model.pi0, v)
     if model.m > 0:
+        try:
+            gHiv = model.ghivprod(model.x0, -v, v)
+        except NotImplementedError:
+            gHiv = None
         J = ndarray_from_coord(model.ncon, model.nvar,
-                               *model.jac(model.x0), symmetric=False)
+                               *model.jac(model.x0),
+                               symmetric=False)
         Jop = model.jop(model.x0)
         Jv = Jop * v
         w = 2 * np.ones(model.ncon)
@@ -275,8 +293,8 @@ def get_derivatives_coord(model):
         if model.nlin > 0:
             A = ndarray_from_coord(model.nlin, model.nvar,
                                    *model.A(), symmetric=False)
-            return (g, H_lag, H, Hv, J, Jv, JTw, A)
-        return (g, H_lag, H, Hv, J, Jv, JTw)
+            return (g, H_lag, H, Hv, gHiv, J, Jv, JTw, A)
+        return (g, H_lag, H, Hv, gHiv, J, Jv, JTw)
     else:
         return (g, H_lag, H, Hv)
 
@@ -288,6 +306,10 @@ def get_derivatives_llmat(model):
     v = np.arange(1, model.nvar + 1, dtype=np.float)
     Hv = model.hprod(model.x0, model.pi0, v)
     if model.m > 0:
+        try:
+            gHiv = model.ghivprod(model.x0, -v, v)
+        except NotImplementedError:
+            gHiv = None
         J = ndarray_from_ll_mat(model.jac(model.x0))
         Jop = model.jop(model.x0)
         Jv = Jop * v
@@ -295,8 +317,8 @@ def get_derivatives_llmat(model):
         JTw = Jop.T * w
         if model.nlin > 0:
             A = ndarray_from_ll_mat(model.A())
-            return (g, H_lag, H, Hv, J, Jv, JTw, A)
-        return (g, H_lag, H, Hv, J, Jv, JTw)
+            return (g, H_lag, H, Hv, gHiv, J, Jv, JTw, A)
+        return (g, H_lag, H, Hv, gHiv, J, Jv, JTw)
     else:
         return (g, H_lag, H, Hv)
 
@@ -308,6 +330,10 @@ def get_derivatives_scipy(model):
     v = np.arange(1, model.nvar + 1, dtype=np.float)
     Hv = model.hprod(model.x0, model.pi0, v)
     if model.m > 0:
+        try:
+            gHiv = model.ghivprod(model.x0, -v, v)
+        except NotImplementedError:
+            gHiv = None
         J = model.jac(model.x0).todense()
         Jop = model.jop(model.x0)
         Jv = Jop * v
@@ -315,8 +341,8 @@ def get_derivatives_scipy(model):
         JTw = Jop.T * w
         if model.nlin > 0:
             A = model.A().todense()
-            return (g, H_lag, H, Hv, J, Jv, JTw, A)
-        return (g, H_lag, H, Hv, J, Jv, JTw)
+            return (g, H_lag, H, Hv, gHiv, J, Jv, JTw, A)
+        return (g, H_lag, H, Hv, gHiv, J, Jv, JTw)
     else:
         return (g, H_lag, H, Hv)
 

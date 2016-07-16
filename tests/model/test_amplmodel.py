@@ -1,8 +1,8 @@
 """Tests relative to problems modeled with AMPL."""
 
 from unittest import TestCase
-from helper import *
 import numpy as np
+from helper import *
 import os
 import pytest
 from nlp.tools.dercheck import DerivativeChecker
@@ -12,7 +12,7 @@ import logging
 this_path = os.path.dirname(os.path.realpath(__file__))
 
 
-class Test_AmplRosenbrock(TestCase, Rosenbrock):  # Test def'd in Rosenbrock
+class Test_AmplRosenbrock(TestCase, Rosenbrock):  # Test also def'd in Rosenbrock
 
     def get_derivatives(self, model):
         return get_derivatives_coord(model)
@@ -22,8 +22,25 @@ class Test_AmplRosenbrock(TestCase, Rosenbrock):  # Test def'd in Rosenbrock
         model = os.path.join(this_path, 'rosenbrock.nl')
         self.model = AmplModel(model)  # x0 = (-1, ..., -1)
 
+    def test_ampl_hessian_issue(self):
+        data = self.get_expected()
+        model = self.model
 
-class Test_AmplHS7(TestCase, Hs7):  # Test defined in Hs7
+        # Trying to trick AMPL.
+        f = model.obj(np.zeros(self.model.n))
+        H_lag = ndarray_from_coord(model.nvar, model.nvar,
+                                   *model.hess(model.x0, model.pi0),
+                                   symmetric=True)
+        assert np.allclose(H_lag, data.expected_H_lag)
+
+        # Trying to trick AMPL.
+        f = model.obj(np.zeros(self.model.n))
+        v = np.arange(1, model.nvar + 1, dtype=np.float)
+        Hv = model.hprod(model.x0, model.pi0, v)
+        assert np.allclose(Hv, data.expected_Hv)
+
+
+class Test_AmplHS7(TestCase, Hs7):  # Test also defined in Hs7
 
     def get_derivatives(self, model):
         return get_derivatives_coord(model)
@@ -35,7 +52,7 @@ class Test_AmplHS7(TestCase, Hs7):  # Test defined in Hs7
         self.model.pi0 = np.ones(1)
 
 
-class Test_AmplMaxProfit(TestCase, MaxProfit):  # Test defined in MaxProfit
+class Test_AmplMaxProfit(TestCase, MaxProfit):  # Test also defined in MaxProfit
 
     def get_derivatives(self, model):
         return get_derivatives_coord(model)
@@ -357,7 +374,6 @@ class Test_AmplModelExtrasim(TestCase):
     def test_lp(self):
         model = self.model
         assert model.islp() is True
-
         assert np.allclose(model.cost().to_array(), np.array([1., 0.]))
         print model.display_basic_info()
 
@@ -400,6 +416,18 @@ class Test_AmplModelExtrasim(TestCase):
         for j in xrange(model.ncon):
             assert (len(dcheck.chess_errs[j]) == 0)
 
+    def test_icons(self):
+        model = self.model
+        cons = np.array([0.])
+        for j in range(model.ncon):
+            assert np.allclose(model.icons(j, model.x0), cons[j])
+
+    def test_irow(self):
+        model = self.model
+        A = np.array([[1., 2.]])
+        for j in range(model.ncon):
+            assert np.allclose(model.irow(j).to_array(), A[j, :])
+
     def test_cons_scaling(self):
         model = self.model
         log = config_logger("nlp.der",
@@ -414,7 +442,10 @@ class Test_AmplModelExtrasim(TestCase):
 
         model.compute_scaling_cons(g_max=2.)
         assert np.allclose(model.scale_con, np.array([1.]))
-        assert np.allclose(model.cons(model.x0), np.array([0.]))
+        cons = np.array([0.])
+        for j in range(model.ncon):
+            assert np.allclose(model.icons(j, model.x0), cons[j])
+        assert np.allclose(model.cons(model.x0), cons)
         assert np.allclose(model.jop(model.x0).to_array(),
                            np.array([[1., 2.]]))
         assert np.allclose(ndarray_from_coord(model.ncon, model.nvar,

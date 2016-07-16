@@ -391,7 +391,7 @@ class AmplModel(NLPModel):
             z = z.copy()
             z *= self.scale_con
 
-        Hv = self.model.H_prod(z, v, obj_weight)
+        Hv = self.model.H_prod(x, z, v, obj_weight)
         if not self.minimize:
             Hv *= -1
         return Hv
@@ -404,20 +404,20 @@ class AmplModel(NLPModel):
         """
         z = np.zeros(self.m)
         z[i] = -1
-        Hv = self.model.H_prod(z, v, 0.)
+        Hv = self.model.H_prod(x, z, v, 0.)
         if self.scale_con is not None:
             Hv *= self.scale_con[i]
         return Hv
 
-    def ghivprod(self, g, v, **kwargs):
-        """Evaluate individual dot products (g, Hi*v).
+    def ghivprod(self, x, g, v, **kwargs):
+        """Evaluate individual dot products (g, Hi(x)*v).
 
-        Evaluate the vector of dot products (g, Hi*v) where Hi is the Hessian
-        of the i-th constraint, i=1..m.
+        Evaluate the vector of dot products (g, Hi(x)*v) where Hi(x) is the
+        Hessian of the i-th constraint at point x, i=1..m.
         """
         if self.nnln == 0:       # Quick exit if no nonlinear constraints
             return np.zeros(self.m)
-        gHi = self.model.gHi_prod(g, v)
+        gHi = self.model.gHi_prod(x, g, v)
         if self.scale_con is not None:
             gHi *= self.scale_con  # componentwise product
         return gHi
