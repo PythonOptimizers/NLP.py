@@ -496,9 +496,6 @@ cdef class ampl:
         cdef:
             ndarray[np.double_t] H
 
-            # Variables needed for coordinate format.
-            # ndarray[np.int_t] a_irow, a_icol  # broken.
-
             # Variables needed for LL format.
             cgrad* cg
             int* dims = [self.n_var, self.n_var]
@@ -507,9 +504,19 @@ cdef class ampl:
             double OW[1]  # Objective type: we currently only support single objective
             int i, j, j0, j1, k
 
+            # variables to compute extra objective function
+            int nerror = 0
+            int obj_num = 0
+            double val
+
         # Ensure contiguous input.
         if not PyArray_ISCARRAY(x): x = x.copy()
         if not PyArray_ISCARRAY(y): y = y.copy()
+
+        # extra objective evaluation.
+        obj = ampl_objval(self.asl, obj_num, <double*>x.data, &nerror)
+        if nerror:
+            raise ValueError
 
         # Determine room for Hessian and objective sign if maximizing.
         nnzh = self.get_nnzh()
@@ -517,7 +524,7 @@ cdef class ampl:
 
         # Allocate storage and evaluate Hessian.
         H = np.empty(nnzh, dtype=np.double)
-        # Note that AMPL is evaluating a UPPER triangular Hessian
+        # Note that AMPL is evaluating a UPPER triangular Hessian.
         ampl_sphes(self.asl, <double*>H.data, -1, OW, <double*>y.data)
 
         a_icol = np.empty(nnzh, dtype=np.int)
@@ -536,18 +543,30 @@ cdef class ampl:
 
         return (H, a_irow, a_icol)
 
-    def H_prod(self, ndarray[np.double_t] y, ndarray[np.double_t] v,
-               double obj_weight=1.0):
+    def H_prod(self, ndarray[np.double_t] x, ndarray[np.double_t] y,
+               ndarray[np.double_t] v, double obj_weight=1.0):
         """Compute matrix-vector product Hv of Lagrangian Hessian
-        times a vector."""
+        times a vector.
+        """
 
         cdef:
             double OW[1]
             ndarray[np.double_t] Hv
 
+            # variables to compute extra objective function
+            int nerror = 0
+            int obj_num = 0
+            double val
+
         # Ensure contiguous input.
+        if not PyArray_ISCARRAY(x): x = x.copy()
         if not PyArray_ISCARRAY(y): y = y.copy()
         if not PyArray_ISCARRAY(v): v = v.copy()
+
+        # extra objective evaluation.
+        obj = ampl_objval(self.asl, obj_num, <double*>x.data, &nerror)
+        if nerror:
+            raise ValueError
 
         OW[0] = obj_weight if self.objtype == 0 else -obj_weight
         Hv = np.empty(self.n_var, dtype=np.double)
@@ -560,8 +579,9 @@ cdef class ampl:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def gHi_prod(self, ndarray[np.double_t] g, ndarray[np.double_t] v):
-        """Compute the vector of dot products (g,Hi*v) with the
+    def gHi_prod(self, ndarray[np.double_t] x, ndarray[np.double_t] g,
+                 ndarray[np.double_t] v):
+        """Compute the vector of dot products (g, Hi(x)*v) with the
         constraint Hessians."""
 
         cdef:
@@ -569,9 +589,20 @@ cdef class ampl:
             ndarray[np.double_t] hv = np.empty(self.n_var, dtype=np.double)
             ndarray[np.double_t] y = np.zeros(self.n_con, dtype=np.double)
 
+            # variables to compute extra objective function
+            int nerror = 0
+            int obj_num = 0
+            double val
+
         # Ensure contiguous input.
+        if not PyArray_ISCARRAY(x): x = x.copy()
         if not PyArray_ISCARRAY(g): g = g.copy()
         if not PyArray_ISCARRAY(v): v = v.copy()
+
+        # extra objective evaluation.
+        obj = ampl_objval(self.asl, obj_num, <double*>x.data, &nerror)
+        if nerror:
+            raise ValueError
 
         # Process nonlinear constraints. The rest are already zero.
         for i in range(self.nlc):
