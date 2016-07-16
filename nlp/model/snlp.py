@@ -86,23 +86,23 @@ class SlackModel(NLPModel):
         # Add bounds corresponding to lower constraints
         bot = self.original_n
         self.sL = range(bot, bot + model.nlowerC)
-        Lvar[bot:bot+model.nlowerC] = model.Lcon[model.lowerC]
+        Lvar[bot:bot + model.nlowerC] = model.Lcon[model.lowerC]
 
         # Add bounds corresponding to upper constraints
         bot += model.nlowerC
         self.sU = range(bot, bot + model.nupperC)
-        Uvar[bot:bot+model.nupperC] = model.Ucon[model.upperC]
+        Uvar[bot:bot + model.nupperC] = model.Ucon[model.upperC]
 
         # Add bounds corresponding to range constraints
         bot += model.nupperC
         self.sR = range(bot, bot + model.nrangeC)
-        Lvar[bot:bot+model.nrangeC] = model.Lcon[model.rangeC]
-        Uvar[bot:bot+model.nrangeC] = model.Ucon[model.rangeC]
+        Lvar[bot:bot + model.nrangeC] = model.Lcon[model.rangeC]
+        Uvar[bot:bot + model.nrangeC] = model.Ucon[model.rangeC]
 
         # No more inequalities. All constraints are now equal to 0
         Lcon = Ucon = np.zeros(m)
 
-        super(SlackModel, self).__init__(n=n, m=m, name='Slack-'+model.name,
+        super(SlackModel, self).__init__(n=n, m=m, name='Slack-' + model.name,
                                          Lvar=Lvar, Uvar=Uvar,
                                          Lcon=Lcon, Ucon=Ucon)
 
@@ -266,3 +266,18 @@ class SlackModel(NLPModel):
     def hess(self, x, z=None, *args, **kwargs):
         """Evaluate Lagrangian Hessian at (x, z)."""
         raise NotImplementedError("Please subclass")
+
+    def ghivprod(self, x, g, v, **kwargs):
+        """Evaluate individual dot products (g, Hi(x)*v).
+
+        Evaluate the vector of dot products (g, Hi(x)*v) where Hi(x) is the
+        Hessian of the i-th constraint at point x, i=1..m.
+        """
+        # Some shortcuts for convenience
+        model = self.model
+        on = self.original_n
+        om = self.original_m
+
+        gHiv = np.zeros(self.m)
+        gHiv[:om] = model.ghivprod(x[:on], g[:on], v[:on], **kwargs)
+        return gHiv

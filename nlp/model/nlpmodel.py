@@ -669,7 +669,7 @@ class NLPModel(object):
         """
         raise NotImplementedError('This method must be subclassed.')
 
-    def ghivprod(self, g, v, **kwargs):
+    def ghivprod(self, x, g, v, **kwargs):
         """Evaluate individual dot products (g, Hi*v).
 
         Evaluate the vector of dot products (g, Hi*v) where Hi is the Hessian
