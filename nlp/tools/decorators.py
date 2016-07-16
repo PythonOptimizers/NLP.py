@@ -1,4 +1,4 @@
-"""Decorators useful in the context of NLPy.py."""
+"""Decorators useful in the context of NLP.py."""
 
 import warnings
 import functools
