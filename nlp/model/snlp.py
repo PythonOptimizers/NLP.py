@@ -263,7 +263,6 @@ class SlackModel(NLPModel):
         Hv[:on] = model.hprod(x[:on], y, v[:on], **kwargs)
         return Hv
 
-
     def ghivprod(self, x, g, v, **kwargs):
         """Evaluate individual dot products (g, Hi(x)*v).
 
