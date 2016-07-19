@@ -20,6 +20,9 @@ try:
 except ImportError:
     from hsl.solvers.pyma27 import PyMa27Solver as LBLSolver
 
+from nlp.optimize.auglag import Auglag
+from nlp.optimize.tron import TRON
+
 import pysparse.sparse.pysparseMatrix as ps
 from pykrylov.linop import IdentityOperator
 
@@ -89,7 +92,7 @@ class FnormModel(UnconstrainedNLPModel):
         Objective function of this model is the norm of the KKT residual of
         `model` at w:=(x,y) defined by
 
-            F(w) =  ‖∇L(w) + ρ(x-xₖ)‖ + ‖c(w) + δ(y-yₖ)‖
+            ‖F(w)‖ =  ‖∇L(w) + ρ(x-xₖ)‖ + ‖c(w) + δ(y-yₖ)‖
 
         :parameters:
             :model: ```NLPModel```.
@@ -134,7 +137,7 @@ class FnormModel(UnconstrainedNLPModel):
         self.logger.debug("setting prox parameter to %7.1e", self.prox)
 
     def obj(self, w, c=None, g=None, gL=None):
-        u"""Evaluate F(w)."""
+        u"""Evaluate ‖F(w)‖."""
         x = w[:self.model.n]
         y = w[self.model.n:]
         J = self.model.jop(x)
@@ -155,7 +158,7 @@ class FnormModel(UnconstrainedNLPModel):
         return gLnorm + cnorm
 
     def grad(self, w, c=None, g=None, gL=None):
-        u"""Evaluate ∇ F(w)."""
+        u"""Evaluate ∇ ‖F(w)‖."""
         x = w[:self.model.n]
         y = w[self.model.n:]
         J = self.model.jop(x)
@@ -192,13 +195,15 @@ class RegSQPSolver(object):
         :keywords:
             :model: `NLPModel` instance.
             :abstol: Absolute stopping tolerance
-            :reltol: relative required accuracy for ‖[g-J'y ; c]‖
+            :reltol: relative required accuracy for ‖[g - Jᵀy ; c]‖
             :theta: sufficient decrease condition for the inner iterations
             :prox: initial proximal parameter
             :penalty: initial penalty parameter
-            :itermax: maximum number of iterations allowed
-            :bump_max: Max number of times regularization parameters are
-                       increased when a factorization fails (default 5).
+            :maxiter: maximum number of iterations allowed
+            :bump_max: maximum number of times regularization parameters are
+                       increased when a factorization fails (default: 5)
+            :better_starting_point: look for a better starting point
+                                    (default: True)
 
         """
         self.model = model
@@ -209,6 +214,7 @@ class RegSQPSolver(object):
         self.reltol = kwargs.get('reltol', 1.0e-6)
         self.theta = kwargs.get('theta', 0.99)
         self.itermax = kwargs.get('maxiter', max(100, 10 * model.n))
+        self.better_starting_point = kwargs.get('better_starting_point', True)
 
         # attributed related to quasi-Newton variants
         self.save_g = kwargs.get('save_g', False)
@@ -219,14 +225,17 @@ class RegSQPSolver(object):
         self.bump_max = kwargs.get('bump_max', 15)
 
         self.itn = 0
+        self.inner_itn = 0
+
         self.K = None
         self.LBL = None
         self.short_status = "unknown"
         self.status = "unk"
         self.tsolve = 0.0
-        self.f0 = None
+        self.f = self.f0 = None
         self.cnorm = None
         self.gLnorm = None
+        self.optimal = False
 
         # Set regularization parameters.
         # This solver uses the proximal augmented Lagrangian formulation
@@ -245,11 +254,13 @@ class RegSQPSolver(object):
         # self.epsilon = (2 - self.theta) * penalty
         self.prox_factor = 10.  # increase factor during inertia correction
         self.penalty_factor = 10.  # increase factor during regularization
+        self.epsilon = 0.
 
         # Initialize format strings for display
-        self.hformat = "%-5s  %8s  %7s  %7s  %7s  %7s"
-        self.header = self.hformat % ("iter", "f", u"‖c‖", u"‖∇L‖", u"ρ", u"δ")
-        self.format = "%-5d  %8.1e  %7.1e  %7.1e  %7.1e  %7.1e"
+        self.hformat = "%-5s  %8s  %7s  %7s  %7s  %7s  %7s"
+        self.header = self.hformat % ("iter", "f", u"‖c‖", u"‖∇L‖",
+                                      u"ρ", u"δ", u"ϵ")
+        self.format = "%-5d  %8.1e  %7.1e  %7.1e  %7.1e  %7.1e  %7.1e"
 
         # Grab logger if one was configured.
         logger_name = kwargs.get('logger_name', 'nlp.regsqp')
@@ -278,17 +289,9 @@ class RegSQPSolver(object):
 
         # contribution of the Hessian
         # print "x: ", x, " y: ", y
-        f = model.obj(x)
-        g = model.grad(x)
-        J = model.jop(x)
-        c = model.cons(x) - model.Lcon
         H = model.hess(x, z=y)
         (val, irow, jcol) = H.find()
         self.K.put(val, irow.tolist(), jcol.tolist())
-
-        # add primal regularization
-        # if self.merit.prox > 0:
-        #     self.K.addAt(self.merit.prox * np.ones(n), range(n), range(n))
 
         # contribution of the Jacobian
         J = model.jac(x)
@@ -303,7 +306,6 @@ class RegSQPSolver(object):
 
     def assemble_rhs(self, g, J, y, c):
         """Set the rhs of Newton system according to current information."""
-        # print g, J.to_array(), y, c
         return np.concatenate((-g + J.T * y, -c))
 
     def new_penalty(self, Fnorm):
@@ -436,8 +438,7 @@ class RegSQPSolver(object):
         """
         return (step[:self.model.n], -step[self.model.n:])
 
-    def solve_inner(self, x, y, f, g, J, c, gL,
-                    Fnorm0, gLnorm0, cnorm0, Fnorm, gLnorm, cnorm):
+    def solve_inner(self, x, y, f, g, J, c, gL, Fnorm, gLnorm, cnorm):
         u"""Perform a sequence of inner iterations.
 
         The objective of the inner iterations is to identify an improved
@@ -446,15 +447,17 @@ class RegSQPSolver(object):
         The improved iterate is identified by minimizing the proximal augmented
         Lagrangian.
         """
-        # self.merit.penalty = 1. / Fnorm
+        cnorm0 = cnorm
+        gLnorm0 = gLnorm
+        Fnorm0 = Fnorm
+
         self.log.debug('starting inner iterations with target %7.1e',
-                       self.theta * Fnorm0 + self.epsilon)
-        self.log.info(self.format, self.itn, f, cnorm, gLnorm,
-                      self.merit.prox, 1.0 / self.merit.penalty)
+                       self.theta * Fnorm + self.epsilon)
+        self.log.info(self.format, self.itn, f, cnorm0, gLnorm0,
+                      self.merit.prox, 1.0 / self.merit.penalty, self.epsilon)
 
         model = self.model
         failure = False
-        # ipdb.set_trace()
 
         # if infeasibility is large, immediately increase penalty
         # if cnorm > self.theta * cnorm0 + 0.5 * self.epsilon:
@@ -510,12 +513,11 @@ class RegSQPSolver(object):
             #                               value=phi, slope=slope)
 
             try:
-                for k, step in enumerate(ls):
+                for step in ls:
                     self.log.debug(ls_fmt, step, ls.trial_value)
 
                 self.log.debug('step norm: %8.2e', norm2(x - ls.iterate))
                 x = ls.iterate
-                f = model.obj(x)
                 g = model.grad(x)
                 J = model.jop(x)
                 c = model.cons(x) - model.Lcon
@@ -540,8 +542,9 @@ class RegSQPSolver(object):
                 finished = Fnorm <= self.theta * Fnorm0 + self.epsilon
                 tired = self.itn > self.itermax
 
-                self.log.info(self.format, self.itn, f, cnorm, gphi_norm,
-                              self.merit.prox, 1.0 / self.merit.penalty)
+                self.log.info(self.format, self.itn, model.obj(x), cnorm,
+                              gphi_norm, self.merit.prox,
+                              1.0 / self.merit.penalty, self.epsilon)
 
                 try:
                     self.post_inner_iteration(x, gL)
@@ -553,8 +556,7 @@ class RegSQPSolver(object):
             except LineSearchFailure:
                 self.status = "Linesearch failure"
                 failure = True
-            # plt.scatter(x_p, y_p)
-            # ipdb.set_trace()
+
         solved = Fnorm <= self.theta * Fnorm0 + self.epsilon
         return x, y, f, g, J, c, gphi, gphi_norm, cnorm, Fnorm, solved
 
@@ -605,7 +607,6 @@ class RegSQPSolver(object):
         self.inner_itn = 0
 
         # Get initial objective value
-        # print 'x0: ', x
         self.f = self.f0 = f = model.obj(x)
 
         c = model.cons(x) - model.Lcon
@@ -619,24 +620,24 @@ class RegSQPSolver(object):
         y = self.least_squares_multipliers(g, model.jac(x))
 
         J = model.jop(x)
-        # print J.to_array()
         gL = g - J.T * y
         self.gLnorm = gLnorm = gLnorm0 = norm2(gL)
         Fnorm = Fnorm0 = gLnorm + cnorm
 
-        self.log.info(self.header)
-        self.log.info(self.format, self.itn, self.f0, cnorm0, gLnorm0,
-                      self.merit.prox, 1.0 / self.merit.penalty)
-
         # Find a better initial point
-        # x, y, f, c, g, J, cnorm, gLnorm, Fnorm = \
-        #     self.find_better_starting_point(x, y, f, c, g, J,
-        #                                     cnorm0, gLnorm0, Fnorm0)
+        if self.better_starting_point:
+            x, y, f, c, g, J, cnorm, gLnorm, Fnorm = \
+                self.find_better_starting_point(x, y, f, c, g, J,
+                                                cnorm0, gLnorm0, Fnorm0)
 
         # Initialize penalty parameter
         # self.merit.penalty = 1.0 / min(0.1, Fnorm)
         self.merit.penalty = 1. / Fnorm
-        # delta = min(0.1, Fnorm0)
+        self.epsilon = 10. / self.merit.penalty
+
+        self.log.info(self.header)
+        self.log.info(self.format, self.itn, self.f0, cnorm0, gLnorm0,
+                      self.merit.prox, 1.0 / self.merit.penalty, self.epsilon)
 
         # set stopping tolerance
         tol = self.reltol * Fnorm0 + self.abstol
@@ -665,22 +666,22 @@ class RegSQPSolver(object):
 
             # compute extrapolation step
             self.assemble_linear_system(x, y)
-            # self.update_rhs(rhs, g, J, y, c)
             rhs = self.assemble_rhs(g, J, y, c)
 
             status, short_status, solved, dx, dy = self.solve_linear_system(
                 rhs, J)
-            # print 'dx_ext: ', dx
             assert solved
+
             penalty_ext = self.merit.penalty
             prox_ext = self.merit.prox
             self.log.debug("step norm: %6.2e", norm2(dx))
 
             # check for acceptance of extrapolation step
             # self.epsilon = (2 - self.theta) * Fnorm  # 10./ self.merit.penalty
-            self.epsilon = 10. / self.merit.penalty
-            # x += dx
-            # y += dy
+            # self.epsilon = 10. / self.merit.penalty
+            self.epsilon = min(10. / self.merit.penalty,
+                               0.99 * max(self.epsilon, self.epsilon**0.1))
+
             xplus = x + dx
             yplus = y + dy
             f_ext = model.obj(xplus)  # only necessary for printing
@@ -720,17 +721,16 @@ class RegSQPSolver(object):
                 self.merit.pi = y.copy()
 
                 (x_in, y_in, f_in, g_in, J_in, c_in, gL_in, gLnorm_in,
-                 cnorm_in, Fnorm_in, solved) = self.solve_inner(x, y, f, g, J, c, gL,
-                                                                Fnorm, gLnorm, cnorm,
-                                                                Fnorm, gLnorm, cnorm)
+                 cnorm_in, Fnorm_in, solved) = self.solve_inner(x, y, f, g, J,
+                                                                c, gL, Fnorm,
+                                                                gLnorm, cnorm)
 
                 if not solved:
                     self.merit.penalty = penalty_ext
                     self.merit.prox = prox_ext
                     self.epsilon = (2 - self.theta) * Fnorm
                     x, y, f, g, J, c, gL, gLnorm, cnorm, Fnorm = \
-                        self.emergency_backtrack(x, y, dx, dy, prox_ext,
-                                                 penalty_ext,
+                        self.emergency_backtrack(x, y, dx, dy,
                                                  Fnorm, Fnorm_ext)
                 else:
                     x = x_in
@@ -753,7 +753,8 @@ class RegSQPSolver(object):
                 self.log.debug(self.header)
 
             self.log.info(self.format, self.itn, f, cnorm, gLnorm,
-                          self.merit.prox, 1.0 / self.merit.penalty)
+                          self.merit.prox, 1.0 / self.merit.penalty,
+                          self.epsilon)
 
             if optimal:
                 status = 'Optimal solution found'
@@ -779,9 +780,8 @@ class RegSQPSolver(object):
         self.short_status = short_status
         return
 
-    def emergency_backtrack(self, x, y, dx, dy, prox, penalty,
-                            Fnorm0, Fnorm_ext):
-        """Backtrack on ‖F(w)‖."""
+    def emergency_backtrack(self, x, y, dx, dy, Fnorm0, Fnorm_ext):
+        u"""Backtrack on ‖F(w)‖."""
         model = self.model
         goal = self.theta * Fnorm0 + self.epsilon
 
@@ -816,7 +816,8 @@ class RegSQPSolver(object):
             Fnorm = gLnorm + cnorm
 
             self.log.info(self.format, self.itn, f, cnorm, gLnorm,
-                          self.merit.prox, 1.0 / self.merit.penalty)
+                          self.merit.prox, 1.0 / self.merit.penalty,
+                          self.epsilon)
 
             try:
                 self.post_inner_iteration(x, gL)
@@ -868,7 +869,8 @@ class RegSQPSolver(object):
 
             self.log.info(self.format, self.itn,
                           self.f, self.cnorm, self.gLnorm,
-                          self.merit.prox, 1.0 / self.merit.penalty)
+                          self.merit.prox, 1.0 / self.merit.penalty,
+                          0)  # ϵ
         return x, y, f, c, g, J, cnorm, gLnorm, Fnorm
 
     def post_iteration(self, x, g, **kwargs):
@@ -887,14 +889,10 @@ class RegSQPSolver(object):
         """
         return None
 
-from nlp.optimize.auglag import Auglag
-from nlp.optimize.tron import TRON
-
 
 class AuglagRegSQPSolver(RegSQPSolver):
 
-    def solve_inner(self, x, y, f, g, J, c, gL,
-                    Fnorm0, gLnorm0, cnorm0, Fnorm, gLnorm, cnorm):
+    def solve_inner(self, x, y, f, g, J, c, gL, Fnorm, gLnorm, cnorm):
         u"""Perform a sequence of inner iterations.
 
         The objective of the inner iterations is to identify an improved
@@ -903,11 +901,14 @@ class AuglagRegSQPSolver(RegSQPSolver):
         The improved iterate is identified by minimizing the proximal augmented
         Lagrangian.
         """
-        # self.merit.penalty = 1. / Fnorm
+        cnorm0 = cnorm
+        gLnorm0 = gLnorm
+        Fnorm0 = Fnorm
+
         self.log.debug('starting inner iterations with target %7.1e',
                        self.theta * Fnorm0 + self.epsilon)
         self.log.info(self.format, self.itn, f, cnorm, gLnorm,
-                      self.merit.prox, 1.0 / self.merit.penalty)
+                      self.merit.prox, 1.0 / self.merit.penalty, self.epsilon)
 
         model = self.model
         self.log.debug(u"δ = %8.1e, ρ = %8.1e, ϵ = %8.1e",
@@ -938,5 +939,5 @@ class AuglagRegSQPSolver(RegSQPSolver):
         Fnorm = gLnorm + cnorm
 
         solved = Fnorm <= self.theta * Fnorm0 + self.epsilon
-        self.log.debug(u'ending inner iterations -- solved: %s', solved)
+        self.log.debug('ending inner iterations -- solved: %s', solved)
         return x, y, f, g, J, c, gL, gLnorm, cnorm, Fnorm, solved
