@@ -3,7 +3,7 @@
 
 try:
     from pysparse.sparse import PysparseMatrix as psp
-except:
+except ImportError:
     print "PySparse is not installed!"
 
 from nlp.model.nlpmodel import NLPModel
@@ -15,8 +15,8 @@ import numpy as np
 
 
 class PySparseNLPModel(NLPModel):
-    """
-    An `NLPModel` where sparse matrices are returned in PySparse format.
+    """An `NLPModel` where sparse matrices are returned in PySparse format.
+
     The `NLPModel`'s `jac` and `hess` methods should return that sparse
     Jacobian and Hessian in coordinate format: (vals, rows, cols).
     """
@@ -59,7 +59,7 @@ try:
             Useful to obtain constraint matrix when problem is a linear programming
             problem.
             """
-            vals, rows, cols = super(PySparseNLPModel,
+            vals, rows, cols = super(PySparseAmplModel,
                                      self).A(*args, **kwargs)
             A = psp(nrow=self.ncon, ncol=self.nvar,
                     sizeHint=vals.size, symmetric=False)
