@@ -54,7 +54,12 @@ parser.add_argument("-i", "--iter", action="store", type=int, default=1000,
                     dest="maxiter", help="maximum number of iterations")
 parser.add_argument("--al", action="store_true", default=False,
                     dest="auglag", help="auglag in inner iterations")
-
+parser.add_argument("-b", "--better_starting_point", action="store_false",
+                    default=True, dest="better_starting_point",
+                    help="better starting point")
+parser.add_argument("-s", "--scale", action="store_true",
+                    default=False, dest="scale",
+                    help="scale problem")
 # Parse command-line arguments
 (args, other) = parser.parse_known_args()
 
@@ -106,10 +111,12 @@ for problem in other:
         verbose = False
         continue
 
-    # model.compute_scaling_obj()
-    # model.compute_scaling_cons()
+    if args.scale:
+        model.compute_scaling_obj()
+        model.compute_scaling_cons()
 
-    regsqp = RegSQP(model, maxiter=args.maxiter, theta=args.theta)
+    regsqp = RegSQP(model, maxiter=args.maxiter, theta=args.theta,
+                    better_starting_point=args.better_starting_point)
 
     try:
         regsqp.solve()
