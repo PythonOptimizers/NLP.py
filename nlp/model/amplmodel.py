@@ -61,13 +61,13 @@ def writestub(template):
 
 
 class AmplModel(NLPModel):
-    """
-    AmplModel creates an instance of an AMPL model. If the `nl` file is
-    already available, simply call `AmplModel(stub)` where the string
-    `stub` is the name of the model. For instance: `AmplModel('elec')`.
-    If only the `.mod` file is available, set the positional parameter
-    `neednl` to `True` so AMPL generates the `nl` file, as in
-    `AmplModel('elec.mod', data='elec.dat', neednl=True)`.
+    """AmplModel creates an instance of an AMPL model.
+
+    If the `nl` file is already available, simply call `AmplModel(stub)` where
+    the string `stub` is the name of the model. For instance:
+    `AmplModel('elec')`. If only the `.mod` file is available, set the
+    positional parameter `neednl` to `True` so AMPL generates the `nl` file, as
+    in `AmplModel('elec.mod', data='elec.dat', neednl=True)`.
 
     Among important attributes of this class are :attr:`nvar`, the number of
     variables, :attr:`ncon`, the number of constraints, and :attr:`nbounds`,
@@ -206,7 +206,7 @@ class AmplModel(NLPModel):
         use the `permC` permutation vector.
         """
         c = self.model.eval_cons(x)
-        if self.scale_con is not None:
+        if isinstance(self.scale_con, np.ndarray):
             c *= self.scale_con
         return c
 
@@ -216,7 +216,7 @@ class AmplModel(NLPModel):
         Returns a floating-point number.
         """
         ci = self.model.eval_ci(i, x)
-        if self.scale_con is not None:
+        if isinstance(self.scale_con, np.ndarray):
             ci *= self.scale_con[i]
         return ci
 
@@ -226,7 +226,7 @@ class AmplModel(NLPModel):
         Returns a Numpy array.
         """
         gi = self.model.eval_gi(i, x)
-        if self.scale_con is not None:
+        if isinstance(self.scale_con, np.ndarray):
             gi *= self.scale_con[i]
         return gi
 
@@ -237,7 +237,7 @@ class AmplModel(NLPModel):
         in coordinate format.
         """
         sci = sv.SparseVector(self.n, self.model.eval_sgi(i, x))
-        if self.scale_con is not None:
+        if isinstance(self.scale_con, np.ndarray):
             sci *= self.scale_con[i]
         return sci
 
@@ -248,7 +248,7 @@ class AmplModel(NLPModel):
         is a linear programming problem.
         """
         sri = sv.SparseVector(self.n, self.model.eval_row(i))
-        if self.scale_con is not None:
+        if isinstance(self.scale_con, np.ndarray):
             sri *= self.scale_con[i]
         return sri
 
@@ -261,7 +261,7 @@ class AmplModel(NLPModel):
         store_zeros = kwargs.get('store_zeros', False)
         store_zeros = 1 if store_zeros else 0
         vals, rows, cols = self.model.eval_A(store_zeros)
-        if self.scale_con is not None:
+        if isinstance(self.scale_con, np.ndarray):
             vals *= self.scale_con[rows]
         return (vals, rows, cols)
 
@@ -273,7 +273,7 @@ class AmplModel(NLPModel):
         store_zeros = kwargs.get('store_zeros', False)
         store_zeros = 1 if store_zeros else 0
         vals, rows, cols = self.model.eval_J(x, store_zeros)
-        if self.scale_con is not None:
+        if isinstance(self.scale_con, np.ndarray):
             vals *= self.scale_con[rows]
         return (vals, rows, cols)
 
@@ -353,7 +353,7 @@ class AmplModel(NLPModel):
 
         if self.scale_obj:
             obj_weight *= self.scale_obj
-        if self.scale_con:
+        if isinstance(self.scale_con, np.ndarray):
             z = z.copy()
             z *= self.scale_con
 
@@ -387,7 +387,7 @@ class AmplModel(NLPModel):
 
         if self.scale_obj:
             obj_weight *= self.scale_obj
-        if self.scale_con:
+        if isinstance(self.scale_con, np.ndarray):
             z = z.copy()
             z *= self.scale_con
 
@@ -405,7 +405,7 @@ class AmplModel(NLPModel):
         z = np.zeros(self.m)
         z[i] = -1
         Hv = self.model.H_prod(x, z, v, 0.)
-        if self.scale_con is not None:
+        if isinstance(self.scale_con, np.ndarray):
             Hv *= self.scale_con[i]
         return Hv
 
@@ -418,7 +418,7 @@ class AmplModel(NLPModel):
         if self.nnln == 0:       # Quick exit if no nonlinear constraints
             return np.zeros(self.m)
         gHi = self.model.gHi_prod(x, g, v)
-        if self.scale_con is not None:
+        if isinstance(self.scale_con, np.ndarray):
             gHi *= self.scale_con  # componentwise product
         return gHi
 
