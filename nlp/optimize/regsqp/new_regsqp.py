@@ -204,6 +204,7 @@ class RegSQPSolver(object):
                        increased when a factorization fails (default: 5)
             :better_starting_point: look for a better starting point
                                     (default: True)
+            :superlinear: enforce superlinear convergence of δ (default: False)
 
         """
         self.model = model
@@ -215,6 +216,7 @@ class RegSQPSolver(object):
         self.theta = kwargs.get('theta', 0.99)
         self.itermax = kwargs.get('maxiter', max(100, 10 * model.n))
         self.better_starting_point = kwargs.get('better_starting_point', True)
+        self.enforce_superlinear = kwargs.get('superlinear', False)
 
         # attributed related to quasi-Newton variants
         self.save_g = kwargs.get('save_g', False)
@@ -288,7 +290,6 @@ class RegSQPSolver(object):
                                    symmetric=True)
 
         # contribution of the Hessian
-        # print "x: ", x, " y: ", y
         H = model.hess(x, z=y)
         (val, irow, jcol) = H.find()
         self.K.put(val, irow.tolist(), jcol.tolist())
@@ -310,18 +311,25 @@ class RegSQPSolver(object):
 
     def new_penalty(self, Fnorm):
         """Return updated penalty parameter value."""
-        alpha = 0.9
-        gamma = 1.1
-        penalty = max(min(Fnorm,
-                          min(alpha / self.merit.penalty,
-                              1.0 / self.merit.penalty**gamma)),
-                      self.penalty_min)
+        if self.enforce_superlinear:
+            alpha = 0.1
+            gamma = 0.8
+            penalty = max(min(alpha / self.merit.penalty,
+                              1.0 / self.merit.penalty**gamma),
+                          self.penalty_min)
+        else:
+            alpha = 0.9
+            gamma = 1.1
+            penalty = max(min(Fnorm,
+                              min(alpha / self.merit.penalty,
+                                  1.0 / self.merit.penalty**gamma)),
+                          self.penalty_min)
         # penalty = max(
         # min(1.0 / self.merit.penalty / 10., 1.0 / self.merit.penalty**(1 +
         #    0.8)), self.penalty_min)
         return penalty
 
-    def solve_linear_system(self, rhs, itref_thresh=1.0e-7, nitref=5):
+    def solve_linear_system(self, rhs, J=None, itref_thresh=1.0e-7, nitref=5):
         u"""Compute a step by solving Newton's equations.
 
         Use a direct method to solve the symmetric and indefinite system
@@ -438,7 +446,8 @@ class RegSQPSolver(object):
         """
         return (step[:self.model.n], -step[self.model.n:])
 
-    def solve_inner(self, x, y, f, g, J, c, gL, Fnorm, gLnorm, cnorm):
+    def solve_inner(self, x, y, f, g, J, c, gL, Fnorm, gLnorm, cnorm,
+                    dx=None, dy=None):
         u"""Perform a sequence of inner iterations.
 
         The objective of the inner iterations is to identify an improved
@@ -476,7 +485,8 @@ class RegSQPSolver(object):
                 y = y_al
 
         Fnorm = gphi_norm + cnorm
-        finished = Fnorm <= self.theta * Fnorm0 + self.epsilon
+        # finished = Fnorm <= self.theta * Fnorm0 + self.epsilon
+        finished = False
         tired = self.itn > self.itermax
 
         while not (failure or finished or tired):
@@ -490,8 +500,8 @@ class RegSQPSolver(object):
             self.assemble_linear_system(x, y)
             rhs = self.assemble_rhs(g, J, y, c)
 
-            status, short_status, solved, dx, _ = self.solve_linear_system(rhs)
-            # print x, y, dx
+            status, short_status, solved, dx, _ = \
+                self.solve_linear_system(rhs, J=J)
             assert solved
 
             if not solved:
@@ -518,6 +528,7 @@ class RegSQPSolver(object):
 
                 self.log.debug('step norm: %8.2e', norm2(x - ls.iterate))
                 x = ls.iterate
+                f = model.obj(x)
                 g = model.grad(x)
                 J = model.jop(x)
                 c = model.cons(x) - model.Lcon
@@ -533,6 +544,7 @@ class RegSQPSolver(object):
                     if cnorm <= self.theta * cnorm0 + 0.5 * self.epsilon:
                         self.log.debug('feasibility improved sufficiently')
                         y = y_al
+                        # gL = gphi
                     else:
                         self.merit.penalty *= 10
 
@@ -542,7 +554,7 @@ class RegSQPSolver(object):
                 finished = Fnorm <= self.theta * Fnorm0 + self.epsilon
                 tired = self.itn > self.itermax
 
-                self.log.info(self.format, self.itn, model.obj(x), cnorm,
+                self.log.info(self.format, self.itn, f, cnorm,
                               gphi_norm, self.merit.prox,
                               1.0 / self.merit.penalty, self.epsilon)
 
@@ -560,14 +572,14 @@ class RegSQPSolver(object):
         solved = Fnorm <= self.theta * Fnorm0 + self.epsilon
         return x, y, f, g, J, c, gphi, gphi_norm, cnorm, Fnorm, solved
 
-    def least_squares_multipliers(self, g, J):
-        u"""Compute least-squares multipliers.
+    def least_squares_multipliers(self, x, g):
+        u"""Compute least-squares multipliers using a direct method.
 
-            min_y   ½ ‖Jᵀy - g‖²
+            min_y   ½ ‖J(x)ᵀy - g‖²
 
         That is solving
-             [I  Jᵀ] [ r] = [-g]
-             [J  0 ] [-y]   [ 0]
+             [I    J(x)ᵀ] [ r] = [-g]
+             [J(x)   0  ] [-y]   [ 0]
         and keeping only y.
         """
         model = self.model
@@ -580,7 +592,7 @@ class RegSQPSolver(object):
         M.put(np.ones(n), range(n), range(n))
 
         # contribution of the Jacobian
-        (val, irow, jcol) = J.find()
+        (val, irow, jcol) = self.model.jac(x).find()
         M.put(val, (n + irow).tolist(), jcol.tolist())
 
         rhs = np.zeros(n + m)
@@ -613,14 +625,13 @@ class RegSQPSolver(object):
         self.cnorm = cnorm = cnorm0 = norm2(c)
 
         g = model.grad(x)
-        J = model.jop(x)
-        gL = g - J.T * y
 
         # set Lagrange mutlipliers to least-squares estimates
-        y = self.least_squares_multipliers(g, model.jac(x))
+        y = self.least_squares_multipliers(x, g)
 
         J = model.jop(x)
         gL = g - J.T * y
+
         self.gLnorm = gLnorm = gLnorm0 = norm2(gL)
         Fnorm = Fnorm0 = gLnorm + cnorm
 
@@ -669,7 +680,7 @@ class RegSQPSolver(object):
             rhs = self.assemble_rhs(g, J, y, c)
 
             status, short_status, solved, dx, dy = self.solve_linear_system(
-                rhs, J)
+                rhs, J=J)
             assert solved
 
             penalty_ext = self.merit.penalty
@@ -848,6 +859,8 @@ class RegSQPSolver(object):
         self.log.debug("residual norm = %8.2e, ‖Δx‖ = %8.2e, ‖Δy‖ = %8.2e",
                        norm2(LBL.residual),  norm2(dx), norm2(dy))
 
+        # TODO: put the following in a method (to be also used by the
+        # QN RegSQP version)
         xs = x + dx
         ys = y + dy
         gs = model.grad(xs)
