@@ -5,7 +5,6 @@ import sys
 import os
 from argparse import ArgumentParser
 
-from nlp.model.pysparsemodel import PySparseAmplModel
 from nlp.tools.logs import config_logger
 
 
@@ -60,6 +59,10 @@ parser.add_argument("-b", "--better_starting_point", action="store_false",
 parser.add_argument("-s", "--scale", action="store_true",
                     default=False, dest="scale",
                     help="scale problem")
+parser.add_argument("--superlinear", action="store_true",
+                    default=False, dest="superlinear",
+                    help=u"enforce superlinear convergence of δ")
+
 # Parse command-line arguments
 (args, other) = parser.parse_known_args()
 
@@ -97,7 +100,12 @@ log.info('%12s %5s %5s %6s %8s %8s %8s %6s %6s %6s %5s %7s',
 for problem in other:
     verbose = True
 
-    model = PySparseAmplModel(problem, **opts)
+    if args.quasi_newton:
+        from counterfeitamplmodel import CounterFeitAmplModel as Model
+    else:
+        from nlp.model.pysparsemodel import PySparseAmplModel as Model
+
+    model = Model(problem, **opts)
 
     prob_name = os.path.basename(problem)
     if prob_name[-3:] == '.nl':
@@ -116,7 +124,8 @@ for problem in other:
         model.compute_scaling_cons()
 
     regsqp = RegSQP(model, maxiter=args.maxiter, theta=args.theta,
-                    better_starting_point=args.better_starting_point)
+                    better_starting_point=args.better_starting_point,
+                    superlinear=args.superlinear)
 
     try:
         regsqp.solve()
