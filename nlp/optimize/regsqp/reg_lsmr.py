@@ -36,17 +36,18 @@ class RegLSMRFramework(KrylovMethod):
         self.acronym = 'LSMR'
         self.prefix = self.acronym + ': '
 
-        self.msg = ('The exact solution is  x = 0                              ',
-                    'Ax - b is small enough, given atol, btol                  ',
-                    'The least-squares solution is good enough, given atol     ',
-                    'The estimate of cond(Abar) has exceeded conlim            ',
-                    'Ax - b is small enough for this machine                   ',
-                    'The least-squares solution is good enough for this machine',
-                    'Cond(Abar) seems to be too large for this machine         ',
-                    'The iteration limit has been reached                      ',
-                    'The truncated direct error is small enough, given etol    ',
-                    'Inner iteration termination test                          ',
-                    'Outer iteration termination test                          ')
+        self.msg = (
+            'The exact solution is  x = 0                              ',
+            'Ax - b is small enough, given atol, btol                  ',
+            'The least-squares solution is good enough, given atol     ',
+            'The estimate of cond(Abar) has exceeded conlim            ',
+            'Ax - b is small enough for this machine                   ',
+            'The least-squares solution is good enough for this machine',
+            'Cond(Abar) seems to be too large for this machine         ',
+            'The iteration limit has been reached                      ',
+            'The truncated direct error is small enough, given etol    ',
+            'Inner iteration termination test                          ',
+            'Outer iteration termination test                          ')
 
         self.A = A
         self.x = None
@@ -68,10 +69,10 @@ class RegLSMRFramework(KrylovMethod):
         self.iterates = []
         return
 
-    def solve(self, b, damp=0.0, atol=1e-9, btol=1e-9, conlim=1e8, gamma=1e-9, mu=1e-10,
-              M=None, N=None, inner=False, itnlim=None, show=False, **kwargs):
-        """
-        Iterative solver for least-squares problems.
+    def solve(self, b, damp=0.0, atol=1e-9, btol=1e-9, conlim=1e8, gamma=1e-9,
+              mu=1e-10, M=None, N=None, inner=False, itnlim=None, show=False,
+              **kwargs):
+        """Iterative solver for least-squares problems.
 
         lsmr solves the system of linear equations A*x=b. If the system
         is inconsistent, it solves the least-squares problem min ||b - Ax||_2.
@@ -99,22 +100,23 @@ class RegLSMRFramework(KrylovMethod):
                 backward error estimate is smaller than some quantity depending
                 on atol and btol.  Let r = b - A*x be the residual vector for
                 the current approximate solution x.  If A*x = b seems to be
-                consistent, lsmr terminates when norm(r) <= atol*norm(A)*norm(x)
-                + btol*norm(b).  Otherwise, lsmr terminates when norm(A^{T}*r)
-                <= atol*norm(A)*norm(r).  If both tolerances are 1.0e-6 (say),
-                the final norm(r) should be accurate to about 6 digits. (The final
-                x will usually have fewer correct digits, depending on cond(A)
-                and the size of LAMBDA.)  If atol or btol is None, a default
-                value of 1.0e-6 will be used.  Ideally, they should be estimates
-                of the relative error in the entries of A and B respectively.
-                For example, if the entries of A have 7 correct digits, set atol
-                = 1e-7. This prevents the algorithm from doing unnecessary work
+                consistent, lsmr terminates when norm(r) <=
+                atol*norm(A)*norm(x) + btol*norm(b).  Otherwise, lsmr
+                terminates when norm(A^{T}*r) <= atol*norm(A)*norm(r).  If both
+                tolerances are 1.0e-6 (say), the final norm(r) should be
+                accurate to about 6 digits. (The final x will usually have
+                fewer correct digits, depending on cond(A) and the size of
+                LAMBDA.)  If atol or btol is None, a default value of 1.0e-6
+                will be used.  Ideally, they should be estimates of the
+                relative error in the entries of A and B respectively. For
+                example, if the entries of A have 7 correct digits, set atol =
+                1e-7. This prevents the algorithm from doing unnecessary work
                 beyond the uncertainty of the input data.
             :etol: float
                 stopping tolerance based on direct error (default 1.0e-6).
             :conlim: float
-                lsmr terminates if an estimate of cond(A) exceeds conlim.
-                For compatible systems Ax = b, conlim could be as large as 1.0e+12
+                lsmr terminates if an estimate of cond(A) exceeds conlim. For
+                compatible systems Ax = b, conlim could be as large as 1.0e+12
                 (say).  For least-squares problems, conlim should be less than
                 1.0e+8. If conlim is None, the default value is CONLIM = 1e+8.
                 Maximum precision can be obtained by setting atol = btol =
@@ -140,8 +142,8 @@ class RegLSMRFramework(KrylovMethod):
                 istop   = 0 means x=0 is a solution.
                         = 1 means x is an approximate solution to A*x = B,
                             according to atol and btol.
-                        = 2 means x approximately solves the least-squares problem
-                            according to atol.
+                        = 2 means x approximately solves the least-squares
+                            problem according to atol.
                         = 3 means COND(A) seems to be greater than CONLIM.
                         = 4 is the same as 1 with atol = btol = eps (machine
                             precision)
