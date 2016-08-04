@@ -1,4 +1,5 @@
 from nlp.model.pysparsemodel import PySparseAmplModel
+from nlp.model.qnmodel import QuasiNewtonModel
 from pykrylov.linop import LinearOperator
 import numpy as np
 
@@ -26,3 +27,8 @@ class CounterFeitAmplModel(PySparseAmplModel):
     def jtprod(self, x, p, **kwargs):
         """Evaluate transposed-Jacobian-vector product at x with p."""
         return p * self.jac(x, **kwargs)
+
+
+class QNCounterFeitAmplModel(QuasiNewtonModel, CounterFeitAmplModel):
+    """Counterfeit AMPL model with quasi-Newton Hessian approximation."""
+    pass  # All the work is done by the parent classes.
