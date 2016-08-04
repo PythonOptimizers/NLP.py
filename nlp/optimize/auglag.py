@@ -9,7 +9,7 @@ For references on these methods see
             Springer, 2006, pp 519--523.
 """
 import logging
-from nlp.model.augmented_lagrangian import AugmentedLagrangian
+from nlp.model.augmented_lagrangian import AugmentedLagrangian, QuasiNewtonAugmentedLagrangian
 from nlp.optimize.pcg import TruncatedCG
 from nlp.tools.exceptions import UserExitRequest
 from nlp.tools.utils import project, where
@@ -99,18 +99,18 @@ class Auglag(object):
         self.eta = None
         self.eta0 = 0.1258925
         self.omega0 = 1.
-        self.omega_init = kwargs.get(
-            'omega_init', self.omega0 * 0.1)  # penalty_init**-1
-        self.eta_init = kwargs.get(
-            'eta_init', self.eta0**0.1)  # penalty_init**-0.1
+        self.omega_init = kwargs.get('omega_init',
+                                     self.omega0 * 0.1)  # penalty_init**-1
+        self.eta_init = kwargs.get('eta_init',
+                                   self.eta0**0.1)  # penalty_init**-0.1
         self.a_omega = kwargs.get('a_omega', 1.)
         self.b_omega = kwargs.get('b_omega', 1.)
         self.a_eta = kwargs.get('a_eta', 0.1)
         self.b_eta = kwargs.get('b_eta', 0.9)
-        self.omega_rel = kwargs.get('omega_rel', 1.e-5)
-        self.omega_abs = kwargs.get('omega_abs', 1.e-7)
-        self.eta_rel = kwargs.get('eta_rel', 1.e-5)
-        self.eta_abs = kwargs.get('eta_abs', 1.e-7)
+        self.omega_rel = kwargs.get('omega_rel', 1.e-6)
+        self.omega_abs = kwargs.get('omega_abs', 1.e-8)
+        self.eta_rel = kwargs.get('eta_rel', 1.e-6)
+        self.eta_abs = kwargs.get('eta_abs', 1.e-8)
 
         self.f0 = self.f = None
 
@@ -211,23 +211,28 @@ class Auglag(object):
         return
 
     def update_multipliers(self, convals, status):
-        """
+        """Update Lagrange multipliers.
+
         Infeasibility is sufficiently small; update multipliers and
         tighten feasibility and optimality tolerances
         """
-        al_model = self.model
-        slack_model = self.model.model
-        al_model.pi -= al_model.penalty * convals
-        if slack_model.m != 0:
-            self.log.debug('New multipliers = %g, %g' %
-                           (max(al_model.pi), min(al_model.pi)))
 
         if status == 'opt':
+            al_model = self.model
+            slack_model = self.model.model
+            al_model.pi -= al_model.penalty * convals
+            if slack_model.m != 0:
+                self.log.info('****  Updating multipliers estimates  ****\n')
+                self.log.debug('New multipliers = %g, %g' %
+                               (max(al_model.pi), min(al_model.pi)))
+
             # Safeguard: tighten tolerances only if desired optimality
             # is reached to prevent rapid decay of the tolerances from failed
             # inner loops
-            self.eta /= al_model.penalty**self.b_eta
-            self.omega /= al_model.penalty**self.b_omega
+            self.eta = max(self.eta_opt,
+                           self.eta / al_model.penalty**self.b_eta)
+            self.omega = max(self.omega_opt,
+                             self.omega / al_model.penalty**self.b_omega)
             self.inner_fail_count = 0
         else:
             self.inner_fail_count += 1
@@ -240,8 +245,9 @@ class Auglag(object):
         """
         al_model = self.model
         al_model.penalty /= self.tau
-        self.eta = self.eta0 * al_model.penalty**-self.a_eta
-        self.omega = self.omega0 * al_model.penalty**-self.a_omega
+        self.eta = max(self.eta_opt, self.eta0 * al_model.penalty**-self.a_eta)
+        self.omega = max(self.omega_opt, self.omega0 *
+                         al_model.penalty**-self.a_omega)
         return
 
     def post_iteration(self, **kwargs):
@@ -255,11 +261,11 @@ class Auglag(object):
     def setup_bc_solver(self):
         """Setup bound-constrained solver."""
         return self.bc_solver(self.model, TruncatedCG, greltol=self.omega,
-                              x0=self.x)
+                              abstol=1e-12, reltol=1e-18, x0=self.x, ny=True)
 
     def check_bc_solver_status(self, status):
         """Check if bound-constrained solver successfuly exited."""
-        return "opt" if status in ['gtol'] else ""
+        return "opt" if status in ['gtol', 'frtol'] else ""
 
     def check_convergence(self, PdL_norm, cons_norm):
         """Convergence check."""
@@ -368,22 +374,15 @@ class Auglag(object):
             else:
                 cons_norm_new = norm(convals_new)
 
-            self.f = self.model.model.model.obj(self.x[:on])
-            self.pgnorm = PdL_norm_new
-
-            # Print out header, say, every 20 iterations.
-            if self.iter % 20 == 0:
-                self.log.info(self.header)
-
-            self.log.info(self.format, self.iter, self.f, self.pgnorm,
-                          cons_norm_new, al_model.penalty, bc_solver.iter,
-                          bc_solver.status, self.omega, self.eta)
-
             # Update penalty parameter or multipliers based on result
             if cons_norm_new <= np.maximum(self.eta, self.eta_opt):
 
                 bc_solver_status = self.check_bc_solver_status(bc_solver.status)
                 self.update_multipliers(convals_new, bc_solver_status)
+
+                dL = al_model.dual_feasibility(self.x)
+                PdL = self.project_gradient(self.x, dL)
+                PdL_norm_new = norm(PdL)
 
                 # Update convergence check
                 exitOptimal = self.check_convergence(PdL_norm_new,
@@ -397,14 +396,11 @@ class Auglag(object):
 
                 # If optimality of the inner loop is not achieved within 10
                 # major iterations, exit immediately
-                if self.inner_fail_count == 10:
+                if self.inner_fail_count == 100:
                     self.status = "fail"
                     self.log.debug(
                         'Current point could not be improved, exiting ... \n')
                     break
-
-                self.log.info(
-                    '******  Updating multipliers estimates  ******\n')
 
             else:
 
@@ -424,13 +420,16 @@ class Auglag(object):
                                    'exiting ... \n')
                     break
 
-            # Safeguard: tightest tolerance should be near optimality to
-            # prevent excessive inner loop iterations at the end of the
-            # algorithm
-            if self.omega < self.omega_opt:
-                self.omega = self.omega_opt
-            if self.eta < self.eta_opt:
-                self.eta = self.eta_opt
+            self.f = self.model.model.model.obj(self.x[:on])
+            self.pgnorm = PdL_norm_new
+
+            # Print out header, say, every 20 iterations.
+            if self.iter % 20 == 0:
+                self.log.info(self.header)
+
+            self.log.info(self.format, self.iter, self.f, self.pgnorm,
+                          cons_norm_new, al_model.penalty, bc_solver.iter,
+                          bc_solver.status, self.omega, self.eta)
 
             try:
                 self.post_iteration()
@@ -440,6 +439,7 @@ class Auglag(object):
             exitIter = self.niter_total > self.max_iter
 
         self.tsolve = cputime() - tick    # Solve time
+
         if slack_model.m != 0:
             self.pi_norm = norm(al_model.pi)
             self.cons_norm = norm(slack_model.cons(self.x))
@@ -459,6 +459,17 @@ class Auglag(object):
         # if slack_model.m != 0:
         #     self.log.info(u'‖π‖ = %12.8g', norm(al_model.pi))
         #     self.log.info(u'‖c‖ = %12.8g', self.cons_norm)
+
+
+class QNAuglag(Auglag):
+
+    def __init__(self, model, bc_solver, **kwargs):
+
+        super(QNAuglag, self).__init__(model, bc_solver, **kwargs)
+        self.model = QuasiNewtonAugmentedLagrangian(model, **kwargs)
+
+    def post_iteration(self):
+        self.model.H.restart()
 
 
 class AuglagSolver(Auglag):
