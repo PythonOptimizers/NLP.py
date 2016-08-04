@@ -90,6 +90,7 @@ packages_list = ['nlp',
                  'nlp.model',
                  'nlp.ls',
                  'nlp.optimize',
+                 'nlp.optimize.regsqp',
                  'nlp.tools',
                  'nlp.tr']
 
