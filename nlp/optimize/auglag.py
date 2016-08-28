@@ -66,7 +66,6 @@ class Auglag(object):
                                multipliers                     (False)
             :logger_name:      name of a logger object that can be used in the
                                post-iteration                  (None)
-            :verbose:          print log if True               (True)
 
         :Exit codes:
             :opt:    Optimal solution found
@@ -113,7 +112,6 @@ class Auglag(object):
         self.inner_fail_count = 0
         self.status = None
 
-        self.verbose = kwargs.get('verbose', True)
         self.hformat = '%-5s  %8s  %8s  %8s  %8s  %5s  %4s  %8s  %8s'
         self.header = self.hformat % ("iter", "f", u"‖P∇L‖", u"‖c‖", u"ρ",
                                       "inner", "stat", u"ω", u"η")
@@ -130,8 +128,7 @@ class Auglag(object):
         # Setup the logger. Install a NullHandler if no output needed.
         logger_name = kwargs.get('logger_name', 'nlp.auglag')
         self.log = logging.getLogger(logger_name)
-        if not self.verbose:
-            self.log.propagate = False
+        self.log.propagate = True
 
     def project_gradient(self, x, g):
         """
