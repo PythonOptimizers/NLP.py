@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 this_path = os.path.dirname(os.path.realpath(__file__))
 
 lib_path = os.path.abspath(os.path.join(
-    this_path, '..', '..', '..', 'tests', 'model'))
+    this_path, '..', 'tests', 'model'))
 sys.path.append(lib_path)
 
 from python_models import SimpleQP, SimpleCubicProb
@@ -113,7 +113,7 @@ def run_demo(model, x, p, step0):
                 xy=(ls.step, ls.trial_value), xytext=(-5, 5),
                 textcoords='offset points', ha='right', va='bottom')
             plt.scatter(x_p, y_p)
-            plt.pause(1)
+            plt.pause(3)
             curve.remove()
     except LineSearchFailure:
         pass
