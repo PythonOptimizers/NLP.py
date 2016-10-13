@@ -27,4 +27,4 @@ for problem_name in sys.argv[1:]:
         # Output final statistics
         probname = basename(splitext(problem_name)[0])
         sys.stdout.write(format % (probname, model.n, model.H.npairs, lbfgs.f,
-                                   lbfgs.gNorm, lbfgs.iter, lbfgs.tsolve))
+                                   lbfgs.g_norm, lbfgs.iter, lbfgs.tsolve))
