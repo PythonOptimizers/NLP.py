@@ -3,7 +3,6 @@
 
 import numpy as np
 from nlp.model.nlpmodel import NLPModel
-from pysparse.sparse.pysparseMatrix import PysparseMatrix as sp
 
 __docformat__ = 'restructuredtext'
 
