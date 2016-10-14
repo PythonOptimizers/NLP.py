@@ -485,7 +485,7 @@ class TRON(object):
                     for step in ls:
                         self.log.debug(ls_fmt, step, ls.trial_value)
 
-                    ared = self.f - f_trial
+                    ared = self.f - ls.trial_value
                     self.x = ls.iterate
                     self.f = ls.trial_value
                     self.g = model.grad(self.x)
