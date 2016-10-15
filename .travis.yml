@@ -9,7 +9,6 @@ notifications:
 
 before_install:
   - brew update
-  - brew install python
   - brew tap homebrew/science
   - brew uninstall -f adol-c boost cppad asl metis
   - brew install adol-c
