@@ -514,7 +514,7 @@ cdef class ampl:
         if not PyArray_ISCARRAY(y): y = y.copy()
 
         # extra objective evaluation.
-        obj = ampl_objval(self.asl, obj_num, <double*>x.data, &nerror)
+        val = ampl_objval(self.asl, obj_num, <double*>x.data, &nerror)
         if nerror:
             raise ValueError
 
@@ -564,7 +564,7 @@ cdef class ampl:
         if not PyArray_ISCARRAY(v): v = v.copy()
 
         # extra objective evaluation.
-        obj = ampl_objval(self.asl, obj_num, <double*>x.data, &nerror)
+        val = ampl_objval(self.asl, obj_num, <double*>x.data, &nerror)
         if nerror:
             raise ValueError
 
