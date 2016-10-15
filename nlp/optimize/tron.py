@@ -400,8 +400,6 @@ class TRON(object):
         exitFunCall = model.obj.ncalls >= self.maxfuncall
         status = ""
 
-        # Wrap Hessian into an operator.
-        H = model.hop(self.x, self.model.pi0)
         tick = cputime()
 
         # Print out header and initial log.
@@ -416,6 +414,9 @@ class TRON(object):
             self.step_accepted = False
             if self.save_g:
                 self.g_old = self.g.copy()
+
+            # Wrap Hessian into an operator.
+            H = model.hop(self.x, self.model.pi0)
 
             # Compute the Cauchy step and store in s.
             (s, self.alphac) = self.cauchy(self.x, self.g, H,
