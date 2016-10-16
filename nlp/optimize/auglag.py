@@ -35,7 +35,7 @@ class Auglag(object):
 
         The augmented Lagrangian is defined as:
 
-            L(x, π; ρ) := f(x) - π'c(x) + ½ ρ |c(x)|².
+            L(x, π; ρ) := f(x) - π"c(x) + ½ ρ |c(x)|².
         where π are the current Lagrange multiplier estimates and ρ is the
         current penalty parameter.
 
@@ -62,10 +62,9 @@ class Auglag(object):
             :n_iter_non_mono:  number of iterations for which non-strict
                                descent can be tolerated if monotone = False
                                                                (25)
-            :least_squares_pi: use of least squares to initialize Lagrange
-                               multipliers                     (False)
+            :least_squares_pi: initialize with least squares multipliers (True)
             :logger_name:      name of a logger object that can be used in the
-                               post-iteration                  (None)
+                               post-iteration                  (nlp.auglag)
 
         :Exit codes:
             :opt:    Optimal solution found
@@ -77,34 +76,34 @@ class Auglag(object):
         print self.model
         print self.model.model
 
-        self.x = kwargs.get('x0', self.model.x0.copy())
+        self.x = kwargs.get("x0", self.model.x0.copy())
 
-        self.least_squares_pi = kwargs.get('least_squares_pi', False)
+        self.least_squares_pi = kwargs.get("least_squares_pi", True)
 
         self.bc_solver = bc_solver
 
-        self.tau = kwargs.get('tau', 0.1)
+        self.tau = kwargs.get("tau", 0.1)
         self.omega = None
         self.eta = None
         self.eta0 = 0.1258925
         self.omega0 = 1.
         self.omega_init = kwargs.get(
-            'omega_init', self.omega0 * 0.1)  # penalty_init**-1
+            "omega_init", self.omega0 * 0.1)  # penalty_init**-1
         self.eta_init = kwargs.get(
-            'eta_init', self.eta0**0.1)  # penalty_init**-0.1
-        self.a_omega = kwargs.get('a_omega', 1.)
-        self.b_omega = kwargs.get('b_omega', 1.)
-        self.a_eta = kwargs.get('a_eta', 0.1)
-        self.b_eta = kwargs.get('b_eta', 0.9)
-        self.omega_rel = kwargs.get('omega_rel', 1.e-5)
-        self.omega_abs = kwargs.get('omega_abs', 1.e-7)
-        self.eta_rel = kwargs.get('eta_rel', 1.e-5)
-        self.eta_abs = kwargs.get('eta_abs', 1.e-7)
+            "eta_init", self.eta0**0.1)  # penalty_init**-0.1
+        self.a_omega = kwargs.get("a_omega", 1.)
+        self.b_omega = kwargs.get("b_omega", 1.)
+        self.a_eta = kwargs.get("a_eta", 0.1)
+        self.b_eta = kwargs.get("b_eta", 0.9)
+        self.omega_rel = kwargs.get("omega_rel", 1.e-5)
+        self.omega_abs = kwargs.get("omega_abs", 1.e-7)
+        self.eta_rel = kwargs.get("eta_rel", 1.e-5)
+        self.eta_abs = kwargs.get("eta_abs", 1.e-7)
 
         self.f0 = self.f = None
 
         # Maximum number of total inner iterations
-        self.max_inner_iter = kwargs.get('max_inner_iter',
+        self.max_inner_iter = kwargs.get("max_inner_iter",
                                          100 * self.model.model.original_n)
 
         self.update_on_rejected_step = False
@@ -112,11 +111,11 @@ class Auglag(object):
         self.inner_fail_count = 0
         self.status = None
 
-        self.hformat = '%-5s  %8s  %8s  %8s  %8s  %5s  %4s  %8s  %8s'
+        self.hformat = "%-5s  %8s  %8s  %8s  %8s  %5s  %4s  %8s  %8s"
         self.header = self.hformat % ("iter", "f", u"‖P∇L‖", u"‖c‖", u"ρ",
                                       "inner", "stat", u"ω", u"η")
-        self.format = "%-5d  %8.1e  %8.1e  %8.1e  %8.1e  %5d  %4s  %8.1e  %8.1e"
-        self.format0 = '%-5d  %8.1e  %8.1e  %8s  %8s  %5s  %4s  %8.1e  %8.1e'
+        self.format = "%-5d %8.1e %8.1e %8.1e %8.1e %5d %4s %8.1e %8.1e"
+        self.format0 = "%-5d %8.1e %8.1e %8s %8s %5s %4s %8.1e %8.1e"
 
         # Initialize some counters for counting number of Hprod used in
         # BQP linesearch and CG.
@@ -124,17 +123,18 @@ class Auglag(object):
         self.hprod_bqp_linesearch_fail = 0
         self.nlinesearch = 0
         self.hprod_bqp_cg = 0
+        self.tsolve = 0.0
 
         # Setup the logger. Install a NullHandler if no output needed.
-        logger_name = kwargs.get('logger_name', 'nlp.auglag')
+        logger_name = kwargs.get("logger_name", "nlp.auglag")
         self.log = logging.getLogger(logger_name)
-        self.log.propagate = True
+        self.log.propagate = False
 
     def project_gradient(self, x, g):
-        """
-        Project the provided gradient on to the bound - constrained space and
-        return the result. This is a helper function for determining
-        optimality conditions of the original NLP.
+        """Project the provided gradient into the bounds.
+
+        This is a helper function for determining optimality conditions of the
+        original NLP.
         """
         p = x - g
         med = np.maximum(np.minimum(p, self.model.Uvar), self.model.Lvar)
@@ -142,11 +142,10 @@ class Auglag(object):
         return q
 
     def magical_step(self, x, g):
-        """
-        Compute a "magical step" to improve the convergence rate of the
-        inner minimization algorithm. This step minimizes the augmented
-        Lagrangian with respect to the slack variables only for a fixed set
-        of decision variables.
+        """Perform a magical step with respect to slacks.
+
+        This step minimizes the augmented Lagrangian with respect to the slack
+        variables only for a fixed set of decision variables.
         """
         al_model = self.model
         slack_model = self.model.model
@@ -158,27 +157,20 @@ class Auglag(object):
         return m_step
 
     def get_active_bounds(self, x, l, u):
-        """
-        Returns a list containing the indices of variables that are at
-        either their lower or upper bound.
-        """
+        """Return a list of indices of variables that are at a bound."""
         lower_active = where(x == l)
         upper_active = where(x == u)
         active_bound = np.concatenate((lower_active, upper_active))
         return active_bound
 
     def least_squares_multipliers(self, x):
-        """
-        Compute a least-squares estimate of the Lagrange multipliers for the
-        current point. This may lead to faster convergence of the augmented
-        Lagrangian algorithm, at the expense of more Jacobian-vector products.
-        """
+        """Compute least-squares multipliers estimates."""
         slack_model = self.model.model
         m = slack_model.m
         n = slack_model.n
 
         lim = max(2 * m, 2 * n)
-        J = slack_model.jac(x)
+        J = slack_model.jop(x)
 
         # Determine which bounds are active to remove appropriate columns of J
         on_bound = self.get_active_bounds(x,
@@ -190,26 +182,25 @@ class Auglag(object):
 
         g = slack_model.grad(x)
 
-        # Call LSQR method
         lsqr = LSQRSolver(Jred.T)
         lsqr.solve(g[free_vars], itnlim=lim)
         if lsqr.optimal:
             self.pi = lsqr.x.copy()
+        else:
+            self.log.debug("lsqr failed to converge")
         return
 
     def update_multipliers(self, convals, status):
-        """
-        Infeasibility is sufficiently small; update multipliers and
-        tighten feasibility and optimality tolerances
-        """
+        """Update multipliers and tighten tolerances."""
+        # TODO: refactor this
         al_model = self.model
         slack_model = self.model.model
         al_model.pi -= al_model.penalty * convals
         if slack_model.m != 0:
-            self.log.debug('New multipliers = %g, %g' %
+            self.log.debug("New multipliers = %g, %g" %
                            (max(al_model.pi), min(al_model.pi)))
 
-        if status == 'opt':
+        if status == "gtol":
             # Safeguard: tighten tolerances only if desired optimality
             # is reached to prevent rapid decay of the tolerances from failed
             # inner loops
@@ -221,9 +212,9 @@ class Auglag(object):
         return
 
     def update_penalty_parameter(self):
-        """
-        Large infeasibility; increase penalty parameter and reset tolerances
-        based on new penalty value.
+        """Increase penalty parameter and reset tolerances.
+
+        Tolerances are reset based on new penalty value.
         """
         al_model = self.model
         al_model.penalty /= self.tau
@@ -232,7 +223,8 @@ class Auglag(object):
         return
 
     def post_iteration(self, **kwargs):
-        """
+        """Perform post-iteration updates.
+
         Override this method to perform additional work at the end of a
         major iteration. For example, use this method to restart an
         approximate Hessian.
@@ -243,10 +235,6 @@ class Auglag(object):
         """Setup bound-constrained solver."""
         return self.bc_solver(self.model, TruncatedCG, greltol=self.omega,
                               x0=self.x)
-
-    def check_bc_solver_status(self, status):
-        """Check if bound-constrained solver successfuly exited."""
-        return "opt" if status in ['gtol'] else ""
 
     def solve(self, **kwargs):
         """Solve method.
@@ -262,11 +250,10 @@ class Auglag(object):
         # Move starting point into the feasible box
         self.x = project(self.x, al_model.Lvar, al_model.Uvar)
 
-        # Use a least-squares estimate of the multipliers to start (if
-        # requested)
+        # Use least-squares multipliers estimates if requested
         if self.least_squares_pi and slack_model.m != 0:
             self.least_squares_multipliers(self.x)
-            self.log.debug('New multipliers = %g, %g' %
+            self.log.debug("New multipliers = %g, %g" %
                            (max(al_model.pi), min(al_model.pi)))
 
         # First augmented lagrangian gradient evaluation
@@ -323,6 +310,7 @@ class Auglag(object):
             self.iter += 1
 
             # Perform bound-constrained minimization
+            # TODO: set appropriate stopping conditions
             bc_solver = self.setup_bc_solver()
             bc_solver.solve()
             self.x = bc_solver.x.copy()  # may not be useful.
@@ -360,8 +348,7 @@ class Auglag(object):
                     exitOptimal = True
                     break
 
-                bc_solver_status = self.check_bc_solver_status(bc_solver.status)
-                self.update_multipliers(convals_new, bc_solver_status)
+                self.update_multipliers(convals_new, bc_solver.status)
 
                 # Update reference constraint norm on successful reduction
                 cons_norm_ref = max_cons_new
@@ -371,18 +358,15 @@ class Auglag(object):
                 # major iterations, exit immediately
                 if self.inner_fail_count == 10:
                     self.status = "fail"
-                    self.log.debug(
-                        'Current point could not be improved, exiting ... \n')
+                    self.log.debug("cannot improve current point, exiting")
                     break
 
-                self.log.debug(
-                    '******  Updating multipliers estimates  ******\n')
+                self.log.debug("updating multipliers estimates")
 
             else:
 
                 self.update_penalty_parameter()
-                self.log.debug(
-                    '******  Keeping current multipliers estimates  ******\n')
+                self.log.debug("keeping current multipliers estimates")
 
                 if max_cons_new > 0.99 * cons_norm_ref and self.iter != 1:
                     infeas_iter += 1
@@ -392,8 +376,7 @@ class Auglag(object):
 
                 if infeas_iter == 10:
                     self.status = "stal"
-                    self.log.debug('Problem appears to be infeasible,' +
-                                   'exiting ... \n')
+                    self.log.debug("problem appears infeasible, exiting")
                     break
 
             # Safeguard: tightest tolerance should be near optimality to
@@ -422,12 +405,12 @@ class Auglag(object):
         # Solution output, etc.
         if exitOptimal:
             self.status = "opt"
-            self.log.debug('Optimal solution found \n')
+            self.log.debug("optimal solution found")
         elif not exitOptimal and self.status is None:
             self.status = "iter"
-            self.log.debug('Maximum number of iterations reached \n')
+            self.log.debug("maximum number of iterations reached")
 
-        self.log.info('f = %12.8g' % self.f)
+        self.log.info("f = %12.8g" % self.f)
         if slack_model.m != 0:
-            self.log.info('pi_max = %12.8g' % np.max(al_model.pi))
-            self.log.info('max infeas. = %12.8g' % max_cons_new)
+            self.log.info("pi_max = %12.8g" % np.max(al_model.pi))
+            self.log.info("max infeas. = %12.8g" % max_cons_new)
