@@ -50,20 +50,15 @@ if nprobs > 1:
 for problem in sys.argv[1:]:
     model = PySparseAmplModel(problem)
     model.compute_scaling_obj()
-
-    print model.x0
-    # model.compute_scaling_obj()
-
     auglag = Auglag(model, TRON, maxiter=100)
-    # try:
-    auglag.solve()
-    status = auglag.status
-    niter, fcalls, gcalls, pgnorm, tsolve = auglag_stats(auglag)
-    # except:
-    #     msg = sys.exc_info()[1].message
-    #     status = msg if len(msg) > 0 else "xfail"  # unknown failure
-    #     print "here"
-    #     niter, fcalls, gcalls, pgnorm, tsolve = auglag_stats(auglag)
+    try:
+        auglag.solve()
+        status = auglag.status
+        niter, fcalls, gcalls, pgnorm, tsolve = auglag_stats(auglag)
+    except:
+        msg = sys.exc_info()[1].message
+        status = msg if len(msg) > 0 else "xfail"  # unknown failure
+        niter, fcalls, gcalls, pgnorm, tsolve = auglag_stats(auglag)
 
     logger.info("%12s %5d %6d %8.1e %8.1e %6d %6d %5s %7.3f",
                 model.name, model.nvar, niter, auglag.f, pgnorm,
