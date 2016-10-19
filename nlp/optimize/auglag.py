@@ -317,41 +317,41 @@ class Auglag(object):
 
             dL = al_model.dual_feasibility(self.x)
             PdL = self.project_gradient(self.x, dL)
-            Pmax_new = np.max(np.abs(PdL))
-            convals_new = slack_model.cons(self.x)
+            Pmax = np.max(np.abs(PdL))
+            convals = slack_model.cons(self.x)
 
             # Specific handling for the case where the original NLP is
             # unconstrained
             if slack_model.m == 0:
-                max_cons_new = 0.
+                max_cons = 0.
             else:
-                max_cons_new = np.max(np.abs(convals_new))
+                max_cons = np.max(np.abs(convals))
 
             self.f = self.model.model.model.obj(self.x[:on])
-            self.pgnorm = Pmax_new
+            self.pgnorm = Pmax
 
             # Print out header, say, every 20 iterations.
             if self.iter % 20 == 0:
                 self.log.info(self.header)
 
             self.log.info(self.format % (self.iter, self.f,
-                                         self.pgnorm, max_cons_new,
+                                         self.pgnorm, max_cons,
                                          al_model.penalty,
                                          bc_solver.iter, bc_solver.status,
                                          self.omega, self.eta))
 
             # Update penalty parameter or multipliers based on result
-            if max_cons_new <= np.maximum(self.eta, self.eta_opt):
+            if max_cons <= np.maximum(self.eta, self.eta_opt):
 
                 # Update convergence check
-                if max_cons_new <= self.eta_opt and Pmax_new <= self.omega_opt:
+                if max_cons <= self.eta_opt and Pmax <= self.omega_opt:
                     exitOptimal = True
                     break
 
-                self.update_multipliers(convals_new, bc_solver.status)
+                self.update_multipliers(convals, bc_solver.status)
 
                 # Update reference constraint norm on successful reduction
-                cons_norm_ref = max_cons_new
+                cons_norm_ref = max_cons
                 infeas_iter = 0
 
                 # If optimality of the inner loop is not achieved within 10
@@ -368,10 +368,10 @@ class Auglag(object):
                 self.update_penalty_parameter()
                 self.log.debug("keeping current multipliers estimates")
 
-                if max_cons_new > 0.99 * cons_norm_ref and self.iter != 1:
+                if max_cons > 0.99 * cons_norm_ref and self.iter != 1:
                     infeas_iter += 1
                 else:
-                    cons_norm_ref = max_cons_new
+                    cons_norm_ref = max_cons
                     infeas_iter = 0
 
                 if infeas_iter == 10:
@@ -413,4 +413,4 @@ class Auglag(object):
         self.log.info("f = %12.8g" % self.f)
         if slack_model.m != 0:
             self.log.info("pi_max = %12.8g" % np.max(al_model.pi))
-            self.log.info("max infeas. = %12.8g" % max_cons_new)
+            self.log.info("max infeas. = %12.8g" % max_cons)
