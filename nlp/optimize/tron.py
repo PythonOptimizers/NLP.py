@@ -22,7 +22,6 @@ from nlp.tools.utils import where, projected_gradient_norm2, \
 from nlp.tools.timing import cputime
 from nlp.tools.exceptions import UserExitRequest, LineSearchFailure
 
-
 __docformat__ = "restructuredtext"
 
 
@@ -362,7 +361,7 @@ class TRON(object):
 
         # Compute the final iterate and step.
         s = projected_step(x, alpha * d, l, u)
-        x = project(x + alpha * s, l, u)
+        x = project(x + s, l, u)
         return (x, s)
 
     def solve(self):
