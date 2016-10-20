@@ -4,6 +4,7 @@
 from nlp.model.nlpmodel import BoundConstrainedNLPModel
 from nlp.model.qnmodel import QuasiNewtonModel
 from nlp.model.snlp import SlackModel
+from nlp.tools.utils import projected_step
 
 import numpy as np
 
@@ -126,6 +127,21 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
         See :meth:`NLPModel.hprod` for more information.
         """
         return self.hop(*args, **kwargs)
+
+
+    def magical_step(self, x, g):
+        """Compute a magical step for the slack variables.
+
+        This step minimizes the augmented Lagrangian with respect to the slack
+        variables only for a fixed set of decision variables. Here, g is the 
+        gradient computed by self.grad at x.
+        """
+        model = self.model
+        on = model.original_n
+        m_step = np.zeros(self.n)
+        m_step[on:] = -g[on:] / self.penalty
+        m_step = projected_step(x, m_step, model.Lvar, model.Uvar)
+        return m_step
 
 
 class QuasiNewtonAugmentedLagrangian(QuasiNewtonModel, AugmentedLagrangian):
