@@ -515,6 +515,18 @@ class TRON(object):
                 # Fall back on trust-region rule.
                 step_status = "Rej"
 
+            # Incorporate the magical step knowledge here, if any
+            # This is a "conservative" approach where the magical step
+            # is not used to determine the trust region size.
+            if "magical_step" in dir(model) and self.step_accepted:
+                s_magic = model.magical_step(self.x, self.g)
+                self.x = project(self.x + s_magic, model.Lvar, model.Uvar)
+                self.dvars += s_magic
+                self.f = model.obj(self.x)
+                self.g = model.grad(self.x)
+                if self.save_g:
+                    self.dgrad = self.g - self.g_old
+
             self.step_status = step_status
             status = ""
             try:
