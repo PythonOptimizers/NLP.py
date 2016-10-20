@@ -357,8 +357,12 @@ class Auglag(object):
                 # If optimality of the inner loop is not achieved within 10
                 # major iterations, exit immediately
                 if self.inner_fail_count == 10:
-                    self.status = "fail"
-                    self.log.debug("cannot improve current point, exiting")
+                    if max_cons <= self.eta_opt:
+                        self.status = "feas"
+                        self.log.debug("cannot improve current point, exiting")
+                    else:
+                        self.status = "fail"
+                        self.log.debug("cannot improve current point, exiting")
                     break
 
                 self.log.debug("updating multipliers estimates")
