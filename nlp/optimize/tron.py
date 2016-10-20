@@ -217,6 +217,10 @@ class TRON(object):
                       further progress: ‖pₖ‖ = Δ.
 
             info = 3  Failure to converge within itermax iterations.
+
+            info = 4  The trust region solver could make no further progress
+                      on the problem, i.e. the computed step is zero. 
+                      Return with the current point.
         """
         self.log.debug("entering projected_newton_step")
         exitOptimal = False
@@ -263,6 +267,11 @@ class TRON(object):
 
             step = self.solver.step
             iters += self.solver.niter
+
+            # Exit if the solver took no additional steps
+            if self.solver.niter == 0:
+                exitOptimal = True
+                info = 4
 
             # Use a projected search to obtain the next iterate
             (xfree, proj_step) = self.projected_linesearch(x[free_vars],
