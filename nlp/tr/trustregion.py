@@ -103,7 +103,7 @@ class GeneralizedTrustRegion(TrustRegion):
 
         The rule implemented by this method is:
 
-        radius = min(max(α, γ1) * step_norm, γ2 radius       if ratio <= η0
+        radius = min(max(α, γ1) * step_norm, γ2*radius)      if ratio <= η0
         radius = max(γ1*radius, min(α*step_norm, γ2*radius)) if ratio ∈ (η0,η1]
         radius = max(γ1*radius,
                      min(α*step_norm, γ3*self.radius))       if ratio ∈ (η1,η2]
