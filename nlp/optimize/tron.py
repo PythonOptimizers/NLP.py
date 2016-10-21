@@ -370,7 +370,7 @@ class TRON(object):
 
         # Compute the final iterate and step.
         s = projected_step(x, alpha * d, l, u)
-        x = project(x + s, l, u)
+        x = project(x + alpha * d, l, u)
         return (x, s)
 
     def solve(self):
