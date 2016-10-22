@@ -277,13 +277,9 @@ class Auglag(object):
             self.log.debug("New multipliers = %g, %g" %
                            (max(al_model.pi), min(al_model.pi)))
 
-        # First augmented lagrangian gradient evaluation
-        dphi = al_model.grad(self.x)
-
         # "Smart" initialization of slack variables using the magical step
         # function that is already available
-        m_step_init = self.model.magical_step(self.x, dphi)
-        self.x += m_step_init
+        (self.x, m_step_init) = self.model.magical_step(self.x)
 
         dL = al_model.dual_feasibility(self.x)
         self.f = self.f0 = self.model.model.model.obj(self.x[:on])

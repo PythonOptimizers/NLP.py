@@ -4,7 +4,7 @@
 from nlp.model.nlpmodel import BoundConstrainedNLPModel
 from nlp.model.qnmodel import QuasiNewtonModel
 from nlp.model.snlp import SlackModel
-from nlp.tools.utils import projected_step
+from nlp.tools.utils import project, projected_step
 
 import numpy as np
 
@@ -129,19 +129,33 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
         return self.hop(*args, **kwargs)
 
 
-    def magical_step(self, x, g):
+    def magical_step(self, x):
         """Compute a magical step for the slack variables.
 
         This step minimizes the augmented Lagrangian with respect to the slack
-        variables only for a fixed set of decision variables. Here, g is the 
-        gradient computed by self.grad at x.
+        variables only for fixed x and π. The function returns both the step 
+        and the updated x.
         """
         model = self.model
-        on = model.original_n
-        m_step = np.zeros(self.n)
-        m_step[on:] = -g[on:] / self.penalty
-        m_step = projected_step(x, m_step, model.Lvar, model.Uvar)
-        return m_step
+        sL = model.sL
+        sU = model.sU
+        sR = model.sR
+        orig_model = self.model.model
+        lowerC = orig_model.lowerC
+        upperC = orig_model.upperC
+        rangeC = orig_model.rangeC
+        cons = orig_model.cons(x)
+        d = np.zeros(self.n)
+
+        # Compute the direction to the optimal slacks from the current point.
+        d[sL] = (cons[lowerC] - self.pi[lowerC]/self.penalty) - x[sL]
+        d[sU] = (cons[upperC] - self.pi[upperC]/self.penalty) - x[sU]
+        d[sR] = (cons[rangeC] - self.pi[rangeC]/self.penalty) - x[sR]
+
+        # Compute the updated x and the step using projection
+        x = project(x + d, model.Lvar, model.Uvar)
+        m_step = projected_step(x, d, model.Lvar, model.Uvar)
+        return (x, m_step)
 
 
 class QuasiNewtonAugmentedLagrangian(QuasiNewtonModel, AugmentedLagrangian):
