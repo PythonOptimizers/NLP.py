@@ -519,8 +519,7 @@ class TRON(object):
             # This is a "conservative" approach where the magical step
             # is not used to determine the trust region size.
             if "magical_step" in dir(model) and self.step_accepted:
-                s_magic = model.magical_step(self.x, self.g)
-                self.x = project(self.x + s_magic, model.Lvar, model.Uvar)
+                (self.x, s_magic) = model.magical_step(self.x)
                 self.dvars += s_magic
                 self.f = model.obj(self.x)
                 self.g = model.grad(self.x)
