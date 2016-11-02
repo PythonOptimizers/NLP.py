@@ -78,7 +78,7 @@ class TRON(object):
         self.abstol = kwargs.get("abstol", 1e-6)
         self.maxiter = kwargs.get("maxiter", 100 * self.model.n)
         self.maxfuncall = kwargs.get("maxfuncall", 100000)
-        self.ny = kwargs.get("ny", False)
+        self.ny = kwargs.get("ny", True)
         self.cgtol = 0.1
         self.alphac = 1
 
@@ -488,11 +488,11 @@ class TRON(object):
                     self.dgrad = self.g - self.g_old
 
             elif self.ny:
-                # Trust-region step is rejected; backtrack.
-                line_model = C1LineModel(model, self.x, s)
-                ls = ArmijoLineSearch(line_model, bkmax=5, decr=1.75)
-
                 try:
+                    # Trust-region step is rejected; backtrack.
+                    line_model = C1LineModel(model, self.x, s)
+                    ls = ArmijoLineSearch(line_model, bkmax=5, decr=1.75)
+
                     for step in ls:
                         self.log.debug(ls_fmt, step, ls.trial_value)
 
@@ -508,7 +508,7 @@ class TRON(object):
                     if self.save_g:
                         self.dgrad = self.g - self.g_old
 
-                except LineSearchFailure:
+                except (LineSearchFailure,ValueError):
                     step_status = "Rej"
 
             else:
