@@ -50,7 +50,7 @@ if nprobs > 1:
 for problem in sys.argv[1:]:
     model = PySparseAmplModel(problem)
     model.compute_scaling_obj()
-    auglag = Auglag(model, TRON, maxiter=100)
+    auglag = Auglag(model, TRON, maxtime=900)
     try:
         auglag.solve()
         status = auglag.status
