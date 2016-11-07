@@ -74,8 +74,8 @@ class TRON(object):
 
         self.gabstol = kwargs.get("gabstol", 1e-12)
         self.greltol = kwargs.get("greltol", 1e-6)
-        self.reltol = kwargs.get("reltol", 1e-12)
-        self.abstol = kwargs.get("abstol", 1e-6)
+        self.abstol = kwargs.get("abstol", 1e-12)
+        self.reltol = kwargs.get("reltol", 1e-6)
         self.maxiter = kwargs.get("maxiter", 100 * self.model.n)
         self.maxfuncall = kwargs.get("maxfuncall", 100000)
         self.ny = kwargs.get("ny", True)
