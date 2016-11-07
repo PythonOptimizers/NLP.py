@@ -102,9 +102,9 @@ class Auglag(object):
 
         self.f0 = self.f = None
 
-        # Maximum number of total inner iterations
-        self.max_inner_iter = kwargs.get("max_inner_iter",
-                                         100 * self.model.model.original_n)
+        # Maximum number of inner iterations
+        self.maxiter = kwargs.get("maxiter",
+                                  100 * self.model.model.original_n)
 
         self.update_on_rejected_step = False
 
@@ -314,6 +314,7 @@ class Auglag(object):
             bc_solver = self.setup_bc_solver()
             bc_solver.solve()
             self.x = bc_solver.x.copy()  # may not be useful.
+            self.niter_total += bc_solver.iter + 1
 
             dL = al_model.dual_feasibility(self.x)
             PdL = self.project_gradient(self.x, dL)
@@ -396,7 +397,7 @@ class Auglag(object):
             except UserExitRequest:
                 self.status = "usr"
 
-            exitIter = self.niter_total > self.max_inner_iter
+            exitIter = self.niter_total > self.maxiter
 
         self.tsolve = cputime() - tick    # Solve time
         if slack_model.m != 0:
