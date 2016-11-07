@@ -106,6 +106,9 @@ class Auglag(object):
         self.maxiter = kwargs.get("maxiter",
                                   100 * self.model.model.original_n)
 
+        # Maximum run time
+        self.maxtime = kwargs.get("maxtime", 1800.)
+
         self.update_on_rejected_step = False
 
         self.inner_fail_count = 0
@@ -292,6 +295,7 @@ class Auglag(object):
         infeas_iter = 0
 
         exitIter = False
+        exitTime = False
         # Convergence check
         exitOptimal = (Pmax <= self.omega_opt and max_cons <= self.eta_opt)
         if exitOptimal:
@@ -306,7 +310,7 @@ class Auglag(object):
                           self.cons0, al_model.penalty, "", "", self.omega,
                           self.eta)
 
-        while not (exitOptimal or exitIter):
+        while not (exitOptimal or exitIter or exitTime):
             self.iter += 1
 
             # Perform bound-constrained minimization
@@ -399,6 +403,8 @@ class Auglag(object):
 
             exitIter = self.niter_total > self.maxiter
 
+            exitTime = (cputime() - tick) > self.maxtime
+
         self.tsolve = cputime() - tick    # Solve time
         if slack_model.m != 0:
             self.pi_max = np.max(np.abs(al_model.pi))
@@ -411,7 +417,10 @@ class Auglag(object):
         if exitOptimal:
             self.status = "opt"
             self.log.debug("optimal solution found")
-        elif not exitOptimal and self.status is None:
+        elif not exitOptimal and exitTime:
+            self.status = "time"
+            self.log.debug("maximum run time exceeded")
+        elif not exitOptimal and exitIter:
             self.status = "iter"
             self.log.debug("maximum number of iterations reached")
 
