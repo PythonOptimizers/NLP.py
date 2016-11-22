@@ -37,6 +37,7 @@ logger = config_logger("nlp", "%(name)-3s %(levelname)-5s %(message)s")
 auglag_logger = config_logger("nlp.auglag",
                               "%(name)-8s %(levelname)-5s %(message)s",
                               level=logging.WARN if nprobs > 1 else logging.INFO)
+
 # Create TRON logger.
 tron_logger = config_logger("nlp.tron",
                             "%(name)-8s %(levelname)-5s %(message)s",
@@ -50,7 +51,7 @@ if nprobs > 1:
 for problem in sys.argv[1:]:
     model = PySparseAmplModel(problem)
     model.compute_scaling_obj()
-    auglag = Auglag(model, TRON, maxtime=900)
+    auglag = Auglag(model, TRON, maxupdate=100)
     try:
         auglag.solve()
         status = auglag.status
