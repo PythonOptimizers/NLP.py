@@ -55,6 +55,8 @@ class Auglag(object):
             :reltol:           relative stopping tolerance     (1.0e-5)
             :abstol:           absolute stopping tolerance     (1.0e-12)
             :maxiter:          maximum number of iterations    (max(1000, 10n))
+            :maxupdate:        maximum number of penalty or multiplier
+                               updates                         (100)
             :ny:               apply Nocedal/Yuan linesearch   (False)
             :nbk:              max number of backtracking steps in Nocedal/Yuan
                                linesearch                      (5)
@@ -69,7 +71,9 @@ class Auglag(object):
         :Exit codes:
             :opt:    Optimal solution found
             :iter:   Maximum iteration reached
-            :stal:   Not making sufficient progress
+            :feas:   Feasible, but not optimal, solution found
+            :fail:   Cannot make further progress from current point
+            :stal:   Problem converged to an infeasible point
             :time:   Time limit exceeded
         """
         self.model = AugmentedLagrangian(model, **kwargs)
@@ -105,6 +109,8 @@ class Auglag(object):
         # Maximum number of inner iterations
         self.maxiter = kwargs.get("maxiter",
                                   100 * self.model.model.original_n)
+
+        self.maxupdate = kwargs.get("maxupdate",100)
 
         # Maximum run time
         self.maxtime = kwargs.get("maxtime", 1800.)
@@ -401,7 +407,7 @@ class Auglag(object):
             except UserExitRequest:
                 self.status = "usr"
 
-            exitIter = self.niter_total > self.maxiter
+            exitIter = self.niter_total > self.maxiter or self.iter > self.maxupdate
 
             exitTime = (cputime() - tick) > self.maxtime
 
