@@ -448,7 +448,7 @@ class TRON(object):
             m = np.dot(s, self.g) + .5 * np.dot(s, H * s)
 
             # Evaluate actual objective.
-            x_trial = self.x + s
+            x_trial = project(self.x + s, model.Lvar, model.Uvar)
             f_trial = model.obj(x_trial)
 
             # Evaluate the step and determine if the step is successful.
@@ -529,20 +529,19 @@ class TRON(object):
             pstatus = step_status if step_status != "Acc" else ""
 
             # Test for convergence.
-            if abs(ared) <= self.abstol and -m <= self.abstol:
-                exitOptimal = True
-                status = "fatol"
-            if abs(ared) <= self.reltol * abs(self.f) and \
-               (-m <= self.reltol * abs(self.f)):
-                exitOptimal = True
-                status = "frtol"
-
             pgnorm = projected_gradient_norm2(self.x, self.g,
                                               model.Lvar, model.Uvar)
-            if pstatus == "":
+            if pstatus == "" or pstatus == "N-Y":
                 if pgnorm <= stoptol:
                     exitOptimal = True
                     status = "gtol"
+                if abs(ared) <= self.abstol and -m <= self.abstol:
+                    exitOptimal = True
+                    status = "fatol"
+                if abs(ared) <= self.reltol * abs(self.f) and \
+                   (-m <= self.reltol * abs(self.f)):
+                    exitOptimal = True
+                    status = "frtol"
             else:
                 self.iter -= 1  # to match TRON iteration number
 
