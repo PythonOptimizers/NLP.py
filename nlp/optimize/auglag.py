@@ -174,6 +174,7 @@ class Auglag(object):
 
     def least_squares_multipliers(self, x):
         """Compute least-squares multipliers estimates."""
+        al_model = self.model
         slack_model = self.model.model
         m = slack_model.m
         n = slack_model.n
@@ -194,7 +195,7 @@ class Auglag(object):
         lsqr = LSQRSolver(Jred.T)
         lsqr.solve(g[free_vars], itnlim=lim)
         if lsqr.optimal:
-            self.pi = lsqr.x.copy()
+            al_model.pi = lsqr.x.copy()
         else:
             self.log.debug("lsqr failed to converge")
         return
@@ -412,12 +413,6 @@ class Auglag(object):
             exitTime = (cputime() - tick) > self.maxtime
 
         self.tsolve = cputime() - tick    # Solve time
-        if slack_model.m != 0:
-            self.pi_max = np.max(np.abs(al_model.pi))
-            self.cons_max = np.max(np.abs(slack_model.cons(self.x)))
-        else:
-            self.pi_max = None
-            self.cons_max = None
 
         # Solution output, etc.
         if exitOptimal:
