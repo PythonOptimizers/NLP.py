@@ -10,6 +10,7 @@ For references on these methods see
 """
 import logging
 from nlp.model.augmented_lagrangian import AugmentedLagrangian
+from nlp.model.augmented_lagrangian import QuasiNewtonAugmentedLagrangian
 from nlp.optimize.pcg import TruncatedCG
 from nlp.tools.exceptions import UserExitRequest
 from nlp.tools.utils import project, where
@@ -76,7 +77,13 @@ class Auglag(object):
             :stal:   Problem converged to an infeasible point
             :time:   Time limit exceeded
         """
-        self.model = AugmentedLagrangian(model, **kwargs)
+        self.qn = kwargs.get("qn",False)
+
+        if self.qn:
+            self.model = QuasiNewtonAugmentedLagrangian(model, **kwargs)
+        else:
+            self.model = AugmentedLagrangian(model, **kwargs)
+
         print self.model
         print self.model.model
 
