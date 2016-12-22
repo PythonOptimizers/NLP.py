@@ -120,7 +120,7 @@ class Auglag(object):
         self.maxupdate = kwargs.get("maxupdate",100)
 
         # Maximum run time
-        self.maxtime = kwargs.get("maxtime", 1800.)
+        self.maxtime = kwargs.get("maxtime", 3600.)
 
         self.update_on_rejected_step = False
 
@@ -212,7 +212,12 @@ class Auglag(object):
         # TODO: refactor this
         al_model = self.model
         slack_model = self.model.model
-        al_model.pi -= al_model.penalty * convals
+
+        if self.least_squares_pi:
+            self.least_squares_multipliers(self.x)
+        else:
+            al_model.pi -= al_model.penalty * convals
+
         if slack_model.m != 0:
             self.log.debug("New multipliers = %g, %g" %
                            (max(al_model.pi), min(al_model.pi)))
