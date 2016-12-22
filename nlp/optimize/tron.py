@@ -535,10 +535,10 @@ class TRON(object):
                 if pgnorm <= stoptol:
                     exitOptimal = True
                     status = "gtol"
-                if abs(ared) <= self.abstol and -m <= self.abstol:
+                elif abs(ared) <= self.abstol and -m <= self.abstol:
                     exitOptimal = True
                     status = "fatol"
-                if abs(ared) <= self.reltol * abs(self.f) and \
+                elif abs(ared) <= self.reltol * abs(self.f) and \
                    (-m <= self.reltol * abs(self.f)):
                     exitOptimal = True
                     status = "frtol"
