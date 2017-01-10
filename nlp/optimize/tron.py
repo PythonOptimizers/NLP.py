@@ -451,6 +451,16 @@ class TRON(object):
             x_trial = project(self.x + s, model.Lvar, model.Uvar)
             f_trial = model.obj(x_trial)
 
+            # Incorporate a magical step to further improve the trial
+            # (if possible) and modify the predicted reduction to
+            # take the extra improvement into account
+            if "magical_step" in dir(model):
+                (x_trial, s_magic) = model.magical_step(x_trial)
+                s += s_magic
+                m -= f_trial
+                f_trial = model.obj(x_trial)
+                m += f_trial
+
             # Evaluate the step and determine if the step is successful.
 
             # Compute the actual reduction.
@@ -514,17 +524,6 @@ class TRON(object):
             else:
                 # Fall back on trust-region rule.
                 step_status = "Rej"
-
-            # Incorporate the magical step knowledge here, if any
-            # This is a "conservative" approach where the magical step
-            # is not used to determine the trust region size.
-            if "magical_step" in dir(model) and self.step_accepted:
-                (self.x, s_magic) = model.magical_step(self.x)
-                self.dvars += s_magic
-                self.f = model.obj(self.x)
-                self.g = model.grad(self.x)
-                if self.save_g:
-                    self.dgrad = self.g - self.g_old
 
             self.step_status = step_status
             status = ""
