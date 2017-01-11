@@ -137,6 +137,11 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
         and the updated x.
         """
         model = self.model
+
+        # Quick exit if the underlying problem has no slack variables
+        if model.n_slacks == 0:
+            return (x, None)
+
         sL = model.sL
         sU = model.sU
         sR = model.sR

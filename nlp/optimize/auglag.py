@@ -13,7 +13,7 @@ from nlp.model.augmented_lagrangian import AugmentedLagrangian
 from nlp.model.augmented_lagrangian import QuasiNewtonAugmentedLagrangian
 from nlp.optimize.pcg import TruncatedCG
 from nlp.tools.exceptions import UserExitRequest
-from nlp.tools.utils import project, where#, projected_step
+from nlp.tools.utils import project, where
 from nlp.tools.timing import cputime
 
 from pykrylov.lls.lsqr import LSQRFramework as LSQRSolver
@@ -156,20 +156,6 @@ class Auglag(object):
         med = np.maximum(np.minimum(p, self.model.Uvar), self.model.Lvar)
         q = x - med
         return q
-
-    # def magical_step(self, x, g):
-    #     """Perform a magical step with respect to slacks.
-
-    #     This step minimizes the augmented Lagrangian with respect to the slack
-    #     variables only for a fixed set of decision variables.
-    #     """
-    #     al_model = self.model
-    #     slack_model = self.model.model
-    #     on = slack_model.original_n
-    #     m_step = np.zeros(al_model.n)
-    #     m_step[on:] = -g[on:] / al_model.penalty
-    #     m_step = projected_step(x, m_step, slack_model.Lvar, slack_model.Uvar)
-    #     return m_step
 
     def get_active_bounds(self, x, l, u):
         """Return a list of indices of variables that are at a bound."""
