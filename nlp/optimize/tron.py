@@ -456,10 +456,11 @@ class TRON(object):
             # take the extra improvement into account
             if "magical_step" in dir(model):
                 (x_trial, s_magic) = model.magical_step(x_trial)
-                s += s_magic
-                m -= f_trial
-                f_trial = model.obj(x_trial)
-                m += f_trial
+                if s_magic is not None:
+                    s += s_magic
+                    m -= f_trial
+                    f_trial = model.obj(x_trial)
+                    m += f_trial
 
             # Evaluate the step and determine if the step is successful.
 
