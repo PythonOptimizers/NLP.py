@@ -176,27 +176,3 @@ class QuasiNewtonAugmentedLagrangian(QuasiNewtonModel, AugmentedLagrangian):
     """
 
     pass  # All the work is done by the parent classes.
-
-
-class StructuredQuasiNewtonAugmentedLagrangian(QuasiNewtonModel, AugmentedLagrangian):
-    """Bound-constrained augmented Lagrangian with a structured Hessian.
-
-    Overwrite only the hprod method to provide a structured estimate of
-    the Hessian in quadratic approximations.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super(StructuredQuasiNewtonAugmentedLagrangian, self).__init__(*args, **kwargs)
-
-    def hprod(self, x, z, v, **kwargs):
-        """Structured Hessian-vector product."""
-        model = self.model
-        # cons = self.model.cons(x)
-
-        # w = model.hprod(x, self.pi - self.penalty * cons, v)
-        w = self.H * v
-        J = model.jop(x)
-        Hv = w + self.penalty * J.T * J * v
-        if self.prox > 0:
-            Hv += self.prox * v
-        return Hv

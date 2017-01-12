@@ -604,6 +604,7 @@ class StructQNTRON(QNTRON):
     def post_iteration(self, **kwargs):
         if self.step_accepted:
             # Form correction to the gradient difference to account for structure
+            on = self.model.model.original_n
             cons_new = self.model.model.cons(self.x)
             cons_old = self.model.model.cons(self.x_old)
             J_old = self.model.model.jop(self.x_old)
@@ -611,4 +612,4 @@ class StructQNTRON(QNTRON):
 
             dgrad_mod = self.dgrad + penalty * J_old.T * (cons_old - cons_new)
 
-            self.model.H.store(self.dvars, self.dgrad, dgrad_mod)
+            self.model.model.model.H.store(self.dvars[:on], self.dgrad[:on], dgrad_mod[:on])
