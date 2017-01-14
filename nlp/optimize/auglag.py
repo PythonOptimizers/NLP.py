@@ -257,12 +257,6 @@ class Auglag(object):
         # Move starting point into the feasible box
         self.x = project(self.x, al_model.Lvar, al_model.Uvar)
 
-        # Use least-squares multipliers estimates if requested
-        if self.least_squares_pi and slack_model.m != 0:
-            self.least_squares_multipliers(self.x)
-            self.log.debug("New multipliers = %g, %g" %
-                           (max(al_model.pi), min(al_model.pi)))
-
         # "Smart" initialization of slack variables using the magical step
         # function that is already available
         (self.x, m_step_init) = self.model.magical_step(self.x)
