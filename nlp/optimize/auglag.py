@@ -182,12 +182,12 @@ class Auglag(object):
         Jred = ReducedJacobian(J, np.arange(m, dtype=np.int),
                                free_vars)
 
-        g = slack_model.grad(x)
+        g = slack_model.grad(x) - J.T * al_model.pi
 
         lsqr = LSQRSolver(Jred.T)
         lsqr.solve(g[free_vars], itnlim=lim)
         if lsqr.optimal:
-            al_model.pi = lsqr.x.copy()
+            al_model.pi += lsqr.x.copy()
         else:
             self.log.debug("lsqr failed to converge")
         return
