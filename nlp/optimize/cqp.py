@@ -13,476 +13,11 @@ try:                            # To solve augmented systems
 except ImportError:
     from hsl.solvers.pyma27 import PyMa27Solver as LBLContext
 from hsl.scaling.mc29 import mc29ad
-from pykrylov.linop import PysparseLinearOperator
+from nlp.model.pysparsemodel import PySparseSlackModel
 from nlp.tools.norms import norm2, norm_infty, normest
 from nlp.tools.timing import cputime
 import logging
-
-# for slack model
-from nlp.model.nlpmodel import NLPModel
-from nlp.model.qnmodel import QuasiNewtonModel
-from pysparse.sparse.pysparseMatrix import PysparseMatrix
 import numpy as np
-
-
-# CQP needs equality constraints and bounds on variables as s>=0
-class SlackModel(NLPModel):
-    """Framework for converting an optimization problem to a form using slacks.
-
-    In the latter problem, the only inequality constraints are bounds on
-    the slack variables. The other constraints are (typically) nonlinear
-    equalities.
-
-    The order of variables in the transformed problem is as follows:
-
-    1. x, the original problem variables.
-
-    2. sL = [ sLL | sLR ], sLL being the slack variables corresponding to
-       general constraints with a lower bound only, and sLR being the slack
-       variables corresponding to the 'lower' side of range constraints.
-
-    3. sU = [ sUU | sUR ], sUU being the slack variables corresponding to
-       general constraints with an upper bound only, and sUR being the slack
-       variables corresponding to the 'upper' side of range constraints.
-
-    4. tL = [ tLL | tLR ], tLL being the slack variables corresponding to
-       variables with a lower bound only, and tLR being the slack variables
-       corresponding to the 'lower' side of two-sided bounds.
-
-    5. tU = [ tUU | tUR ], tUU being the slack variables corresponding to
-       variables with an upper bound only, and tLR being the slack variables
-       corresponding to the 'upper' side of two-sided bounds.
-
-    This framework initializes the slack variables sL, sU, tL, and tU to
-    zero by default.
-
-    Note that the slack framework does not update all members of AmplModel,
-    such as the index set of constraints with an upper bound, etc., but
-    rather performs the evaluations of the constraints for the updated
-    model implicitly.
-    """
-
-    def __init__(self, model, keep_variable_bounds=False, **kwargs):
-        """Instantiate a model in its slack form.
-
-        :parameters:
-            :model:  Original NLP to transform to a slack form.
-
-        :keywords:
-            :keep_variable_bounds: set to `True` if you don't want to convert
-                                   bounds on variables to inequalities. In this
-                                   case bounds are kept as they were in the
-                                   original NLP.
-        """
-        self.model = model
-        self.keep_variable_bounds = keep_variable_bounds
-
-        n_con_low = model.nlowerC + model.nrangeC  # ineqs with lower bound.
-        n_con_upp = model.nupperC + model.nrangeC  # ineqs with upper bound.
-        n_var_low = model.nlowerB + model.nrangeB  # vars  with lower bound.
-        n_var_upp = model.nupperB + model.nrangeB  # vars  with upper bound.
-
-        bot = model.n
-        self.sLL = range(bot, bot + model.nlowerC)
-        bot += model.nlowerC
-        self.sLR = range(bot, bot + model.nrangeC)
-        bot += model.nrangeC
-        self.sUU = range(bot, bot + model.nupperC)
-        bot += model.nupperC
-        self.sUR = range(bot, bot + model.nrangeC)
-
-        # Update effective number of variables and constraints
-        if keep_variable_bounds:
-            n = model.n + n_con_low + n_con_upp
-            m = model.m + model.nrangeC
-
-            Lvar = np.zeros(n)
-            Lvar[:model.n] = model.Lvar
-            Uvar = np.inf * np.ones(n)
-            Uvar[:model.n] = model.Uvar
-
-        else:
-            bot += model.nrangeC
-            self.tLL = range(bot, bot + model.nlowerB)
-            bot += model.nlowerB
-            self.tLR = range(bot, bot + model.nrangeB)
-            bot += model.nrangeB
-            self.tUU = range(bot, bot + model.nupperB)
-            bot += model.nupperB
-            self.tUR = range(bot, bot + model.nrangeB)
-
-            n = model.n + n_con_low + n_con_upp + n_var_low + n_var_upp
-            m = model.m + model.nrangeC + n_var_low + n_var_upp
-            Lvar = np.zeros(n)
-            Lvar[:model.n] = -np.inf * np.ones(model.n)
-            Uvar = np.inf * np.ones(n)
-
-        NLPModel.__init__(self, n=n, m=m, name='slack-' + model.name,
-                          Lvar=Lvar, Uvar=Uvar, Lcon=np.zeros(m))
-
-        # Redefine primal and dual initial guesses
-        self.x0 = np.empty(self.n)
-        self.x0[:model.n] = model.x0[:]
-        self.x0[model.n:] = 0
-
-        self.pi0 = np.empty(self.m)
-        self.pi0[:model.m] = model.pi0[:]
-        self.pi0[model.m:] = 0
-        return
-
-    def obj(self, x):
-        """Evaluate the objective function at x."""
-        return self.model.obj(x[:self.model.n])
-
-    def grad(self, x):
-        """Evaluate the objective gradient at x."""
-        g = np.zeros(self.n)
-        g[:self.model.n] = self.model.grad(x[:self.model.n])
-        return g
-
-    def cons(self, x):
-        """Evaluate vector of constraints at x.
-
-        Evaluate the vector of general constraints for the modified problem.
-        Constraints are stored in the order in which they appear in the
-        original problem. If constraint i is a range constraint, c[i] will be
-        the constraint that has the slack on the lower bound on c[i]. The
-        constraint with the slack on the upper bound on c[i] will be stored in
-        position m + k, where k is the position of index i in rangeC, i.e., k=0
-        iff constraint i is the range constraint that appears first, k=1 iff it
-        appears second, etc.
-        """
-        model = self.model
-        on = model.n
-        m = self.m
-        om = model.m
-        lowerC = model.lowerC
-        upperC = model.upperC
-        rangeC = model.rangeC
-        nrangeC = model.nrangeC
-
-        c = np.empty(m)
-        c[:om + nrangeC] = model.cons_pos(x[:on])
-        c[lowerC] -= x[self.sLL]
-        c[upperC] -= x[self.sUU]
-        c[rangeC] -= x[self.sLR]
-        c[om:] -= x[self.sUR]
-        return c
-
-    def cons_pos(self, x):
-        """Convenience function to return constraints as non negative ones."""
-        return self.cons(x)
-
-    def jprod(self, x, p, **kwargs):
-        """Evaluate Jacobian-vector product at x with p.
-
-        Evaluate the Jacobian matrix-vector product of all equality
-        constraints of the transformed problem with a vector `p` (J(x).T p).
-        See the documentation of :meth:`jac` for more details on how the
-        constraints are ordered.
-        """
-        # Create some shortcuts for convenience
-        model = self.model
-        on = model.n
-        om = model.m
-        m = self.m
-
-        lowerC = model.lowerC
-        upperC = model.upperC
-        rangeC = model.rangeC
-        nrangeC = model.nrangeC
-
-        v = np.zeros(m)
-
-        J = model.jop(x[:on])
-        v[:om] = J * p[:on]
-        v[upperC] *= -1.0
-        v[om:om + nrangeC] = v[rangeC]
-        v[om:om + nrangeC] *= -1.0
-
-        # Insert contribution of slacks on general constraints
-        v[lowerC] -= p[self.sLL]
-        v[rangeC] -= p[self.sLR]
-        v[upperC] -= p[self.sUU]
-        v[om:om + nrangeC] -= p[self.sUR]
-
-        if self.keep_variable_bounds:
-            return v
-
-        # Create some more shortcuts
-        lowerB = model.lowerB
-        upperB = model.upperB
-        rangeB = model.rangeB
-        nlowerB = model.nlowerB
-        nupperB = model.nupperB
-        nrangeB = model.nrangeB
-
-        # Insert contribution of bound constraints on the original problem
-        bot = om + nrangeC
-        v[bot:bot + nlowerB] += p[lowerB]
-        bot += nlowerB
-        v[bot:bot + nrangeB] += p[rangeB]
-        bot += nrangeB
-        v[bot:bot + nupperB] -= p[upperB]
-        bot += nupperB
-        v[bot:bot + nrangeB] -= p[rangeB]
-
-        # Insert contribution of slacks on the bound constraints
-        bot = om + nrangeC
-        v[bot:bot + nlowerB] -= p[self.tLL]
-        bot += nlowerB
-        v[bot:bot + nrangeB] -= p[self.tLR]
-        bot += nrangeB
-        v[bot:bot + nupperB] -= p[self.tUU]
-        bot += nupperB
-        v[bot:bot + nrangeB] -= p[self.tUR]
-        return v
-
-    def jtprod(self, x, p, **kwargs):
-        """Evaluate transposed-Jacobian-vector product at x with p.
-
-        Evaluate the Jacobian-transpose matrix-vector product of all equality
-        constraints of the transformed problem with a vector `p` (J(x).T p).
-        See the documentation of :meth:`jac` for more details on how the
-        constraints are ordered.
-        """
-        # Create some shortcuts for convenience
-        model = self.model
-        on = model.n
-        om = model.m
-        n = self.n
-
-        lowerC = model.lowerC
-        upperC = model.upperC
-        rangeC = model.rangeC
-        nrangeC = model.nrangeC
-
-        v = np.zeros(n)
-        pmv = p[:om].copy()
-        pmv[upperC] *= -1.0
-        pmv[rangeC] -= p[om:om + nrangeC]
-
-        J = model.jop(x[:on])
-        v[:on] = J.T * pmv
-
-        # Insert contribution of slacks on general constraints
-        v[self.sLL] = -p[lowerC]
-        v[self.sLR] = -p[rangeC]
-        v[self.sUU] = -p[upperC]
-        v[self.sUR] = -p[om:om + nrangeC]
-
-        if self.keep_variable_bounds:
-            return v
-
-        # Create some more shortcuts
-        lowerB = model.lowerB
-        upperB = model.upperB
-        rangeB = model.rangeB
-        nlowerB = model.nlowerB
-        nupperB = model.nupperB
-        nrangeB = model.nrangeB
-
-        # Insert contribution of bound constraints on the original problem
-        bot = om + nrangeC
-        v[lowerB] += p[bot:bot + nlowerB]
-        bot += nlowerB
-        v[rangeB] += p[bot:bot + nrangeB]
-        bot += nrangeB
-        v[upperB] -= p[bot:bot + nupperB]
-        bot += nupperB
-        v[rangeB] -= p[bot:bot + nrangeB]
-
-        # Insert contribution of slacks on the bound constraints
-        bot = om + nrangeC
-        v[self.tLL] -= p[bot:bot + nlowerB]
-        bot += nlowerB
-        v[self.tLR] -= p[bot:bot + nrangeB]
-        bot += nrangeB
-        v[self.tUU] -= p[bot:bot + nupperB]
-        bot += nupperB
-        v[self.tUR] -= p[bot:bot + nrangeB]
-        return v
-
-    def jac(self, x):
-        """Evaluate constraints Jacobian at x.
-
-        Evaluate the Jacobian matrix of all equality constraints of the
-        transformed problem. The gradients of the general constraints appear in
-        'natural' order, i.e., in the order in which they appear in the
-        problem. The gradients of range constraints appear in two places: first
-        in the 'natural' location and again after all other general
-        constraints, with a flipped sign to account for the upper bound on
-        those constraints.
-
-        The gradients of the linear equalities corresponding to bounds on the
-        original variables appear in the following order:
-
-        1. variables with a lower bound only
-        2. lower bound on variables with two-sided bounds
-        3. variables with an upper bound only
-        4. upper bound on variables with two-sided bounds
-
-        The overall Jacobian of the new constraints thus has the form::
-
-            [ J    -I         ]
-            [-JR      -I      ]
-            [ I          -I   ]
-            [-I             -I]
-
-        where the columns correspond, in order, to the variables `x`, `s`,
-        `sU`, `t`, and `tU`, the rows correspond, in order, to
-
-        1. general constraints (in natural order)
-        2. 'upper' side of range constraints
-        3. bounds, ordered as explained above
-        4. 'upper' side of two-sided bounds,
-
-        and where the signs corresponding to 'upper' constraints and upper
-        bounds are flipped in the (1,1) and (3,1) blocks.
-        """
-        return self._jac(x, lp=False)
-
-    def A(self):
-        """Evaluate the constraints Jacobian of linear constraints at x.
-
-        Return the constraint matrix if the problem is a linear program.
-        See the documentation of :meth:`jac` for more information.
-        """
-        return self._jac(0, lp=True)
-
-    def _jac(self, x, lp=False):
-        raise NotImplementedError("Please subclass")
-
-    def convert_multipliers(self, z):
-        """Convert multipliers from slack problem to orginal NLP."""
-        if z is None:
-            return np.zeros(self.m)
-        om = self.model.m
-        upperC = self.model.upperC
-        rangeC = self.model.rangeC
-        nrangeC = self.model.nrangeC
-        pi = z[:om].copy()
-        pi[upperC] *= -1.
-        pi[rangeC] -= z[om:om + nrangeC]
-        return pi
-
-    def hprod(self, x, y, v, **kwargs):
-        """Hessian-vector product.
-
-        Evaluate the Hessian vector product of the Hessian of the Lagrangian
-        at (x,y) with the vector v.
-        """
-        model = self.model
-        on = model.n
-
-        Hv = np.zeros(self.n)
-        pi = self.convert_multipliers(y)
-        Hv[:on] = model.hprod(x[:on], pi, v[:on], **kwargs)
-        return Hv
-
-    def hess(self, x, z=None, *args, **kwargs):
-        """Evaluate Lagrangian Hessian at (x, z)."""
-        raise NotImplementedError("Please subclass")
-
-
-class PySparseSlackModel(SlackModel):
-    """Slack model in which matrices are represented as PySparse matrices."""
-
-    def _jac(self, x, lp=False):
-        """Helper method to assemble the Jacobian matrix of the constraints.
-
-        See the documentation of :meth:`jac` for more information.
-
-        The positional argument `lp` should be set to `True` only if the
-        problem is known to be a linear program. In this case, the evaluation
-        of the constraint matrix is cheaper and the argument `x` is ignored.
-        """
-        n = self.n
-        m = self.m
-        model = self.model
-        on = self.model.n
-        om = self.model.m
-
-        lowerC = np.array(model.lowerC)
-        nlowerC = model.nlowerC
-        upperC = np.array(model.upperC)
-        nupperC = model.nupperC
-        rangeC = np.array(model.rangeC)
-        nrangeC = model.nrangeC
-        lowerB = np.array(model.lowerB)
-        nlowerB = model.nlowerB
-        upperB = np.array(model.upperB)
-        nupperB = model.nupperB
-        rangeB = np.array(model.rangeB)
-        nrangeB = model.nrangeB
-        nbnds = nlowerB + nupperB + 2 * nrangeB
-        nSlacks = nlowerC + nupperC + 2 * nrangeC
-
-        # Initialize sparse Jacobian
-        # Overestimate of the number of non zero elements
-        nnzJ = 2 * self.model.nnzj + m + nrangeC + nbnds + nrangeB
-        J = PysparseMatrix(nrow=m, ncol=n, sizeHint=nnzJ)
-
-        # Insert contribution of general constraints.
-        if lp:
-            J[:om, :on] = self.model.A()
-        else:
-            J[:om, :on] = self.model.jac(x[:on])
-        J[upperC, :on] *= -1.0
-        J[om:om + nrangeC, :on] = J[rangeC, :on]  # upper side of range const.
-        J[om:om + nrangeC, :on] *= -1.0
-
-        # Create a few index lists
-        rlowerC = np.array(range(nlowerC))
-        rlowerB = np.array(range(nlowerB))
-        rupperC = np.array(range(nupperC))
-        rupperB = np.array(range(nupperB))
-        rrangeC = np.array(range(nrangeC))
-        rrangeB = np.array(range(nrangeB))
-
-        # Insert contribution of slacks on general constraints
-        J.put(-1.0, lowerC, on + rlowerC)
-        J.put(-1.0, upperC, on + nlowerC + rupperC)
-        J.put(-1.0, rangeC, on + nlowerC + nupperC + rrangeC)
-        J.put(-1.0, om + rrangeC, on + nlowerC + nupperC + nrangeC + rrangeC)
-
-        if self.keep_variable_bounds:
-            return J
-
-        # Insert contribution of bound constraints on the original problem
-        bot = om + nrangeC
-        J.put(1.0, bot + rlowerB, lowerB)
-        bot += nlowerB
-        J.put(1.0, bot + rrangeB, rangeB)
-        bot += nrangeB
-        J.put(-1.0, bot + rupperB, upperB)
-        bot += nupperB
-        J.put(-1.0, bot + rrangeB, rangeB)
-
-        # Insert contribution of slacks on the bound constraints
-        bot = om + nrangeC
-        J.put(-1.0, bot + rlowerB, on + nSlacks + rlowerB)
-        bot += nlowerB
-        J.put(-1.0, bot + rrangeB, on + nSlacks + nlowerB + rrangeB)
-        bot += nrangeB
-        J.put(-1.0, bot + rupperB, on + nSlacks + nlowerB + nrangeB + rupperB)
-        bot += nupperB
-        J.put(-1.0, bot + rrangeB, on + nSlacks + nlowerB + nrangeB +
-              nupperB + rrangeB)
-        return J
-
-    def hess(self, x, z=None, *args, **kwargs):
-        """Evaluate Lagrangian Hessian at (x, z)."""
-        model = self.model
-        if isinstance(model, QuasiNewtonModel):
-            return self.hop(x, z, *args, **kwargs)
-
-        on = model.n
-        pi = self.convert_multipliers(z)
-        H = PysparseMatrix(nrow=self.n, ncol=self.n, symmetric=True,
-                           sizeHint=self.model.nnzh)
-        H[:on, :on] = self.model.hess(x[:on], pi, *args, **kwargs)
-        return H
 
 
 class RegQPInteriorPointSolver(object):
@@ -491,8 +26,13 @@ class RegQPInteriorPointSolver(object):
     Solve a convex quadratic program of the form::
 
        minimize    cᵀx + ½ xᵀ Q x
-       subject to  A1 x + A2 s = b,                                 (QP)
-                   s ≥ 0,
+       subject to  Aᴱ x = bᴱ
+                   Aᴵ x - s = bᴵ                                  (QP)
+
+                     l ≤ x ≤ u
+                    cᴸ ≤ sᴸ
+                         sᵁ ≤ cᵁ
+                   cᴿᴸ ≤ sᴿ ≤ cᴿᵁ
 
     where Q is a symmetric positive semi-definite matrix, the variables
     x are the original problem variables and s are slack variables. Any
@@ -508,16 +48,14 @@ class RegQPInteriorPointSolver(object):
     positive real numbers and should not be "too large". By default they
     are set to 1.0 and updated at each iteration.
 
-    If `scale` is set to `True`, (QP) is scaled automatically prior to
-    solution so as to equilibrate the rows and columns of the constraint
-    matrix [A1 A2].
+    Problem scaling options are provided through the `scale` key word.
 
     Advantages of this method are that it is not sensitive to dense columns
     in A, no special treatment of the unbounded variables x is required,
     and a sparse symmetric quasi-definite system of equations is solved at
     each iteration. The latter, although indefinite, possesses a
-    Cholesky-like factorization. Those properties makes the method
-    typically more robust that a standard predictor-corrector
+    Cholesky-like factorization. Those properties make the method
+    typically more robust than a standard predictor-corrector
     implementation and the linear system solves are often much faster than
     in a traditional interior-point method in augmented form.
     """
@@ -530,7 +68,7 @@ class RegQPInteriorPointSolver(object):
 
         :keywords:
             :scale: Perform row and column equilibration of the constraint
-                    matrix [A1 A2] prior to solution (default: `True`).
+                    matrix [Aᴱ 0 ; Aᴵ -I] prior to solution (default: `none`).
 
             :regpr: Initial value of primal regularization parameter
                     (default: `1.0`).
@@ -545,52 +83,29 @@ class RegQPInteriorPointSolver(object):
 
             :verbose: Turn on verbose mode (default `False`).
         """
-        if not isinstance(qp, SlackModel):
-            msg = 'Input problem must be an instance of SlackModel'
-            raise ValueError(msg)
+        if not isinstance(qp, PySparseSlackModel):
+            msg = 'The QP model must be an instance of SlackModel with sparse'
+            msg2 = ' Hessian and Jacobian matrices available.'
+            raise TypeError(msg+msg2)
 
         # Grab logger if one was configured.
         logger_name = kwargs.get('logger_name', 'cqp.solver')
         self.log = logging.getLogger(logger_name)
 
-        self.verbose = kwargs.get('verbose', True)
-        scale = kwargs.get('scale', True)
+        # Either none, abs, or mc29
+        self.scale = kwargs.get('scale', 'none')
 
         self.qp = qp
-        self.A = qp.A()               # Constraint matrix
-        if not isinstance(self.A, PysparseMatrix):
-            self.A = PysparseMatrix(matrix=self.A)
-
-        _, n = self.A.shape
         on = qp.original_n
-        # Record number of slack variables in QP
-        self.nSlacks = qp.n - on
 
         # Collect basic info about the problem.
-        zero = np.zeros(n)
+        zero_pt = np.zeros(on)
+        self.b = -qp.cons(zero_pt)  # Constraint Right-hand side
+        self.c = qp.c               # Objective cost vector
+        self.A = qp.jac(zero_pt)    # Jacobian including slack blocks
+        self.Q = qp.hess(zero_pt)   # Hessian including slack blocks
 
-        self.b = -qp.cons(zero)                  # Right-hand side
-        self.c0 = qp.obj(zero)                   # Constant term in objective
-        self.c = qp.grad(zero[:on])              # Cost vector
-        self.Q = PysparseMatrix(matrix=qp.hess(zero[:on],
-                                               np.zeros(qp.original_m)))
-
-        # Apply in-place problem scaling if requested.
-        self.prob_scaled = False
-        if scale:
-            self.t_scale = cputime()
-            self.scale()
-            self.t_scale = cputime() - self.t_scale
-        else:
-            # self.scale() sets self.normQ to the Frobenius norm of Q
-            # and self.normA to the Frobenius norm of A as a by-product.
-            # If we're not scaling, set normQ and normA manually.
-            self.normQ = self.Q.matrix.norm('fro')
-            self.normA = self.A.matrix.norm('fro')
-
-        self.normb = norm_infty(self.b)
-        self.normc = norm_infty(self.c)
-        self.normbc = 1 + max(self.normb, self.normc)
+        # ** DEV NOTE: Move scaling call to solve function **
 
         # Initialize augmented matrix.
         self.H = self.initialize_kkt_matrix()
@@ -617,6 +132,8 @@ class RegQPInteriorPointSolver(object):
         if self.regdu < 0.0:
             self.regdu = 0.0
 
+        # ** DEV NOTE: This is WAY TOO MUCH to display on one line **
+
         # Initialize format strings for display
         fmt_hdr = '%-4s  %9s' + '  %-8s' * 6 + \
                   '  %-7s  %-4s  %-4s' + '  %-8s' * 8
@@ -629,19 +146,13 @@ class RegQPInteriorPointSolver(object):
         self.format2 = '  %-7.1e  %-4.2f  %-4.2f'
         self.format2 += '  %-8.2e' * 8
 
-        self.mu_history = []
-        self.cond_history = []
-        self.berr_history = []
-        self.derr_history = []
-        self.nrms_history = []
-        self.lres_history = []
-
         self.condest = kwargs.get('condest', False)
-        self.condest_history = []
-        self.normest_history = []
 
-        if self.verbose:
-            self.display_stats()
+        # Additional options to collect
+        self.itermax = kwargs.get('itermax', max(100, 10*qp.n))
+        self.stoptol = kwargs.get('stoptol', 1.0e-6)
+        self.predcor = kwargs.get('predcor', True)
+        self.check_infeas = kwargs.get('check_infeas', True)
 
         return
 
@@ -696,7 +207,7 @@ class RegQPInteriorPointSolver(object):
         log.info('Adjusted number of constraints excluding bounds: %d' % qp.m)
         log.info('Number of nonzeros in Hessian matrix Q: %d' % self.Q.nnz)
         log.info('Number of nonzeros in constraint matrix: %d' % self.A.nnz)
-        log.info('Constant term in objective: %8.2e' % self.c0)
+        # log.info('Constant term in objective: %8.2e' % self.c0)
         log.info('Cost vector norm: %8.2e' % self.normc)
         log.info('Right-hand side norm: %8.2e' % self.normb)
         log.info('Hessian norm: %8.2e' % self.normQ)
@@ -708,125 +219,94 @@ class RegQPInteriorPointSolver(object):
         return
 
     def scale(self, **kwargs):
-        """Equilibrate the constraint matrix of the linear program.
+        """Compute scaling factors for the problem.
 
-        Equilibration is done by first dividing every row by its largest
-        element in absolute value and then by dividing every column by its
-        largest element in absolute value. In effect the original problem::
+        If the solver is run with scaling, this function computes scaling
+        factors for the rows and columns of the Jacobian so that the scaled
+        matrix entries have some nicer properties.
 
-            minimize c' x + 1/2 x' Q x
-            subject to  A1 x + A2 s = b, x >= 0
+        In effect the original problem::
+
+            minimize    c' x + 1/2 x' Q x
+            subject to  Aᴱ x = bᴱ
+                        Aᴵ x - s = bᴵ
+                        (bounds)
 
         is converted to::
 
-            minimize (Cc)' x + 1/2 x' (CQC') x
-            subject to  R A1 C x + R A2 C s = Rb, x >= 0,
+            minimize    (Cˣc)' x + 1/2 x' (CˣQCˣ') x
+            subject to  Rᴱ Aᴱ Cˣ x = Rᴱ bᴱ
+                        Rᴵ Aᴵ Cˣ x - Rᴵ I Cˢ s = Rᴵ bᴵ
+                        (bounds)
 
-        where the diagonal matrices R and C operate row and column scaling
-        respectively.
+        where the diagonal matrices R and C contain row and column scaling
+        factors respectively.
 
-        Upon return, the matrix A and the right-hand side b are scaled and the
-        members `row_scale` and `col_scale` are set to the row and column
-        scaling factors.
+        The options for the :scale: keyword are as follows:
+            :none:  Do not calculate scaling factors (The resulting 
+                    variables are of type `None`)
 
-        The scaling may be undone by subsequently calling :meth:`unscale`. It
-        is necessary to unscale the problem in order to unscale the final dual
-        variables. Normally, the :meth:`solve` method takes care of unscaling
-        the problem upon termination.
+            :abs:   Compute each row scaling as the largest absolute-value
+                    row entry, then compute each column scaling as the largest
+                    absolute-value column entry.
+
+            :mc29:  Compute row and column scaling using the Harwell
+                    Subroutine MC29, available from the HSL.py interface.
+
         """
         log = self.log
         m, n = self.A.shape
-        row_scale = np.zeros(m)
-        col_scale = np.zeros(n)
+        self.row_scale = np.zeros(m)
+        self.col_scale = np.zeros(n)
         (values, irow, jcol) = self.A.find()
 
-        if self.verbose:
-            log.info('Smallest and largest elements of A prior to scaling: ')
-            log.info('%8.2e %8.2e' % (np.min(np.abs(values)),
-                                      np.max(np.abs(values))))
+        if self.scale == 'none':
 
-        # Find row scaling.
-        for k in range(len(values)):
-            row = irow[k]
-            val = abs(values[k])
-            row_scale[row] = max(row_scale[row], val)
-        row_scale[row_scale == 0.0] = 1.0
+            self.row_scale = None
+            self.col_scale = None
 
-        if self.verbose:
-            log.info('Max row scaling factor = %8.2e' % np.max(row_scale))
+        elif self.scale == 'abs':
 
-        # Apply row scaling to A and b.
-        values /= row_scale[irow]
-        self.b /= row_scale
+            log.debug('Smallest and largest elements of A prior to scaling: ')
+            log.debug('%8.2e %8.2e' % (np.min(np.abs(values)),
+                                          np.max(np.abs(values))))
 
-        # Find column scaling.
-        for k in range(len(values)):
-            col = jcol[k]
-            val = abs(values[k])
-            col_scale[col] = max(col_scale[col], val)
-        col_scale[col_scale == 0.0] = 1.0
+            # Find row scaling.
+            for k in range(len(values)):
+                row = irow[k]
+                val = abs(values[k])
+                self.row_scale[row] = min(self.row_scale[row], 1/val)
+            self.row_scale[row_scale == 0.0] = 1.0
 
-        if self.verbose:
-            log.info('Max column scaling factor = %8.2e' % np.max(col_scale))
+            log.debug('Max row scaling factor = %8.2e' % np.max(self.row_scale))
 
-        # Apply column scaling to A and c.
-        values /= col_scale[jcol]
-        self.c[:self.qp.original_n] /= col_scale[:self.qp.original_n]
+            # Modified A values after row scaling
+            temp_values = values * self.row_scale[irow]
+            # self.b /= row_scale
 
-        if self.verbose:
-            log.info('Smallest and largest elements of A after scaling: ')
-            log.info('%8.2e %8.2e' % (np.min(np.abs(values)),
-                                      np.max(np.abs(values))))
+            # Find column scaling.
+            for k in range(len(temp_values)):
+                col = jcol[k]
+                val = abs(temp_values[k])
+                self.col_scale[col] = max(self.col_scale[col], 1/val)
+            self.col_scale[self.col_scale == 0.0] = 1.0
 
-        # Overwrite A with scaled values.
-        self.A.put(values, irow, jcol)
-        self.normA = norm2(values)   # Frobenius norm of A.
+            log.debug('Max column scaling factor = %8.2e' % np.max(self.col_scale))
 
-        # Apply scaling to Hessian matrix Q.
-        (values, irow, jcol) = self.Q.find()
-        values /= col_scale[irow]
-        values /= col_scale[jcol]
-        self.Q.put(values, irow, jcol)
-        self.normQ = norm2(values)  # Frobenius norm of Q
+        elif self.scale == 'mc29':
 
-        # Save row and column scaling.
-        self.row_scale = row_scale
-        self.col_scale = col_scale
+            row_scale, col_scale, ifail = mc29ad(m, n, values, irow, jcol)
 
-        self.prob_scaled = True
+            # row_scale and col_scale contain in fact the logarithms of the
+            # scaling factors. Modify these before storage
+            self.row_scale = np.exp(row_scale)
+            self.col_scale = np.exp(col_scale)
 
-        return
+        else:
 
-    def unscale(self, **kwargs):
-        """Unscale the constraint matrix of the linear program.
-
-        Restore the constraint matrix A, the right-hand side b and the cost
-        vector c to their original value by undoing the row and column
-        equilibration scaling.
-        """
-        row_scale = self.row_scale
-        col_scale = self.col_scale
-        on = self.qp.original_n
-
-        # Unscale constraint matrix A.
-        self.A.row_scale(row_scale)
-        self.A.col_scale(col_scale)
-
-        # Unscale right-hand side and cost vectors.
-        self.b *= row_scale
-        self.c[:on] *= col_scale[:on]
-
-        # Unscale Hessian matrix Q.
-        (values, irow, jcol) = self.Q.find()
-        values *= col_scale[irow]
-        values *= col_scale[jcol]
-        self.Q.put(values, irow, jcol)
-
-        # Recover unscaled multipliers y and z.
-        self.y *= self.row_scale
-        self.z /= self.col_scale[on:]
-
-        self.prob_scaled = False
+            log.info('Scaling option not recognized, no scaling will be applied.')
+            self.row_scale = None
+            self.col_scale = None
 
         return
 
@@ -860,10 +340,10 @@ class RegQPInteriorPointSolver(object):
 
         """
         qp = self.qp
-        itermax = kwargs.get('itermax', max(100, 10 * qp.n))
-        tolerance = kwargs.get('tolerance', 1.0e-6)
-        PredictorCorrector = kwargs.get('PredictorCorrector', True)
-        check_infeasible = kwargs.get('check_infeasible', True)
+        itermax = self.itermax
+        tolerance = self.stoptol
+        PredictorCorrector = self.predcor
+        check_infeasible = self.check_infeas
 
         # Transfer pointers for convenience.
         on = qp.original_n
@@ -883,7 +363,7 @@ class RegQPInteriorPointSolver(object):
 
         # Slack variables are the trailing variables in x.
         s = x[on:]
-        ns = self.nSlacks
+        ns = qp.nSlacks
 
         # Initialize steps in dual variables.
         dz = np.zeros(ns)
@@ -1192,13 +672,6 @@ class RegQPInteriorPointSolver(object):
         self.status = status
         self.short_status = short_status
 
-        # Unscale problem if applicable.
-        if self.prob_scaled:
-            self.unscale()
-
-        # Recompute final objective value.
-        self.obj_value = self.c0 + cx + 0.5 * xQx
-
         return
 
     def set_initial_guess(self, **kwargs):
@@ -1441,99 +914,6 @@ class RegQPInteriorPointSolver(object):
         dy = step[n:]
         dz = -(comp + z * ds) / s
         return (dx, ds, dy, dz)
-
-
-class RegQPInteriorPointSolver29(RegQPInteriorPointSolver):
-    """A variant of the regularized interior-point method with MC29 scaling."""
-
-    def scale(self, **kwargs):
-        """Scale the constraint matrix of the linear program.
-
-        The scaling is done so that the scaled matrix has all its entries near
-        1.0 in the sense that the square of the sum of the logarithms of the
-        entries is minimized.
-
-        In effect the original problem::
-
-            minimize c'x + 1/2 x'Qx subject to  A1 x + A2 s = b, x >= 0
-
-        is converted to::
-
-            minimize (Cc)'x + 1/2 x' (CQC') x
-            subject to  R A1 C x + R A2 C s = Rb, x >= 0,
-
-        where the diagonal matrices R and C operate row and column scaling
-        respectively.
-
-        Upon return, the matrix A and the right-hand side b are scaled and the
-        members `row_scale` and `col_scale` are set to the row and column
-        scaling factors.
-
-        The scaling may be undone by subsequently calling :meth:`unscale`. It
-        is necessary to unscale the problem in order to unscale the final dual
-        variables. Normally, the :meth:`solve` method takes care of unscaling
-        the problem upon termination.
-        """
-        (values, irow, jcol) = self.A.find()
-        m, n = self.A.shape
-
-        # Obtain row and column scaling
-        row_scale, col_scale, ifail = mc29ad(m, n, values, irow, jcol)
-
-        # row_scale and col_scale contain in fact the logarithms of the
-        # scaling factors.
-        row_scale = np.exp(row_scale)
-        col_scale = np.exp(col_scale)
-
-        # Apply row and column scaling to constraint matrix A.
-        values *= row_scale[irow]
-        values *= col_scale[jcol]
-
-        # Overwrite A with scaled matrix.
-        self.A.put(values, irow, jcol)
-
-        # Apply row scaling to right-hand side b.
-        self.b *= row_scale
-
-        # Apply column scaling to cost vector c.
-        self.c[:self.qp.original_n] *= col_scale[:self.qp.original_n]
-
-        # Save row and column scaling.
-        self.row_scale = row_scale
-        self.col_scale = col_scale
-
-        self.prob_scaled = True
-
-        return
-
-    def unscale(self, **kwargs):
-        """Unscale the constraint matrix of the linear program.
-
-        Restore the constraint matrix A, the right-hand side b and the cost
-        vector c to their original value by undoing the row and column
-        equilibration scaling.
-        """
-        row_scale = self.row_scale
-        col_scale = self.col_scale
-        on = self.qp.original_n
-
-        # Unscale constraint matrix A.
-        self.A.row_scale(1 / row_scale)
-        self.A.col_scale(1 / col_scale)
-
-        # Unscale right-hand side b.
-        self.b /= row_scale
-
-        # Unscale cost vector c.
-        self.c[:on] /= col_scale[:on]
-
-        # Recover unscaled multipliers y and z.
-        self.y /= row_scale
-        self.z *= col_scale[on:]
-
-        self.prob_scaled = False
-
-        return
 
 
 class RegQPInteriorPointSolver3x3(RegQPInteriorPointSolver):
