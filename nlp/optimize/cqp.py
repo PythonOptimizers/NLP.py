@@ -25,7 +25,7 @@ class RegQPInteriorPointSolver(object):
 
     Solve a convex quadratic program of the form::
 
-       minimize    cᵀx + ½ xᵀ Q x
+       minimize    q + cᵀx + ½ xᵀ Q x
        subject to  Aᴱ x = bᴱ
                    Aᴵ x - s = bᴵ                                  (QP)
 
@@ -48,7 +48,7 @@ class RegQPInteriorPointSolver(object):
     positive real numbers and should not be "too large". By default they
     are set to 1.0 and updated at each iteration.
 
-    Problem scaling options are provided through the `scale` key word.
+    Problem scaling options are provided through the `scale_type` key word.
 
     Advantages of this method are that it is not sensitive to dense columns
     in A, no special treatment of the unbounded variables x is required,
@@ -67,7 +67,7 @@ class RegQPInteriorPointSolver(object):
             :qp:       a :class:`QPModel` instance.
 
         :keywords:
-            :scale: Perform row and column equilibration of the constraint
+            :scale_type: Perform row and column scaling of the constraint
                     matrix [Aᴱ 0 ; Aᴵ -I] prior to solution (default: `none`).
 
             :regpr: Initial value of primal regularization parameter
@@ -93,15 +93,15 @@ class RegQPInteriorPointSolver(object):
         self.log = logging.getLogger(logger_name)
 
         # Either none, abs, or mc29
-        self.scale = kwargs.get('scale', 'none')
+        self.scale_type = kwargs.get('scale_type', 'none')
 
         self.qp = qp
-        on = qp.original_n
 
         # Collect basic info about the problem.
-        zero_pt = np.zeros(on)
+        zero_pt = np.zeros(qp.n)
+        self.q = qp.obj(zero_pt)    # Constant term in the objective
         self.b = -qp.cons(zero_pt)  # Constraint Right-hand side
-        self.c = qp.c               # Objective cost vector
+        self.c = qp.grad(zero_pt)   # Objective cost vector
         self.A = qp.jac(zero_pt)    # Jacobian including slack blocks
         self.Q = qp.hess(zero_pt)   # Hessian including slack blocks
 
@@ -242,7 +242,7 @@ class RegQPInteriorPointSolver(object):
         where the diagonal matrices R and C contain row and column scaling
         factors respectively.
 
-        The options for the :scale: keyword are as follows:
+        The options for the :scale_type: keyword are as follows:
             :none:  Do not calculate scaling factors (The resulting 
                     variables are of type `None`)
 
@@ -260,12 +260,12 @@ class RegQPInteriorPointSolver(object):
         self.col_scale = np.zeros(n)
         (values, irow, jcol) = self.A.find()
 
-        if self.scale == 'none':
+        if self.scale_type == 'none':
 
             self.row_scale = None
             self.col_scale = None
 
-        elif self.scale == 'abs':
+        elif self.scale_type == 'abs':
 
             log.debug('Smallest and largest elements of A prior to scaling: ')
             log.debug('%8.2e %8.2e' % (np.min(np.abs(values)),
@@ -282,7 +282,6 @@ class RegQPInteriorPointSolver(object):
 
             # Modified A values after row scaling
             temp_values = values * self.row_scale[irow]
-            # self.b /= row_scale
 
             # Find column scaling.
             for k in range(len(temp_values)):
@@ -293,7 +292,7 @@ class RegQPInteriorPointSolver(object):
 
             log.debug('Max column scaling factor = %8.2e' % np.max(self.col_scale))
 
-        elif self.scale == 'mc29':
+        elif self.scale_type == 'mc29':
 
             row_scale, col_scale, ifail = mc29ad(m, n, values, irow, jcol)
 

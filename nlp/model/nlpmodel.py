@@ -53,41 +53,46 @@ class NLPModel(object):
         if 'x0' in kwargs.keys():
             self.x0 = np.ascontiguousarray(kwargs['x0'], dtype=float)
         else:
-            self.x0 = np.zeros(self.n, dtype=np.float)
+            self.x0 = np.zeros(self._n, dtype=np.float)
 
         # Set initial multipliers
         if 'pi0' in kwargs.keys():
             self.pi0 = np.ascontiguousarray(kwargs['pi0'], dtype=np.float)
         else:
-            self.pi0 = np.zeros(self.m, dtype=np.float)
+            self.pi0 = np.zeros(self._m, dtype=np.float)
 
         # Set lower bounds on variables    Lvar[i] <= x[i]  i = 1,...,n
         if 'Lvar' in kwargs.keys():
             self.Lvar = np.ascontiguousarray(kwargs['Lvar'], dtype=np.float)
         else:
-            self.Lvar = -np.inf * np.ones(self.n, dtype=np.float)
+            self.Lvar = -np.inf * np.ones(self._n, dtype=np.float)
 
         # Set upper bounds on variables    x[i] <= Uvar[i]  i = 1,...,n
         if 'Uvar' in kwargs.keys():
             self.Uvar = np.ascontiguousarray(kwargs['Uvar'], dtype=np.float)
         else:
-            self.Uvar = np.inf * np.ones(self.n, dtype=np.float)
+            self.Uvar = np.inf * np.ones(self._n, dtype=np.float)
 
         # Set lower bounds on constraints  Lcon[i] <= c[i]  i = 1,...,m
         if 'Lcon' in kwargs.keys():
             self.Lcon = np.ascontiguousarray(kwargs['Lcon'], dtype=np.float)
         else:
-            self.Lcon = -np.inf * np.ones(self.m, dtype=np.float)
+            self.Lcon = -np.inf * np.ones(self._m, dtype=np.float)
 
         # Set upper bounds on constraints  c[i] <= Ucon[i]  i = 1,...,m
         if 'Ucon' in kwargs.keys():
             self.Ucon = np.ascontiguousarray(kwargs['Ucon'], dtype=np.float)
         else:
-            self.Ucon = np.inf * np.ones(self.m, dtype=np.float)
+            self.Ucon = np.inf * np.ones(self._m, dtype=np.float)
+
+        # The number of nonzeros in the Jacobian and Lagrangian Hessian
+        # Only used in derived classes with sparse matrix storage
+        self.nnzj = kwargs.get('nnzj',None)
+        self.nnzh = kwargs.get('nnjh',None)
 
         # Default classification of constraints
         self._lin = []                        # Linear    constraints
-        self._nln = range(self.m)             # Nonlinear constraints
+        self._nln = range(self._m)            # Nonlinear constraints
         self._net = []                        # Network   constraints
         self._nlin = len(self.lin)            # Number of linear constraints
         self._nnln = len(self.nln)            # Number of nonlinear constraints
@@ -99,7 +104,7 @@ class NLPModel(object):
         self.upperC = []    # Upper bound constraints:       c(x) <= cU
         self.equalC = []    # Equality constraints:    cL  = c(x)  = cU
 
-        for i in range(self.m):
+        for i in range(self._m):
             if self.Lcon[i] > -np.inf and self.Ucon[i] < np.inf:
                 if self.Lcon[i] == self.Ucon[i]:
                     self.equalC.append(i)
@@ -125,7 +130,7 @@ class NLPModel(object):
         self.fixedB = []
         self.freeB = []
 
-        for i in range(self.n):
+        for i in range(self._n):
             if self.Lvar[i] > -np.inf and self.Uvar[i] < np.inf:
                 if self.Lvar[i] == self.Uvar[i]:
                     self.fixedB.append(i)
@@ -143,7 +148,7 @@ class NLPModel(object):
         self.nupperB = len(self.upperB)
         self.nfixedB = len(self.fixedB)
         self.nfreeB = len(self.freeB)
-        self.nbounds = self.n - self.nfreeB
+        self.nbounds = self._n - self.nfreeB
 
         # Define permutations to order bound constraints / multipliers.
         self.permB = self.fixedB + self.lowerB + self.upperB + \
