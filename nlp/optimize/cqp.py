@@ -38,10 +38,13 @@ class RegQPInteriorPointSolver(object):
     x are the original problem variables and s are slack variables. Any
     quadratic program may be converted to the above form by instantiation
     of the `SlackModel` class. The conversion to the slack formulation
-    is mandatory in this implementation.
+    is mandatory in this implementation. In the following code, the
+    distinction between x and s is essentially hidden in `SlackModel` class
+    methods.
 
     The method is a variant of Mehrotra's predictor-corrector method where
     steps are computed by solving the primal-dual system in augmented form.
+    A long-step variant is also available.
 
     Primal and dual regularization parameters may be specified by the user
     via the opional keyword arguments `primal_reg` and `dual_reg`. Both should be
@@ -355,13 +358,12 @@ class RegQPInteriorPointSolver(object):
         b = self.b
         c = self.c
         Q = self.Q
-        H = self.H
 
         primal_reg = self.primal_reg
         dual_reg = self.dual_reg
 
         # Obtain initial point from Mehrotra's heuristic.
-        (x, y, z) = self.set_initial_guess(**kwargs)
+        (self.x, self.y, self.z) = self.set_initial_guess(**kwargs)
 
         # Slack variables are the trailing variables in x.
         s = x[on:]
@@ -680,65 +682,96 @@ class RegQPInteriorPointSolver(object):
     def set_initial_guess(self, **kwargs):
         """Compute initial guess according the Mehrotra's heuristic.
 
-        Initial values of x are computed as the solution to the least-squares
-        problem::
-
-            minimize ||s||  subject to  A1 x + A2 s = b
-
-        which is also the solution to the augmented system::
-
-            [ Q   0   A1' ] [x]   [0]
-            [ 0   I   A2' ] [s] = [0]
-            [ A1  A2   0  ] [w]   [b].
-
-        Initial values for (y,z) are chosen as the solution to the
+        Initial values of x are computed as the solution to the
         least-squares problem::
 
-            minimize ||z||  subject to  A1' y = c,  A2' y + z = 0
+            minimize    ½ xᵀQx + ½||rᴸ||² + ½||rᵁ||²
+            subject to  Ax = b
+                        rᴸ = x - l
+                        rᵁ = u - x
+
+        The solution is also the solution to the augmented system::
+
+            [ Q   Aᵀ   I   I] [x ]   [0 ]
+            [ A   0    0   0] [y']   [b ]
+            [ I   0   -I   0] [rᴸ] = [l ]
+            [ I   0    0  -I] [rᵁ]   [u ].
+
+        Initial values for the multipliers y and z are chosen as the
+        solution to the least-squares problem::
+
+            minimize    ½ x'ᵀQx' + ½||zᴸ||² + ½||zᵁ||²
+            subject to  Qx' + c - Aᵀy - zᴸ + zᵁ = 0
 
         which can be computed as the solution to the augmented system::
 
-            [ Q   0   A1' ] [w]   [c]
-            [ 0   I   A2' ] [z] = [0]
-            [ A1  A2   0  ] [y]   [0].
+            [ Q   Aᵀ   I   I] [x']   [-c]
+            [ A   0    0   0] [y ]   [ 0]
+            [ I   0   -I   0] [zᴸ] = [ 0]
+            [ I   0    0  -I] [zᵁ]   [ 0].
 
         To ensure stability and nonsingularity when A does not have full row
-        rank, the (1,1) block is perturbed to 1.0e-4 * I and the (3,3) block is
-        perturbed to -1.0e-4 * I.
+        rank or Q is singluar, the (1,1) block is perturbed by
+        sqrt(self.primal_reg_min) * I and the (2,2) block is perturbed by
+        sqrt(self.dual_reg_min) * I.
 
-        The values of s and z are subsequently adjusted to ensure they are
-        positive. See [Methrotra, 1992] for details.
+        The values of x', y', rᴸ, and rᵁ are discarded after solving the
+        linear systems.
+
+        The values of x and z are subsequently adjusted to ensure they
+        are strictly within their bounds. See [Methrotra, 1992] for details.
         """
         qp = self.qp
         n = qp.n
-        on = qp.original_n
+        m = qp.m
+        sys_size = 3*n + m    # Use given upper and lower bounds
+
+        # Some parameters for iterative refinement in the LBL solve
+        itref_threshold = 1.e-5
+        nitref = 5
 
         self.log.debug('Computing initial guess')
 
-        # Set up augmented system matrix and factorize it.
-        self.set_initial_guess_system()
-        self.LBL = LBLContext(self.H, sqd=self.dual_reg > 0)  # Analyze+factorize
+        # Set up augmented system matrix
+        H_init = PysparseMatrix(size=sys_size,
+            sizeHint=4*qp.n + self.A.nnz + self.Q.nnz,
+            symmetric=True)
+        H_init[:n, :n] = self.Q
+        H_init[n:n+m, :n] = self.A
+        H_init.put(self.diagQ + self.primal_reg_min**0.5, range(n))
+        H_init.put(-self.dual_reg_min**0.5, range(n,n+m))
+        # ** Identity blocks still to be added **
 
-        # Assemble first right-hand side and solve.
-        rhs = self.set_initial_guess_rhs()
-        (step, nres, neig) = self.solve_system(rhs)
+        # Analyze and factorize the system
+        self.LBL = LBLContext(H_init,
+            sqd=(self.primal_reg > 0.0 and self.dual_reg > 0.0))
 
-        dx, _, _, _ = self.get_dxsyz(step, 0, 1, 0, 0, 0)
+        # Assemble first right-hand side
+        rhs_primal_init = np.zeros(sys_size)
+        rhs_primal_init[n:n+m] = self.b
+        rhs_primal_init[n+m:2*n+m] = qp.Lvar
+        rhs_primal_init[2*n+m:] = qp.Uvar
 
-        # dx is just a reference; we need to make a copy.
-        x = dx.copy()
-        s = x[on:]  # Slack variables. Must be positive.
+        # Solve system and collect solution
+        self.LBL.solve(rhs_primal_init)
+        self.LBL.refine(rhs_primal_init, tol=itref_threshold, nitref=nitref)
+
+        # Extract copy of x solution
+        x_guess = step[:n].copy()
 
         # Assemble second right-hand side and solve.
-        self.update_initial_guess_rhs(rhs)
+        rhs_dual_init = np.zeros(sys_size)
+        rhs_dual_init[:n] = -self.c
 
-        (step, nres, neig) = self.solve_system(rhs)
+        self.LBL.solve(rhs_dual_init)
+        self.LBL.refine(rhs_dual_init, tol=itref_threshold, nitref=nitref)
 
-        _, dz, dy, _ = self.get_dxsyz(step, 0, 1, 0, 0, 0)
+        # Extract copies of y and z solutions
+        y_guess = -step[n:n+m].copy()
+        zL_guess = -step[n+m:2*n+m].copy()
+        zU_guess = step[2*n+m:].copy()
 
-        # dy and dz are just references; we need to make copies.
-        y = dy.copy()
-        z = -dz
+        # ** Refactor the next block, taking infinite bounds into account **
 
         # If there are no inequality constraints, this is it.
         if n == on:
