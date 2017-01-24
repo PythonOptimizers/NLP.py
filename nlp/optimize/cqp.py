@@ -44,7 +44,7 @@ class RegQPInteriorPointSolver(object):
     steps are computed by solving the primal-dual system in augmented form.
 
     Primal and dual regularization parameters may be specified by the user
-    via the opional keyword arguments `regpr` and `regdu`. Both should be
+    via the opional keyword arguments `primal_reg` and `dual_reg`. Both should be
     positive real numbers and should not be "too large". By default they
     are set to 1.0 and updated at each iteration.
 
@@ -68,20 +68,38 @@ class RegQPInteriorPointSolver(object):
 
         :keywords:
             :scale_type: Perform row and column scaling of the constraint
-                    matrix [Aᴱ 0 ; Aᴵ -I] prior to solution (default: `none`).
+                         matrix [Aᴱ 0 ; Aᴵ -I] prior to solution
+                         (default: `none`).
 
-            :regpr: Initial value of primal regularization parameter
-                    (default: `1.0`).
+            :primal_reg: Initial value of primal regularization parameter
+                         (default: `1.0`).
 
-            :regdu: Initial value of dual regularization parameter
-                    (default: `1.0`).
+            :primal_reg_min: Minimum value of primal regularization parameter
+                             (default: `1.0e-8`).
+
+            :dual_reg: Initial value of dual regularization parameter
+                       (default: `1.0`).
+
+            :dual_reg_min: Minimum value of dual regularization parameter
+                           (default: `1.0e-8`).
 
             :bump_max: Max number of times regularization parameters are
                        increased when a factorization fails (default 5).
 
             :logger_name: Name of a logger to control output.
 
-            :verbose: Turn on verbose mode (default `False`).
+            :cond_est: Estimate the matrix condition number when solving
+                       the linear system (default: `False`)
+
+            :itermax: Max number of iterations. (default: max(100,10*qp.n))
+
+            :mehrotra_pc: Use Mehrotra's predictor-corrector strategy
+                          to update the step (default: `True`) If `False`,
+                          use a variant of the long-step method.
+
+            :stoptol: The convergence tolerance (default: 1.0e-6)
+
+            :check_infeas: Check for an infeasible problem (default: `True`)
         """
         if not isinstance(qp, PySparseSlackModel):
             msg = 'The QP model must be an instance of SlackModel with sparse'
@@ -105,10 +123,7 @@ class RegQPInteriorPointSolver(object):
         self.A = qp.jac(zero_pt)    # Jacobian including slack blocks
         self.Q = qp.hess(zero_pt)   # Hessian including slack blocks
 
-        # ** DEV NOTE: Move scaling call to solve function **
-
-        # Initialize augmented matrix.
-        self.H = self.initialize_kkt_matrix()
+        # ** DEV NOTE: Moved scaling call to solve function **
 
         # It will be more efficient to keep the diagonal of Q around.
         self.diagQ = self.Q.take(range(qp.original_n))
@@ -118,21 +133,27 @@ class RegQPInteriorPointSolver(object):
         self.LBL = None
 
         # Set regularization parameters.
-        self.regpr = kwargs.get('regpr', 1.0)
-        self.regpr_min = 1.0e-8
-        self.regdu = kwargs.get('regdu', 1.0)
-        self.regdu_min = 1.0e-8
+        self.primal_reg = kwargs.get('primal_reg', 1.0)
+        self.primal_reg_min = kwargs.get('primal_reg_min',1.0e-8)
+        self.dual_reg = kwargs.get('dual_reg', 1.0)
+        self.dual_reg_min = kwargs.get('dual_reg_min',1.0e-8)
 
         # Max number of times regularization parameters are increased.
         self.bump_max = kwargs.get('bump_max', 5)
 
         # Check input parameters.
-        if self.regpr < 0.0:
-            self.regpr = 0.0
-        if self.regdu < 0.0:
-            self.regdu = 0.0
+        if self.primal_reg < 0.0 or self.dual_reg < 0.0:
+            raise ValueError('Regularization parameters must be nonnegative.')
+        if self.primal_reg_min < 0.0 or self.dual_reg_min < 0.0:
+            raise ValueError('Minimum regularization parameters must be nonnegative.')
+
+        if self.primal_reg < self.primal_reg_min:
+            self.primal_reg = self.primal_reg_min
+        if self.dual_reg < self.dual_reg_min:
+            self.dual_reg = self.dual_reg_min
 
         # ** DEV NOTE: This is WAY TOO MUCH to display on one line **
+        # ** to be trimmed later **
 
         # Initialize format strings for display
         fmt_hdr = '%-4s  %9s' + '  %-8s' * 6 + \
@@ -146,12 +167,11 @@ class RegQPInteriorPointSolver(object):
         self.format2 = '  %-7.1e  %-4.2f  %-4.2f'
         self.format2 += '  %-8.2e' * 8
 
-        self.condest = kwargs.get('condest', False)
-
         # Additional options to collect
+        self.cond_est = kwargs.get('cond_est', False)
         self.itermax = kwargs.get('itermax', max(100, 10*qp.n))
         self.stoptol = kwargs.get('stoptol', 1.0e-6)
-        self.predcor = kwargs.get('predcor', True)
+        self.mehrotra_pc = kwargs.get('mehrotra_pc', True)
         self.check_infeas = kwargs.get('check_infeas', True)
 
         return
@@ -159,9 +179,9 @@ class RegQPInteriorPointSolver(object):
     def initialize_kkt_matrix(self):
         u"""Create and initialize KKT matrix.
 
-        [ -(Q+ρI)      0             A1ᵀ ] [∆x]   [c + Q x - A1ᵀ y     ]
-        [  0      -(S^{-1} Z + ρI)   A2ᵀ ] [∆s] = [- A2ᵀ y - µ S^{-1} e]
-        [  A1          A2            δI  ] [∆y]   [b - A1 x - A2 s     ]
+        [ -(Q+ρI)      0             Aᵀ ] [∆x]   [c + Q x - Aᵀ y     ]
+        [  0      -(S^{-1} Z + ρI)  -Iᵀ ] [∆s] = [- Iᵀ y - µ S^{-1} e]
+        [  A          -I            δI  ] [∆y]   [b - A x + I s     ]
         """
         m, n = self.A.shape
         on = self.qp.original_n
@@ -212,8 +232,8 @@ class RegQPInteriorPointSolver(object):
         log.info('Right-hand side norm: %8.2e' % self.normb)
         log.info('Hessian norm: %8.2e' % self.normQ)
         log.info('Jacobian norm: %8.2e' % self.normA)
-        log.info('Initial primal regularization: %8.2e' % self.regpr)
-        log.info('Initial dual   regularization: %8.2e' % self.regdu)
+        log.info('Initial primal regularization: %8.2e' % self.primal_reg)
+        log.info('Initial dual   regularization: %8.2e' % self.dual_reg)
         if self.prob_scaled:
             log.info('Time for scaling: %6.2fs' % self.t_scale)
         return
@@ -310,18 +330,7 @@ class RegQPInteriorPointSolver(object):
         return
 
     def solve(self, **kwargs):
-        """Solve.
-
-        Accepted input keyword arguments are
-
-        :keywords:
-
-          :itermax:  The maximum allowed number of iterations (default: 10n)
-          :tolerance:  Stopping tolerance (default: 1.0e-6)
-          :PredictorCorrector:  Use the predictor-corrector method
-                                (default: `True`). If set to `False`, a variant
-                                of the long-step method is used. The long-step
-                                method is generally slower and less robust.
+        """Solve the problem.
 
         :returns:
 
@@ -339,10 +348,6 @@ class RegQPInteriorPointSolver(object):
 
         """
         qp = self.qp
-        itermax = self.itermax
-        tolerance = self.stoptol
-        PredictorCorrector = self.predcor
-        check_infeasible = self.check_infeas
 
         # Transfer pointers for convenience.
         on = qp.original_n
@@ -352,10 +357,8 @@ class RegQPInteriorPointSolver(object):
         Q = self.Q
         H = self.H
 
-        regpr = self.regpr
-        regdu = self.regdu
-        regpr_min = self.regpr_min
-        regdu_min = self.regdu_min
+        primal_reg = self.primal_reg
+        dual_reg = self.dual_reg
 
         # Obtain initial point from Mehrotra's heuristic.
         (x, y, z) = self.set_initial_guess(**kwargs)
@@ -367,8 +370,10 @@ class RegQPInteriorPointSolver(object):
         # Initialize steps in dual variables.
         dz = np.zeros(ns)
 
-        # Allocate room for right-hand side of linear systems.
-        rhs = self.initialize_rhs()
+        # Initialize linear system
+        self.H = self.initialize_kkt_matrix()
+        self.rhs = self.initialize_rhs()
+
         finished = False
         iter = 0
 
@@ -423,20 +428,20 @@ class RegQPInteriorPointSolver(object):
 
             # At the first iteration, initialize perturbation vectors
             # (q=primal, r=dual).
-            # Should probably get rid of q when regpr=0 and of r when regdu=0.
+            # Should probably get rid of q when primal_reg=0 and of r when dual_reg=0.
             if iter == 0:
-                if regpr > 0:
-                    q = dFeas / regpr
-                    qNorm = dResid / regpr
+                if primal_reg > 0:
+                    q = dFeas / primal_reg
+                    qNorm = dResid / primal_reg
                     rho_q = dResid
                 else:
                     q = dFeas
                     qNorm = dResid
                     rho_q = 0.0
                 rho_q_min = rho_q
-                if regdu > 0:
-                    r = -pFeas / regdu
-                    rNorm = pResid / regdu
+                if dual_reg > 0:
+                    r = -pFeas / dual_reg
+                    rNorm = pResid / dual_reg
                     del_r = pResid
                 else:
                     r = -pFeas
@@ -451,17 +456,17 @@ class RegQPInteriorPointSolver(object):
 
             else:
 
-                if regdu > 0:
-                    regdu = regdu / 10
-                    regdu = max(regdu, regdu_min)
-                if regpr > 0:
-                    regpr = regpr / 10
-                    regpr = max(regpr, regpr_min)
+                if dual_reg > 0:
+                    dual_reg = dual_reg / 10
+                    dual_reg = max(dual_reg, dual_reg_min)
+                if primal_reg > 0:
+                    primal_reg = primal_reg / 10
+                    primal_reg = max(primal_reg, primal_reg_min)
 
                 # Check for infeasible problem.
-                if check_infeasible:
-                    if mu < tolerance / 100 * mu0 and \
-                            rho_q > 1. / tolerance / 1.0e+6 * rho_q_min:
+                if self.check_infeas:
+                    if mu < self.stoptol / 100 * mu0 and \
+                            rho_q > 1. / self.stoptol / 1.0e+6 * rho_q_min:
                         pr_infeas_count += 1
                         if pr_infeas_count > 1 and pr_last_iter == iter - 1:
                             if pr_infeas_count > 6:
@@ -474,8 +479,8 @@ class RegQPInteriorPointSolver(object):
                     else:
                         pr_infeas_count = 0
 
-                    if mu < tolerance / 100 * mu0 and \
-                            del_r > 1. / tolerance / 1.0e+6 * del_r_min:
+                    if mu < self.stoptol / 100 * mu0 and \
+                            del_r > 1. / self.stoptol / 1.0e+6 * del_r_min:
                         du_infeas_count += 1
                         if du_infeas_count > 1 and du_last_iter == iter - 1:
                             if du_infeas_count > 6:
@@ -493,13 +498,13 @@ class RegQPInteriorPointSolver(object):
                                           dResid, cResid, rgap, qNorm,
                                           rNorm)
 
-            if kktResid <= tolerance:
+            if kktResid <= self.stoptol:
                 status = 'Optimal solution found'
                 short_status = 'opt'
                 finished = True
                 continue
 
-            if iter >= itermax:
+            if iter >= self.itermax:
                 status = 'Maximum number of iterations reached'
                 short_status = 'iter'
                 finished = True
@@ -520,7 +525,7 @@ class RegQPInteriorPointSolver(object):
             nb_bump = 0
             while not factorized and not degenerate:
 
-                self.update_linear_system(s, z, regpr, regdu)
+                self.update_linear_system(s, z, primal_reg, dual_reg)
                 self.log.debug('Factorizing')
                 self.LBL.factorize(H)
                 factorized = True
@@ -528,17 +533,16 @@ class RegQPInteriorPointSolver(object):
                 # If the augmented matrix does not have full rank, bump up the
                 # regularization parameters.
                 if not self.LBL.isFullRank:
-                    if self.verbose:
-                        self.log.info('Primal-Dual Matrix Rank Deficient' +
+                    self.log.debug('Primal-Dual Matrix Rank Deficient' +
                                       '... bumping up reg parameters')
 
-                    if regpr == 0. and regdu == 0.:
+                    if primal_reg == 0. and dual_reg == 0.:
                         degenerate = True
                     else:
-                        if regpr > 0:
-                            regpr *= 100
-                        if regdu > 0:
-                            regdu *= 100
+                        if primal_reg > 0:
+                            primal_reg *= 100
+                        if dual_reg > 0:
+                            dual_reg *= 100
                         nb_bump += 1
                         degenerate = nb_bump > self.bump_max
                     factorized = False
@@ -550,7 +554,7 @@ class RegQPInteriorPointSolver(object):
                 finished = True
                 continue
 
-            if PredictorCorrector:
+            if self.mehrotra_pc:
                 # Use Mehrotra predictor-corrector method.
                 # Compute affine-scaling step, i.e. with centering = 0.
                 self.set_affine_scaling_rhs(rhs, pFeas, dFeas, s, z)
@@ -595,7 +599,7 @@ class RegQPInteriorPointSolver(object):
             # Compute fraction-to-the-boundary factor.
             tau = max(.9995, 1.0 - mu)
 
-            if PredictorCorrector:
+            if self.mehrotra_pc:
                 # Compute actual stepsize using Mehrotra's heuristic.
                 mult = 0.1
 
@@ -627,7 +631,7 @@ class RegQPInteriorPointSolver(object):
 
             # Display data.
             output_line += self.format2 % (mu, alpha_p, alpha_d,
-                                           nres, regpr, regdu, rho_q,
+                                           nres, primal_reg, dual_reg, rho_q,
                                            del_r, mins, minz, maxs)
             self.log.info(output_line)
 
@@ -641,13 +645,13 @@ class RegQPInteriorPointSolver(object):
             r += alpha_d * dy
             qNorm = norm2(q)
             rNorm = norm2(r)
-            if regpr > 0:
-                rho_q = regpr * qNorm / (1 + self.normc)
+            if primal_reg > 0:
+                rho_q = primal_reg * qNorm / (1 + self.normc)
                 rho_q_min = min(rho_q_min, rho_q)
             else:
                 rho_q = 0.0
-            if regdu > 0:
-                del_r = regdu * rNorm / (1 + self.normb)
+            if dual_reg > 0:
+                del_r = dual_reg * rNorm / (1 + self.normb)
                 del_r_min = min(del_r_min, del_r)
             else:
                 del_r = 0.0
@@ -713,7 +717,7 @@ class RegQPInteriorPointSolver(object):
 
         # Set up augmented system matrix and factorize it.
         self.set_initial_guess_system()
-        self.LBL = LBLContext(self.H, sqd=self.regdu > 0)  # Analyze+factorize
+        self.LBL = LBLContext(self.H, sqd=self.dual_reg > 0)  # Analyze+factorize
 
         # Assemble first right-hand side and solve.
         rhs = self.set_initial_guess_rhs()
@@ -818,7 +822,7 @@ class RegQPInteriorPointSolver(object):
         rhs[on:] = 0.0
         return
 
-    def update_linear_system(self, s, z, regpr, regdu):
+    def update_linear_system(self, s, z, primal_reg, dual_reg):
         """Update linear system for current iteration."""
         self.log.debug('Updating linear system for current iteration')
         qp = self.qp
@@ -826,10 +830,10 @@ class RegQPInteriorPointSolver(object):
         m = qp.m
         on = qp.original_n
         diagQ = self.diagQ
-        self.H.put(-diagQ - regpr, range(on))
-        self.H.put(-z / s - regpr, range(on, n))
-        if regdu > 0:
-            self.H.put(regdu, range(n, n + m))
+        self.H.put(-diagQ - primal_reg, range(on))
+        self.H.put(-z / s - primal_reg, range(on, n))
+        if dual_reg > 0:
+            self.H.put(dual_reg, range(n, n + m))
         return
 
     def solve_system(self, rhs, itref_threshold=1.0e-5, nitrefmax=5):
@@ -852,15 +856,15 @@ class RegQPInteriorPointSolver(object):
         self.lres_history.append(self.LBL.relRes)
 
         # Estimate matrix l2-norm condition number.
-        if self.condest:
+        if self.cond_est:
             rhsNorm = norm2(rhs)
             solnNorm = norm2(self.LBL.x)
             Hop = PysparseLinearOperator(self.H, symmetric=True)
             normH, _ = normest(Hop, tol=1.0e-3)
             if rhsNorm > 0 and solnNorm > 0:
-                self.condest_history.append(solnNorm * normH / rhsNorm)
+                self.cond_est_history.append(solnNorm * normH / rhsNorm)
             else:
-                self.condest_history.append(1.)
+                self.cond_est_history.append(1.)
             self.normest_history.append(normH)
 
         nr = norm2(self.LBL.residual)
@@ -932,18 +936,16 @@ class RegQPInteriorPointSolver3x3(RegQPInteriorPointSolver):
             :scale: Perform row and column equilibration of the constraint
                     matrix [A1 A2] prior to solution (default: `True`).
 
-            :regpr: Initial value of primal regularization parameter
+            :primal_reg: Initial value of primal regularization parameter
                     (default: `1.0`).
 
-            :regdu: Initial value of dual regularization parameter
+            :dual_reg: Initial value of dual regularization parameter
                     (default: `1.0`).
 
             :bump_max: Max number of times regularization parameters are
                        increased when a factorization fails (default 5).
 
             :logger_name: Name of a logger to control output.
-
-            :verbose: Turn on verbose mode (default `False`).
         """
         super(RegQPInteriorPointSolver3x3, self).__init__(*args, **kwargs)
 
@@ -1000,18 +1002,18 @@ class RegQPInteriorPointSolver3x3(RegQPInteriorPointSolver):
         on = self.qp.original_n
         return np.zeros(2 * n + m - on)
 
-    def update_linear_system(self, s, z, regpr, regdu, **kwargs):
+    def update_linear_system(self, s, z, primal_reg, dual_reg, **kwargs):
         """Update linear system."""
         qp = self.qp
         n = qp.n
         m = qp.m
         on = qp.original_n
         diagQ = self.diagQ
-        self.H.put(-diagQ - regpr, range(on))
-        if regpr > 0:
-            self.H.put(-regpr, range(on, n))
-        if regdu > 0:
-            self.H.put(regdu, range(n, n + m))
+        self.H.put(-diagQ - primal_reg, range(on))
+        if primal_reg > 0:
+            self.H.put(-primal_reg, range(on, n))
+        if dual_reg > 0:
+            self.H.put(dual_reg, range(n, n + m))
         self.H.put(np.sqrt(z), range(n + m, 2 * n + m - on), range(on, n))
         self.H.put(s, range(n + m, 2 * n + m - on))
         return
