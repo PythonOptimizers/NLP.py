@@ -134,7 +134,7 @@ class PySparseSlackModel(SlackModel):
 
         return J
 
-    def hess(self, x, z=None, obj_num=0, *args, **kwargs):
+    def hess(self, x, z=None, *args, **kwargs):
         """Evaluate Lagrangian Hessian at (x, z)."""
         model = self.model
         if isinstance(model, QuasiNewtonModel):
@@ -149,5 +149,5 @@ class PySparseSlackModel(SlackModel):
 
         H = psp(nrow=self.n, ncol=self.n, symmetric=True,
                 sizeHint=self.model.nnzh)
-        H[:on, :on] = model.hess(x[:on], z, obj_num, *args, **kwargs)
+        H[:on, :on] = model.hess(x[:on], z, *args, **kwargs)
         return H
