@@ -14,6 +14,7 @@ except ImportError:
     from hsl.solvers.pyma27 import PyMa27Solver as LBLContext
 from hsl.scaling.mc29 import mc29ad
 from nlp.model.pysparsemodel import PySparseSlackModel
+from pysparse.sparse import PysparseMatrix
 from nlp.tools.norms import norm2, norm_infty, normest
 from nlp.tools.timing import cputime
 import logging
@@ -140,7 +141,7 @@ class RegQPInteriorPointSolver(object):
         self.all_ub.sort()
 
         # Compute indices of the range variables within the all_lb and
-        # all_ub arrays
+        # all_ub arrays (used in the initial point calculation)
         self.range_in_lb = []
         self.range_in_ub = []
         for k in qp.rangeB:
@@ -158,7 +159,7 @@ class RegQPInteriorPointSolver(object):
         # ** DEV NOTE: Moved scaling call to solve function **
 
         # It will be more efficient to keep the diagonal of Q around.
-        self.diagQ = self.Q.take(range(qp.original_n))
+        self.diagQ = self.Q.take(range(self.n))
 
         # We perform the analyze phase on the augmented system only once.
         # self.LBL will be initialized in solve().
@@ -792,7 +793,7 @@ class RegQPInteriorPointSolver(object):
         self.LBL.refine(rhs_primal_init, tol=itref_threshold, nitref=nitref)
 
         # Extract copy of x solution
-        x_guess = step[:n].copy()
+        x_guess = self.LBL.x[:n].copy()
 
         # Assemble second right-hand side and solve.
         rhs_dual_init = np.zeros(self.sys_size)
@@ -802,9 +803,9 @@ class RegQPInteriorPointSolver(object):
         self.LBL.refine(rhs_dual_init, tol=itref_threshold, nitref=nitref)
 
         # Extract copies of y and z solutions
-        y = -step[n:n+m].copy()
-        zL_guess = -step[n+m:n+m+nl].copy()
-        zU_guess = step[n+m+nl:].copy()
+        y = -self.LBL.x[n:n+m].copy()
+        zL_guess = -self.LBL.x[n+m:n+m+nl].copy()
+        zU_guess = self.LBL.x[n+m+nl:].copy()
 
         # Use Mehrotra's heuristic to compute a strictly feasible starting
         # point for all x and z
