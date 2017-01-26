@@ -118,11 +118,40 @@ class RegQPInteriorPointSolver(object):
 
         self.qp = qp
 
+        # Solver cannot support QPs with fixed variables at this time
+        if qp.nfixedB > 0:
+            msg = 'The QP model must not contain fixed variables'
+            raise ValueError(msg)
+
+        # Compute the size of the linear system in the problem,
+        # i.e., count the number of finite bounds and fixed variables
+        # present in the problem to determine the true size
+        self.n = qp.n
+        self.m = qp.m
+        self.nl = qp.nlowerB + qp.nrangeB
+        self.nu = qp.nupperB + qp.nrangeB
+        self.sys_size = self.n + self.m + self.nl + self.nu
+
+        # Some useful index lists for associating variables with bound
+        # multipliers
+        self.all_lb = qp.lowerB + qp.rangeB
+        self.all_lb.sort()
+        self.all_ub = qp.upperB + qp.rangeB
+        self.all_ub.sort()
+
+        # Compute indices of the range variables within the all_lb and
+        # all_ub arrays
+        self.range_in_lb = []
+        self.range_in_ub = []
+        for k in qp.rangeB:
+            self.range_in_lb.append(self.all_lb.index(k))
+            self.range_in_ub.append(self.all_ub.index(k))
+
         # Collect basic info about the problem.
         zero_pt = np.zeros(qp.n)
         self.q = qp.obj(zero_pt)    # Constant term in the objective
-        self.b = -qp.cons(zero_pt)  # Constraint Right-hand side
-        self.c = qp.grad(zero_pt)   # Objective cost vector
+        self.b = -qp.cons(zero_pt)  # Constant term in the constraints
+        self.c = qp.grad(zero_pt)   # Vector term in the objective
         self.A = qp.jac(zero_pt)    # Jacobian including slack blocks
         self.Q = qp.hess(zero_pt)   # Hessian including slack blocks
 
@@ -722,9 +751,10 @@ class RegQPInteriorPointSolver(object):
         are strictly within their bounds. See [Methrotra, 1992] for details.
         """
         qp = self.qp
-        n = qp.n
-        m = qp.m
-        sys_size = 3*n + m    # Use given upper and lower bounds
+        n = self.n
+        m = self.m
+        nl = self.nl
+        nu = self.nu
 
         # Some parameters for iterative refinement in the LBL solve
         itref_threshold = 1.e-5
@@ -733,24 +763,29 @@ class RegQPInteriorPointSolver(object):
         self.log.debug('Computing initial guess')
 
         # Set up augmented system matrix
-        H_init = PysparseMatrix(size=sys_size,
-            sizeHint=4*qp.n + self.A.nnz + self.Q.nnz,
+        H_init = PysparseMatrix(size=self.sys_size,
+            sizeHint=2*nl + 2*nu + self.A.nnz + self.Q.nnz,
             symmetric=True)
+
         H_init[:n, :n] = self.Q
         H_init[n:n+m, :n] = self.A
+
         H_init.put(self.diagQ + self.primal_reg_min**0.5, range(n))
         H_init.put(-self.dual_reg_min**0.5, range(n,n+m))
-        # ** Identity blocks still to be added **
+
+        H_init.put(-1.0, range(n+m, n+m+nl+nu))
+        H_init.put(1.0, range(n+m, n+m+nl), self.all_lb)
+        H_init.put(1.0, range(n+m+nl, n+m+nl+nu), self.all_ub)
 
         # Analyze and factorize the system
         self.LBL = LBLContext(H_init,
             sqd=(self.primal_reg > 0.0 and self.dual_reg > 0.0))
 
         # Assemble first right-hand side
-        rhs_primal_init = np.zeros(sys_size)
+        rhs_primal_init = np.zeros(self.sys_size)
         rhs_primal_init[n:n+m] = self.b
-        rhs_primal_init[n+m:2*n+m] = qp.Lvar
-        rhs_primal_init[2*n+m:] = qp.Uvar
+        rhs_primal_init[n+m:n+m+nl] = qp.Lvar[self.all_lb]
+        rhs_primal_init[n+m+nl:] = qp.Uvar[self.all_ub]
 
         # Solve system and collect solution
         self.LBL.solve(rhs_primal_init)
@@ -760,51 +795,59 @@ class RegQPInteriorPointSolver(object):
         x_guess = step[:n].copy()
 
         # Assemble second right-hand side and solve.
-        rhs_dual_init = np.zeros(sys_size)
+        rhs_dual_init = np.zeros(self.sys_size)
         rhs_dual_init[:n] = -self.c
 
         self.LBL.solve(rhs_dual_init)
         self.LBL.refine(rhs_dual_init, tol=itref_threshold, nitref=nitref)
 
         # Extract copies of y and z solutions
-        y_guess = -step[n:n+m].copy()
-        zL_guess = -step[n+m:2*n+m].copy()
-        zU_guess = step[2*n+m:].copy()
+        y = -step[n:n+m].copy()
+        zL_guess = -step[n+m:n+m+nl].copy()
+        zU_guess = step[n+m+nl:].copy()
 
-        # ** Refactor the next block, taking infinite bounds into account **
+        # Use Mehrotra's heuristic to compute a strictly feasible starting
+        # point for all x and z
+        rL_guess = x_guess[self.all_lb] - qp.Lvar[self.all_lb]
+        rU_guess = qp.Uvar[self.all_ub] - x_guess[self.all_ub]
 
-        # If there are no inequality constraints, this is it.
-        if n == on:
-            return (x, y, z)
+        drL = max(0.0, -1.5*np.min(rL_guess))
+        drU = max(0.0, -1.5*np.min(rU_guess))
+        dzL = max(0.0, -1.5*np.min(zL_guess))
+        dzU = max(0.0, -1.5*np.min(zU_guess))
 
-        # Use Mehrotra's heuristic to ensure (s,z) > 0.
-        if np.all(s >= 0):
-            dp = 0.0
-        else:
-            dp = -1.5 * min(s[s < 0])
-        if np.all(z >= 0):
-            dd = 0.0
-        else:
-            dd = -1.5 * min(z[z < 0])
+        rL_shift = drL + 0.5*np.dot(rL_guess + drL, zL_guess + dzL) / \
+            ((zL_guess + dzL).sum())
+        zL_shift = dzL + 0.5*np.dot(rL_guess + drL, zL_guess + dzL) / \
+            ((rL_guess + drL).sum())
+        rU_shift = drU + 0.5*np.dot(rU_guess + drU, zU_guess + dzU) / \
+            ((zU_guess + dzU).sum())
+        zU_shift = dzU + 0.5*np.dot(rU_guess + drU, zU_guess + dzU) / \
+            ((rU_guess + drU).sum())
 
-        if dp == 0.0:
-            dp = 1.5
-        if dd == 0.0:
-            dd = 1.5
+        rL = rL_guess + rL_shift
+        rU = rU_guess + rU_shift
+        zL = zL_guess + zL_shift
+        zU = zU_guess + zU_shift
 
-        es = sum(s + dp)
-        ez = sum(z + dd)
-        xs = sum((s + dp) * (z + dd))
+        x = x_guess
+        x[self.all_lb] = qp.Lvar[self.all_lb] + rL
+        x[self.all_ub] = qp.Uvar[self.all_ub] - rU
 
-        dp += 0.5 * xs / ez
-        dd += 0.5 * xs / es
-        s += dp
-        z += dd
+        # An additional normalization step for the range-bounded variables
+        #
+        # This normalization prevents the shift computed in rL and rU from
+        # taking us outside the feasible range, and yields the same final
+        # x value whether we take (Lvar + rL*norm) or (Uvar - rU*norm) as x
+        intervals = qp.Uvar[qp.rangeB] - qp.Lvar[qp.rangeB]
+        norm_factors = intervals / (intervals + rL_shift[self.range_in_lb] + rU_shift[self.range_in_ub])
+        x[qp.rangeB] = qp.Lvar[qp.rangeB] + rL[self.range_in_lb]*norm_factors
 
-        if not np.all(s > 0) or not np.all(z > 0):
+        # Check strict feasibility
+        if not np.all(x > qp.Lvar and x < qp.Uvar and zL > 0 and zU > 0):
             raise ValueError('Initial point not strictly feasible')
 
-        return (x, y, z)
+        return (x, y, zL, zU)
 
     def max_step_length(self, x, d):
         """Compute step length to boundary from x in direction d.
