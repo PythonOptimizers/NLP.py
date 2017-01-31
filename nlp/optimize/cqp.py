@@ -148,6 +148,22 @@ class RegQPInteriorPointSolver(object):
         self.A = qp.jac(zero_pt)    # Jacobian including slack blocks
         self.Q = qp.hess(zero_pt)   # Hessian including slack blocks
 
+        # A few useful norms to measure algorithm convergence
+        self.normb = norm2(self.b)
+        self.normc = norm2(self.c)
+        self.normA = self.A.matrix.norm('fro')
+        self.normQ = self.Q.matrix.norm('fro')
+
+        # Initialize the augmented system matrix
+        # This matrix object is used both in calculating the starting point
+        # and the steps in the algorithm. Blocks common to all problems,
+        # i.e., the sparse Q and A matrices, are also put in place
+        self.H = PysparseMatrix(size=self.sys_size,
+            sizeHint=2*self.nl + 2*self.nu + self.A.nnz + self.Q.nnz,
+            symmetric=True)
+        self.H[:n, :n] = self.Q
+        self.H[n:n+m, :n] = self.A
+
         # ** DEV NOTE: Moved scaling call to solve function **
 
         # It will be more efficient to keep the diagonal of Q around.
@@ -165,6 +181,10 @@ class RegQPInteriorPointSolver(object):
 
         # Max number of times regularization parameters are increased.
         self.bump_max = kwargs.get('bump_max', 5)
+
+        # Parameters for the LBL solve and iterative refinement
+        self.itref_threshold = 1.e-5
+        self.nitref = 5
 
         # Check input parameters.
         if self.primal_reg < 0.0 or self.dual_reg < 0.0:
@@ -197,7 +217,6 @@ class RegQPInteriorPointSolver(object):
         self.itermax = kwargs.get('itermax', max(100, 10*qp.n))
         self.stoptol = kwargs.get('stoptol', 1.0e-6)
         self.mehrotra_pc = kwargs.get('mehrotra_pc', True)
-        self.check_infeas = kwargs.get('check_infeas', True)
 
         return
 
@@ -263,7 +282,7 @@ class RegQPInteriorPointSolver(object):
             log.info('Time for scaling: %6.2fs' % self.t_scale)
         return
 
-    def scale(self, **kwargs):
+    def scale(self):
         """Compute scaling factors for the problem.
 
         If the solver is run with scaling, this function computes scaling
@@ -273,15 +292,13 @@ class RegQPInteriorPointSolver(object):
         In effect the original problem::
 
             minimize    c' x + 1/2 x' Q x
-            subject to  Aᴱ x = bᴱ
-                        Aᴵ x - s = bᴵ
+            subject to  Ax = b
                         (bounds)
 
         is converted to::
 
-            minimize    (Cˣc)' x + 1/2 x' (CˣQCˣ') x
-            subject to  Rᴱ Aᴱ Cˣ x = Rᴱ bᴱ
-                        Rᴵ Aᴵ Cˣ x - Rᴵ I Cˢ s = Rᴵ bᴵ
+            minimize    (Cc)' x + 1/2 x' (CQC') x
+            subject to  R A C x = R b
                         (bounds)
 
         where the diagonal matrices R and C contain row and column scaling
@@ -361,177 +378,147 @@ class RegQPInteriorPointSolver(object):
 
             :x:            final iterate
             :y:            final value of the Lagrange multipliers associated
-                           to `A1 x + A2 s = b`
-            :z:            final value of the Lagrange multipliers associated
-                           to `s >= 0`
+                           to `Ax = b`
+            :zL:           final value of lower-bound multipliers
+            :zU:           final value of upper-bound multipliers
             :obj_value:    final cost
             :iter:         total number of iterations
-            :kktResid:     final relative residual
+            :kktRes:     final relative residual
             :solve_time:   time to solve the QP
             :status:       string describing the exit status.
             :short_status: short version of status, used for printing.
 
         """
         qp = self.qp
+        Lvar = qp.Lvar
+        Uvar = qp.Uvar
 
         # Transfer pointers for convenience.
-        on = qp.original_n
         A = self.A
         b = self.b
         c = self.c
         Q = self.Q
+        nl = self.nl
+        nu = self.nu
 
         primal_reg = self.primal_reg
         dual_reg = self.dual_reg
 
         # Obtain initial point from Mehrotra's heuristic.
-        (self.x, self.y, self.z) = self.set_initial_guess(**kwargs)
+        (self.x, self.y, self.zL, self.zU) = self.set_initial_guess()
 
-        # Slack variables are the trailing variables in x.
-        s = x[on:]
-        ns = qp.nSlacks
-
-        # Initialize steps in dual variables.
-        dz = np.zeros(ns)
-
-        # Initialize linear system
-        self.H = self.initialize_kkt_matrix()
-        self.rhs = self.initialize_rhs()
-
-        finished = False
+        exitOpt = False
+        exitInfeasP = False
+        exitInfeasD = False
+        exitIter = False
+        exitReg = False
         iter = 0
+
+        # Display header and initial point info
+        self.log.info(self.header)
+        self.log.info('-' * len(self.header))
+        output_line = self.format1 % (iter, cx + 0.5 * xQx, pResid,
+                                      dResid, cResid, rgap, qNorm,
+                                      rNorm)
+        output_line += self.format2 % (mu, alpha_p, alpha_d,
+                                       nres, primal_reg, dual_reg, rho_q,
+                                       del_r, mins, minz, maxs)
+        self.log.info(output_line)
 
         setup_time = cputime()
 
         # Main loop.
-        while not finished:
+        while not (exitOpt or exitInfeasP or exitInfeasD or exitIter or exitReg):
+
+            iter += 1
 
             # Display initial header every so often.
-            if iter % 50 == 0:
+            if iter % 20 == 0:
                 self.log.info(self.header)
                 self.log.info('-' * len(self.header))
 
             # Compute residuals.
-            pFeas = A * x - b
-            comp = s * z
-            sz = sum(comp)                # comp   = Sz
-            Qx = Q * x[:on]
-            dFeas = y * A
-            dFeas[:on] -= self.c + Qx    # dFeas1 = A1'y - c - Qx
-            dFeas[on:] += z                            # dFeas2 = A2'y + z
+            pFeas = A*x - b
+            dFeas = Q*x + c - y*A - zL + zU
+            lComp = zL*(x[self.all_lb] - Lvar[self.all_lb])
+            uComp = zU*(Uvar[self.all_ub] - x[self.all_ub])
 
-            # Compute duality measure.
-            if ns > 0:
-                mu = sz / ns
+            # Compute complementarity measure.
+            if (nl + nu) > 0:
+                mu = (lComp.sum() + uComp.sum()) / (nl + nu)
             else:
                 mu = 0.0
 
-            self.mu_history.append(mu)
-
             # Compute residual norms and scaled residual norms.
-            pResid = norm2(pFeas)
-            spResid = pResid / (1 + self.normb + self.normA + self.normQ)
-            dResid = norm2(dFeas)
-            sdResid = dResid / (1 + self.normc + self.normA + self.normQ)
-            if ns > 0:
-                cResid = norm_infty(comp) / (self.normbc + self.normA +
-                                             self.normQ)
-            else:
-                cResid = 0.0
+            pFeasNorm = norm2(pFeas)
+            pFeasNorm_scaled = pFeasNorm / (1 + self.normb + self.normA + self.normQ)
+            dFeasNorm = norm2(dFeas)
+            dFeasNorm_scaled = dFeasNorm / (1 + self.normc + self.normA + self.normQ)
 
             # Compute relative duality gap.
-            cx = np.dot(c, x[:on])
-            xQx = np.dot(x[:on], Qx)
-            by = np.dot(b, y)
-            rgap = cx + xQx - by
-            rgap = abs(rgap) / (1 + abs(cx) + self.normA + self.normQ)
-            rgap2 = mu / (1 + abs(cx) + self.normA + self.normQ)
+            dual_gap = mu / (1 + abs(np.dot(c,x)) + self.normA + self.normQ)
 
             # Compute overall residual for stopping condition.
-            kktResid = max(spResid, sdResid, rgap2)
+            kktRes = max(pFeasNorm_scaled, dFeasNorm_scaled, dual_gap)
 
             # At the first iteration, initialize perturbation vectors
-            # (q=primal, r=dual).
-            # Should probably get rid of q when primal_reg=0 and of r when dual_reg=0.
-            if iter == 0:
-                if primal_reg > 0:
-                    q = dFeas / primal_reg
-                    qNorm = dResid / primal_reg
-                    rho_q = dResid
-                else:
-                    q = dFeas
-                    qNorm = dResid
-                    rho_q = 0.0
-                rho_q_min = rho_q
-                if dual_reg > 0:
-                    r = -pFeas / dual_reg
-                    rNorm = pResid / dual_reg
-                    del_r = pResid
-                else:
-                    r = -pFeas
-                    rNorm = pResid
-                    del_r = 0.0
-                del_r_min = del_r
-                pr_infeas_count = 0  # Used to detect primal infeasibility.
-                du_infeas_count = 0  # Used to detect dual infeasibility.
-                pr_last_iter = 0
-                du_last_iter = 0
+            # that regularize the problem.
+            # Use r for the primal feasibility and s for the dual feasibility.
+            # Also, initialize some parameters for infeasibility detection
+            if iter == 1:
+                s = -dFeas / primal_reg
+                r = -pFeas / dual_reg
+                pr_infeas_count = 0
+                du_infeas_count = 0
+                dFeasMin = dFeasNorm
+                pFeasMin = pFeasNorm
                 mu0 = mu
 
             else:
 
-                if dual_reg > 0:
-                    dual_reg = dual_reg / 10
-                    dual_reg = max(dual_reg, dual_reg_min)
-                if primal_reg > 0:
-                    primal_reg = primal_reg / 10
-                    primal_reg = max(primal_reg, primal_reg_min)
+                dual_reg = max(dual_reg / 10, dual_reg_min)
+                primal_reg = max(primal_reg / 10, primal_reg_min)
 
                 # Check for infeasible problem.
-                if self.check_infeas:
-                    if mu < self.stoptol / 100 * mu0 and \
-                            rho_q > 1. / self.stoptol / 1.0e+6 * rho_q_min:
-                        pr_infeas_count += 1
-                        if pr_infeas_count > 1 and pr_last_iter == iter - 1:
-                            if pr_infeas_count > 6:
-                                status = 'Problem seems to be (locally) dual'
-                                status += ' infeasible'
-                                short_status = 'dInf'
-                                finished = True
-                                continue
-                        pr_last_iter = iter
-                    else:
-                        pr_infeas_count = 0
+                if mu < 0.01 * self.stoptol * mu0 and \
+                        pFeasNorm > pFeasMin * (1.e-6 / self.stoptol) :
+                    pr_infeas_count += 1
+                    if pr_infeas_count > 6:
+                        status = 'Problem seems to be (locally) dual'
+                        status += ' infeasible'
+                        short_status = 'dInf'
+                        exitInfeasD = True
+                        continue
+                else:
+                    pr_infeas_count = 0
 
-                    if mu < self.stoptol / 100 * mu0 and \
-                            del_r > 1. / self.stoptol / 1.0e+6 * del_r_min:
-                        du_infeas_count += 1
-                        if du_infeas_count > 1 and du_last_iter == iter - 1:
-                            if du_infeas_count > 6:
-                                status = 'Problem seems to be (locally) primal'
-                                status += ' infeasible'
-                                short_status = 'pInf'
-                                finished = True
-                                continue
-                        du_last_iter = iter
-                    else:
-                        du_infeas_count = 0
+                if mu < 0.01 * self.stoptol * mu0 and \
+                        dFeasNorm > dFeasMin * (1.e-6 / self.stoptol) :
+                    du_infeas_count += 1
+                    if du_infeas_count > 6:
+                        status = 'Problem seems to be (locally) primal'
+                        status += ' infeasible'
+                        short_status = 'pInf'
+                        exitInfeasP = True
+                        continue
+                else:
+                    du_infeas_count = 0
 
             # Display objective and residual data.
             output_line = self.format1 % (iter, cx + 0.5 * xQx, pResid,
                                           dResid, cResid, rgap, qNorm,
                                           rNorm)
 
-            if kktResid <= self.stoptol:
+            if kktRes <= self.stoptol:
                 status = 'Optimal solution found'
                 short_status = 'opt'
-                finished = True
+                exitOpt = True
                 continue
 
             if iter >= self.itermax:
                 status = 'Maximum number of iterations reached'
                 short_status = 'iter'
-                finished = True
+                exitIter = True
                 continue
 
             # Record some quantities for display
@@ -575,7 +562,7 @@ class RegQPInteriorPointSolver(object):
             if not self.LBL.isFullRank and degenerate:
                 status = 'Unable to regularize sufficiently.'
                 short_status = 'degn'
-                finished = True
+                exitReg = True
                 continue
 
             if self.mehrotra_pc:
@@ -694,14 +681,14 @@ class RegQPInteriorPointSolver(object):
         self.cResid = cResid
         self.dResid = dResid
         self.rgap = rgap
-        self.kktResid = kktResid
+        self.kktRes = kktRes
         self.solve_time = solve_time
         self.status = status
         self.short_status = short_status
 
         return
 
-    def set_initial_guess(self, **kwargs):
+    def set_initial_guess(self):
         """Compute initial guess according the Mehrotra's heuristic.
 
         Initial values of x are computed as the solution to the
@@ -751,30 +738,19 @@ class RegQPInteriorPointSolver(object):
         nl = self.nl
         nu = self.nu
 
-        # Some parameters for iterative refinement in the LBL solve
-        itref_threshold = 1.e-5
-        nitref = 5
-
         self.log.debug('Computing initial guess')
 
         # Set up augmented system matrix
-        H_init = PysparseMatrix(size=self.sys_size,
-            sizeHint=2*nl + 2*nu + self.A.nnz + self.Q.nnz,
-            symmetric=True)
+        self.H.put(self.diagQ + self.primal_reg_min**0.5, range(n))
+        self.H.put(-self.dual_reg_min**0.5, range(n,n+m))
 
-        H_init[:n, :n] = self.Q
-        H_init[n:n+m, :n] = self.A
-
-        H_init.put(self.diagQ + self.primal_reg_min**0.5, range(n))
-        H_init.put(-self.dual_reg_min**0.5, range(n,n+m))
-
-        H_init.put(-1.0, range(n+m, n+m+nl+nu))
-        H_init.put(1.0, range(n+m, n+m+nl), self.all_lb)
-        H_init.put(1.0, range(n+m+nl, n+m+nl+nu), self.all_ub)
+        self.H.put(-1.0, range(n+m, n+m+nl+nu))
+        self.H.put(1.0, range(n+m, n+m+nl), self.all_lb)
+        self.H.put(1.0, range(n+m+nl, n+m+nl+nu), self.all_ub)
 
         # Analyze and factorize the system
-        self.LBL = LBLContext(H_init,
-            sqd=(self.primal_reg > 0.0 and self.dual_reg > 0.0))
+        self.LBL = LBLContext(self.H,
+            sqd=(self.primal_reg_min > 0.0 and self.dual_reg_min > 0.0))
 
         # Assemble first right-hand side
         rhs_primal_init = np.zeros(self.sys_size)
@@ -784,7 +760,8 @@ class RegQPInteriorPointSolver(object):
 
         # Solve system and collect solution
         self.LBL.solve(rhs_primal_init)
-        self.LBL.refine(rhs_primal_init, tol=itref_threshold, nitref=nitref)
+        self.LBL.refine(rhs_primal_init, tol=self.itref_threshold,
+            nitref=self.nitref)
 
         # Extract copy of x solution
         x_guess = self.LBL.x[:n].copy()
@@ -796,7 +773,8 @@ class RegQPInteriorPointSolver(object):
         rhs_dual_init[n+m+nl:] = qp.Uvar[self.all_ub]
 
         self.LBL.solve(rhs_dual_init)
-        self.LBL.refine(rhs_dual_init, tol=itref_threshold, nitref=nitref)
+        self.LBL.refine(rhs_dual_init, tol=self.itref_threshold,
+            nitref=self.nitref)
 
         # Extract copies of y and z solutions
         y = -self.LBL.x[n:n+m].copy()
