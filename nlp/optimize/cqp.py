@@ -27,21 +27,13 @@ class RegQPInteriorPointSolver(object):
     Solve a convex quadratic program of the form::
 
        minimize    q + cᵀx + ½ xᵀ Q x
-       subject to  Aᴱ x = bᴱ
-                   Aᴵ x - s = bᴵ                                  (QP)
+       subject to  Ax = b                                  (QP)
+                   l ≤ x ≤ u
 
-                     l ≤ x ≤ u
-                    cᴸ ≤ sᴸ
-                         sᵁ ≤ cᵁ
-                   cᴿᴸ ≤ sᴿ ≤ cᴿᵁ
-
-    where Q is a symmetric positive semi-definite matrix, the variables
-    x are the original problem variables and s are slack variables. Any
+    where Q is a symmetric positive semi-definite matrix. Any
     quadratic program may be converted to the above form by instantiation
     of the `SlackModel` class. The conversion to the slack formulation
-    is mandatory in this implementation. In the following code, the
-    distinction between x and s is essentially hidden in `SlackModel` class
-    methods.
+    is mandatory in this implementation.
 
     The method is a variant of Mehrotra's predictor-corrector method where
     steps are computed by solving the primal-dual system in augmented form.
@@ -732,13 +724,15 @@ class RegQPInteriorPointSolver(object):
 
             minimize    ½ x'ᵀQx' + ½||zᴸ||² + ½||zᵁ||²
             subject to  Qx' + c - Aᵀy - zᴸ + zᵁ = 0
+                        zᴸ = -(x - l)
+                        zᵁ = -(u - x)
 
         which can be computed as the solution to the augmented system::
 
             [ Q   Aᵀ   I   I] [x']   [-c]
             [ A   0    0   0] [y ]   [ 0]
-            [ I   0   -I   0] [zᴸ] = [ 0]
-            [ I   0    0  -I] [zᵁ]   [ 0].
+            [ I   0   -I   0] [zᴸ] = [ l]
+            [ I   0    0  -I] [zᵁ]   [ u].
 
         To ensure stability and nonsingularity when A does not have full row
         rank or Q is singluar, the (1,1) block is perturbed by
@@ -798,6 +792,8 @@ class RegQPInteriorPointSolver(object):
         # Assemble second right-hand side and solve.
         rhs_dual_init = np.zeros(self.sys_size)
         rhs_dual_init[:n] = -self.c
+        rhs_dual_init[n+m:n+m+nl] = qp.Lvar[self.all_lb]
+        rhs_dual_init[n+m+nl:] = qp.Uvar[self.all_ub]
 
         self.LBL.solve(rhs_dual_init)
         self.LBL.refine(rhs_dual_init, tol=itref_threshold, nitref=nitref)
@@ -841,11 +837,12 @@ class RegQPInteriorPointSolver(object):
         # taking us outside the feasible range, and yields the same final
         # x value whether we take (Lvar + rL*norm) or (Uvar - rU*norm) as x
         intervals = qp.Uvar[qp.rangeB] - qp.Lvar[qp.rangeB]
-        norm_factors = intervals / (intervals + rL_shift[self.range_in_lb] + rU_shift[self.range_in_ub])
+        norm_factors = intervals / (intervals + rL_shift + rU_shift)
         x[qp.rangeB] = qp.Lvar[qp.rangeB] + rL[self.range_in_lb]*norm_factors
 
         # Check strict feasibility
-        if not np.all(x > qp.Lvar and x < qp.Uvar and zL > 0 and zU > 0):
+        if not np.all(x > qp.Lvar) or not np.all(x < qp.Uvar) or \
+        not np.all(zL > 0) or not np.all(zU > 0):
             raise ValueError('Initial point not strictly feasible')
 
         return (x, y, zL, zU)
