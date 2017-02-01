@@ -504,71 +504,109 @@ class RegQPInteriorPointSolver(object):
                 dx_aff = self.LBL.x[:n]
                 dy_aff = -self.LBL.x[n:n+m]
                 dzL_aff = -(zL**0.5)*self.LBL.x[n+m:n+m+nl]
-                dzU_aff = -(zU**0.5)*self.LBL.x[n+m:n+m+nl]
-
-                # ** Carry on from here **
+                dzU_aff = (zU**0.5)*self.LBL.x[n+m:n+m+nl]
 
                 # Compute largest allowed primal and dual stepsizes.
-                (alpha_p, ip) = self.max_step_length(s, ds)
-                (alpha_d, ip) = self.max_step_length(z, dz)
+                (alpha_p, index_p, is_up_p) = self.max_primal_step_length(dx_aff)
+                (alpha_d, index_d, is_up_d) = self.max_dual_step_length(dzL_aff, dzU_aff)
 
                 # Estimate duality gap after affine-scaling step.
-                muAff = np.dot(s + alpha_p * ds, z + alpha_d * dz) / ns
-                sigma = (muAff / mu)**3
+                lComp_aff = (zL + alpha_d*dzL_aff)*(x[self.all_lb] + \
+                    alpha_p*dx_aff[self.all_lb] - Lvar[self.all_lb])
+                uComp_aff = (zU + alpha_d*dzU_aff)*(Uvar[self.all_ub] - \
+                    x[self.all_ub] - alpha_p*dx_aff[self.all_ub])
+                mu_aff = (lComp_aff.sum() + uComp_aff.sum()) / (nl + nu)
+                sigma = (mu_aff / mu)**3
 
                 # Incorporate predictor information for corrector step.
-                # Only update rhs[on:n]; the rest of the vector did not change.
-                comp += ds * dz
-                comp -= sigma * mu
-                self.update_corrector_rhs(rhs, s, z, comp)
+                rhs = rhs_affine.copy()
+                rhs[n+m:n+m+nl] += sigma*mu*(zL**-0.5)
+                rhs[n+m+nl:] -= sigma*mu*(zU**-0.5)
             else:
                 # Use long-step method: Compute centering parameter.
                 sigma = min(0.1, 100 * mu)
-                comp -= sigma * mu
 
                 # Assemble rhs.
-                self.update_long_step_rhs(rhs, pFeas, dFeas, comp, s)
+                rhs = np.zeros(self.sys_size)
+                rhs[:n] = -dFeas
+                rhs[n:n+m] = -pFeas
+                rhs[n+m:n+m+nl] = -(zL**0.5)*lComp + sigma*mu*(zL**-0.5)
+                rhs[n+m+nl:] = (zU**0.5)*uComp - sigma*mu*(zU**-0.5)
 
             # Solve augmented system.
-            (step, nres, neig) = self.solve_system(rhs)
+            self.solve_system(rhs)
 
             # Recover step.
-            dx, ds, dy, dz = self.get_dxsyz(step, x, s, y, z, comp)
+            dx = self.LBL.x[:n]
+            dy = -self.LBL.x[n:n+m]
+            dzL = -(zL**0.5)*self.LBL.x[n+m:n+m+nl]
+            dzU = (zU**0.5)*self.LBL.x[n+m:n+m+nl]
 
             # Compute largest allowed primal and dual stepsizes.
-            (alpha_p, ip) = self.max_step_length(s, ds)
-            (alpha_d, id) = self.max_step_length(z, dz)
+            (alpha_p, index_p, is_up_p) = self.max_primal_step_length(dx)
+            (alpha_d, index_d, is_up_d) = self.max_dual_step_length(dzL, dzU)
 
-            # Compute fraction-to-the-boundary factor.
+            # Define fraction-to-the-boundary factor and compute the true
+            # step sizes
             tau = max(.995, 1.0 - mu)
 
             if self.mehrotra_pc:
                 # Compute actual stepsize using Mehrotra's heuristic.
-                mult = 0.1
 
-                # ip=-1 if ds ≥ 0, and id=-1 if dz ≥ 0
-                if (ip != -1 or id != -1) and ip != id:
-                    mu_tmp = np.dot(s + alpha_p * ds, z + alpha_d * dz) / ns
+                if index_p == index_d and is_up_p == is_up_d:
+                    # If both are -1, do nothing, since the step remains
+                    # strictly feasible and alpha_p = alpha_d = 1
+                    if index_p != -1:
+                        # There is a division by zero in Mehrotra's heuristic
+                        # Fall back on classical rule.
+                        alpha_p *= tau
+                        alpha_d *= tau
+                else:
+                    mult = 0.01
+                    lComp_temp = (zL + alpha_d*dzL_aff)*(x[self.all_lb] + \
+                        alpha_p*dx_aff[self.all_lb] - Lvar[self.all_lb])
+                    uComp_temp = (zU + alpha_d*dzU_aff)*(Uvar[self.all_ub] - \
+                        x[self.all_ub] - alpha_p*dx_aff[self.all_ub])
+                    mu_temp = (lComp_temp.sum() + uComp_temp.sum()) / (nl + nu)
 
-                if ip != -1 and ip != id:
-                    zip = z[ip] + alpha_d * dz[ip]
-                    gamma_p = ((mult * mu_tmp - s[ip] * zip) /
-                               (alpha_p * ds[ip] * zip))
-                    alpha_p *= max(1 - mult, gamma_p)
+                    # If alpha_p < 1.0, compute a gamma_p such that the
+                    # complementarity of the updated (x,z) pair is mult*mu_temp
+                    if index_p != -1:
+                        if is_up_p:
+                            ref_index = self.all_ub.index(index_p)
+                            gamma_p = mult * mu_temp
+                            gamma_p /= (zU[ref_index] + alpha_d*dzU[ref_index])
+                            gamma_p -= (Uvar[index_p] - x[index_p])
+                            gamma_p /= -(alpha_p*dx[index_p])
+                        else:
+                            ref_index = self.all_lb.index(index_p)
+                            gamma_p = mult * mu_temp
+                            gamma_p /= (zL[ref_index] + alpha_d*dzL[ref_index])
+                            gamma_p -= (x[index_p] - Lvar[index_p])
+                            gamma_p /= (alpha_p*dx[index_p])
 
-                if id != -1 and ip != id:
-                    sid = s[id] + alpha_p * ds[id]
-                    gamma_d = ((mult * mu_tmp - z[id] * sid) /
-                               (alpha_d * dz[id] * sid))
-                    alpha_d *= max(1 - mult, gamma_d)
+                        alpha_p *= max(1 - mult, gamma_p)
 
-                if ip == id and ip != -1:
-                    # There is a division by zero in Mehrotra's heuristic
-                    # Fall back on classical rule.
-                    alpha_p *= tau
-                    alpha_d *= tau
+                    # If alpha_d < 1.0, compute a gamma_d such that the
+                    # complementarity of the updated (x,z) pair is mult*mu_temp
+                    if index_d != -1:
+                        if is_up_d:
+                            ref_index = self.all_ub.index(index_d)
+                            gamma_d = mult * mu_temp
+                            gamma_d /= (Uvar[index_d] - x[index_d] - alpha_p*dx[index_d])
+                            gamma_d -= zU[ref_index]
+                            gamma_d /= (alpha_d*dzU[ref_index])
+                        else:
+                            ref_index = self.all_lb.index(index_d)
+                            gamma_d = mult * mu_temp
+                            gamma_d /= (x[index_d] + alpha_p*dx[index_d] - Lvar[index_d])
+                            gamma_d -= zL[ref_index]
+                            gamma_d /= (alpha_d*dzL[ref_index])
+
+                        alpha_d *= max(1 - mult, gamma_d)
 
             else:
+                # Use the standard fraction-to-the-boundary rule
                 alpha_p *= tau
                 alpha_d *= tau
 
@@ -579,26 +617,23 @@ class RegQPInteriorPointSolver(object):
             self.log.info(output_line)
 
             # Update iterates and perturbation vectors.
-            x += alpha_p * dx    # This also updates slack variables.
+            x += alpha_p * dx
             y += alpha_d * dy
-            z += alpha_d * dz
-            q *= (1 - alpha_p)
-            q += alpha_p * dx
+            zL += alpha_d * dzL
+            zU += alpha_d * dzU
+
+            s *= (1 - alpha_p)
+            s += alpha_p * dx
             r *= (1 - alpha_d)
             r += alpha_d * dy
-            qNorm = norm2(q)
+            sNorm = norm2(s)
             rNorm = norm2(r)
-            if primal_reg > 0:
-                rho_q = primal_reg * qNorm / (1 + self.normc)
-                rho_q_min = min(rho_q_min, rho_q)
-            else:
-                rho_q = 0.0
-            if dual_reg > 0:
-                del_r = dual_reg * rNorm / (1 + self.normb)
-                del_r_min = min(del_r_min, del_r)
-            else:
-                del_r = 0.0
-            iter += 1
+
+            dFeasNorm = primal_reg * sNorm / (1 + self.normc)
+            dFeasMin = min(dFeasMin, dFeasNorm)
+
+            pFeasNorm = dual_reg * rNorm / (1 + self.normb)
+            pFeasMin = min(pFeasMin, pFeasNorm)
 
         solve_time = cputime() - setup_time
 
@@ -745,28 +780,74 @@ class RegQPInteriorPointSolver(object):
 
         return (x, y, zL, zU)
 
-    def max_step_length(self, x, d):
-        """Compute step length to boundary from x in direction d.
+    def max_primal_step_length(self, dx):
+        """Compute the maximum step to the boundary in the primal variables.
 
-        It computes the max step length from x to the boundary of the
-        nonnegative orthant in the direction d. Also return the component index
-        responsible for cutting the steplength the most (or -1 if no such index
-        exists).
+        The function also returns the component index that produces the
+        minimum steplength. (If the minimum steplength is 1, this value is
+        set to -1.)
         """
-        self.log.debug('Computing step length to boundary')
-        whereneg = np.where(d < 0)[0]
-        if len(whereneg) > 0:
-            dxneg = -x[whereneg] / d[whereneg]
-            kmin = np.argmin(dxneg)
-            stepmax = min(1.0, dxneg[kmin])
-            if stepmax == 1.0:
-                kmin = -1
-            else:
-                kmin = whereneg[kmin]
+        self.log.debug('Computing primal step length')
+        xl = self.x[self.all_lb]
+        xu = self.x[self.all_ub]
+        l = self.Lvar[self.all_lb]
+        u = self.Uvar[self.all_ub]
+
+        if self.nl == 0:
+            alphaL_max = 1.0
         else:
-            stepmax = 1.0
-            kmin = -1
-        return (stepmax, kmin)
+            alphaL = np.where(dx[self.all_lb] < 0, -(xl - l)/dx, 1.)
+            alphaL_max = alphaL.min()
+
+        if self.nu == 0:
+            alphaU_max = 1.0
+        else:
+            alphaU = np.where(dx[self.all_ub] > 0, (u - xu)/dx, 1.)
+            alphaU_max = alphaU.min()
+
+        if min(alphaL_max,alphaU_max) == 1.0:
+            return (1.0, -1, False)
+
+        if alphaL_max < alphaU_max:
+            alpha_max = alphaL_max
+            ind_max = self.all_lb[np.argmin(alphaL)]
+            is_upper = False
+        else:
+            alpha_max = alphaU_max
+            ind_max = self.all_ub[np.argmin(alphaU)]
+            is_upper = True
+
+        return (alpha_max, ind_max, is_upper)
+
+    def max_dual_step_length(self, dzL, dzU):
+        """Compute the maximum step to the boundary in the dual variables."""
+        self.log.debug('Computing dual step length')
+
+        if self.nl == 0:
+            alphaL_max = 1.0
+        else:
+            alphaL = np.where(dzL < 0, -self.zL/dzL, 1.)
+            alphaL_max = alphaL.min()
+
+        if self.nu == 0:
+            alphaU_max = 1.0
+        else:
+            alphaU = np.where(dzU < 0, -self.zU/dzU, 1.)
+            alphaU_max = alphaU.min()
+
+        if min(alphaL_max,alphaU_max) == 1.0:
+            return (1.0, -1, False)
+
+        if alphaL_max < alphaU_max:
+            alpha_max = alphaL_max
+            ind_max = self.all_lb[np.argmin(alphaL)]
+            is_upper = False
+        else:
+            alpha_max = alphaU_max
+            ind_max = self.all_ub[np.argmin(alphaU)]
+            is_upper = True
+
+        return (alpha_max, ind_max, is_upper)
 
     def set_system_matrix(self, initial_guess=False):
         """Set up the linear system matrix."""
@@ -835,39 +916,6 @@ class RegQPInteriorPointSolver(object):
             else:
                 self.cond_est = 1.0
 
-        return
-
-    def get_affine_scaling_dxsyz(self, step, x, s, y, z):
-        """Split `step` into steps along x, s, y and z.
-
-        his function returns *references*, not copies. Only dz is computed
-        from `step` without being a subvector of `step`.
-        """
-        self.log.debug('Recovering affine-scaling step')
-        m, n = self.A.shape
-        on = self.qp.original_n
-        dx = step[:n]
-        ds = dx[on:]
-        dy = step[n:]
-        dz = -z * (1 + ds / s)
-        return (dx, ds, dy, dz)
-
-    def update_corrector_rhs(self, rhs, s, z, comp):
-        """Update right-hand side for corrector step."""
-        self.log.debug('Updating right-hand side for corrector step')
-        m, n = self.A.shape
-        on = self.qp.original_n
-        rhs[on:n] += comp / s - z
-        return
-
-    def update_long_step_rhs(self, rhs, pFeas, dFeas, comp, s):
-        """Update right-hand side when using long step."""
-        self.log.debug('Updating right-hand side for long step')
-        m, n = self.A.shape
-        on = self.qp.original_n
-        rhs[:n] = -dFeas
-        rhs[on:n] += comp / s
-        rhs[n:] = -pFeas
         return
 
 
