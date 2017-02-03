@@ -161,8 +161,11 @@ class RegQPInteriorPointSolver(object):
         self.H = PysparseMatrix(size=self.sys_size,
             sizeHint=2*self.nl + 2*self.nu + self.A.nnz + self.Q.nnz,
             symmetric=True)
-        self.H[:n, :n] = self.Q
-        self.H[n:n+m, :n] = self.A
+        self.H[:self.n, :self.n] = self.Q
+        self.H[self.n:self.n+self.m, :self.n] = self.A
+
+        # Initialize RHS
+        self.rhs = np.zeros(self.sys_size)
 
         # ** DEV NOTE: Moved scaling call to solve function **
 
@@ -342,30 +345,9 @@ class RegQPInteriorPointSolver(object):
         zL = self.zL
         zU = self.zU
 
-        # Calculate optimality conditions at initial point:
-        # Residuals and complementarity
+        # Calculate optimality conditions at initial point
         qpObj = self.q + np.dot(c,x) + 0.5*np.dot(x,Q*x)
-        pFeas = A*x - b
-        dFeas = Q*x + c - y*A - zL + zU
-        lComp = zL*(x[self.all_lb] - Lvar[self.all_lb])
-        uComp = zU*(Uvar[self.all_ub] - x[self.all_ub])
-
-        if (nl + nu) > 0:
-            mu = (lComp.sum() + uComp.sum()) / (nl + nu)
-        else:
-            mu = 0.0
-
-        # Scaled residual norms
-        pFeasNorm = norm2(pFeas)
-        pResid = pFeasNorm / (1 + self.normb + self.normA + self.normQ)
-        dFeasNorm = norm2(dFeas)
-        dResid = dFeasNorm / (1 + self.normc + self.normA + self.normQ)
-
-        # Relative duality gap
-        dual_gap = mu / (1 + abs(np.dot(c,x)) + self.normA + self.normQ)
-
-        # Overall residual for stopping condition
-        kktRes = max(pResid, dResid, dual_gap)
+        kktRes = self.check_optimality()
         exitOpt = kktRes <= self.stoptol
 
         # Set up other stopping conditions
@@ -376,21 +358,21 @@ class RegQPInteriorPointSolver(object):
 
         # Compute initial perturbation vectors
         # Note: r is primal feas. perturbation, s is dual feas. perturbation
-        s = -dFeas / self.primal_reg
-        r = -pFeas / self.dual_reg
+        s = -self.dFeas / self.primal_reg
+        r = -self.pFeas / self.dual_reg
         pr_infeas_count = 0
         du_infeas_count = 0
-        rho_s = dFeasNorm / (1 + self.normc)
+        rho_s = norm2(self.dFeas) / (1 + self.normc)
         rho_s_min = rho_s
-        delta_r = pFeasNorm / (1 + self.normb)
+        delta_r = norm2(self.pFeas) / (1 + self.normb)
         delta_r_min = delta_r
-        mu0 = mu
+        mu0 = self.mu
 
         # Display header and initial point info
         self.log.info(self.header)
         self.log.info('-' * len(self.header))
-        output_line = self.format0 % (iter, qpObj, pResid, dResid, dual_gap,
-                                     rho_s, delta_r, ' ', ' ')
+        output_line = self.format0 % (iter, qpObj, self.pResid, self.dResid,
+                                     self.dual_gap, rho_s, delta_r, ' ', ' ')
         self.log.info(output_line)
 
         setup_time = cputime()
@@ -424,18 +406,9 @@ class RegQPInteriorPointSolver(object):
             # Compute the right-hand side based on the step computation method
             if self.mehrotra_pc:
                 # Compute affine-scaling step, i.e. with centering = 0.
-                rhs_affine = np.zeros(self.sys_size)
-                rhs_affine[:n] = -dFeas
-                rhs_affine[n:n+m] = -pFeas
-                rhs_affine[n+m:n+m+nl] = -(zL**0.5)*lComp
-                rhs_affine[n+m+nl:] = (zU**0.5)*uComp
-
-                self.solve_system(rhs_affine)
-
-                dx_aff = self.LBL.x[:n]
-                dy_aff = -self.LBL.x[n:n+m]
-                dzL_aff = -(zL**0.5)*self.LBL.x[n+m:n+m+nl]
-                dzU_aff = (zU**0.5)*self.LBL.x[n+m:n+m+nl]
+                self.set_system_rhs(sigma=0.0)
+                self.solve_system(self.rhs)
+                dx_aff, dy_aff, dzL_aff, dzU_aff = self.extract_xyz()
 
                 # Compute largest allowed primal and dual stepsizes.
                 (alpha_p, index_p, is_up_p) = self.max_primal_step_length(dx_aff)
@@ -447,31 +420,18 @@ class RegQPInteriorPointSolver(object):
                 uComp_aff = (zU + alpha_d*dzU_aff)*(Uvar[self.all_ub] - \
                     x[self.all_ub] - alpha_p*dx_aff[self.all_ub])
                 mu_aff = (lComp_aff.sum() + uComp_aff.sum()) / (nl + nu)
-                sigma = (mu_aff / mu)**3
 
                 # Incorporate predictor information for corrector step.
-                rhs = rhs_affine.copy()
-                rhs[n+m:n+m+nl] += sigma*mu*(zL**-0.5)
-                rhs[n+m+nl:] -= sigma*mu*(zU**-0.5)
+                sigma_pc = (mu_aff / self.mu)**3
+                self.set_system_rhs(sigma=sigma_pc)
             else:
                 # Use long-step method: Compute centering parameter.
-                sigma = min(0.1, 100 * mu)
-
-                # Assemble rhs.
-                rhs = np.zeros(self.sys_size)
-                rhs[:n] = -dFeas
-                rhs[n:n+m] = -pFeas
-                rhs[n+m:n+m+nl] = -(zL**0.5)*lComp + sigma*mu*(zL**-0.5)
-                rhs[n+m+nl:] = (zU**0.5)*uComp - sigma*mu*(zU**-0.5)
+                sigma_ls = min(0.1, 100 * self.mu)
+                self.set_system_rhs(sigma=sigma_ls)
 
             # Solve augmented system.
-            self.solve_system(rhs)
-
-            # Recover step.
-            dx = self.LBL.x[:n]
-            dy = -self.LBL.x[n:n+m]
-            dzL = -(zL**0.5)*self.LBL.x[n+m:n+m+nl]
-            dzU = (zU**0.5)*self.LBL.x[n+m:n+m+nl]
+            self.solve_system(self.rhs)
+            dx, dy, dzL, dzU = self.extract_xyz()
 
             # Update regularization parameters before calculating the 
             # step sizes
@@ -484,7 +444,7 @@ class RegQPInteriorPointSolver(object):
 
             # Define fraction-to-the-boundary factor and compute the true
             # step sizes
-            tau = max(.995, 1.0 - mu)
+            tau = max(.995, 1.0 - self.mu)
 
             if self.mehrotra_pc:
                 # Compute actual stepsize using Mehrotra's heuristic.
@@ -564,7 +524,7 @@ class RegQPInteriorPointSolver(object):
             delta_r_min = min(delta_r_min, delta_r)
 
             # Check for dual infeasibility
-            if mu < 0.01 * self.stoptol * mu0 and \
+            if self.mu < 0.01 * self.stoptol * mu0 and \
                     rho_s > rho_s_min * (1.e-6 / self.stoptol) :
                 du_infeas_count += 1
                 if du_infeas_count > 6:
@@ -573,7 +533,7 @@ class RegQPInteriorPointSolver(object):
                 du_infeas_count = 0
 
             # Check for primal infeasibility
-            if mu < 0.01 * self.stoptol * mu0 and \
+            if self.mu < 0.01 * self.stoptol * mu0 and \
                     delta_r > delta_r_min * (1.e-6 / self.stoptol) :
                 pr_infeas_count += 1
                 if pr_infeas_count > 6:
@@ -584,27 +544,7 @@ class RegQPInteriorPointSolver(object):
 
             # Check for optimality at new point
             qpObj = self.q + np.dot(c,x) + 0.5*np.dot(x,Q*x)
-            pFeas = A*x - b
-            dFeas = Q*x + c - y*A - zL + zU
-            lComp = zL*(x[self.all_lb] - Lvar[self.all_lb])
-            uComp = zU*(Uvar[self.all_ub] - x[self.all_ub])
-
-            if (nl + nu) > 0:
-                mu = (lComp.sum() + uComp.sum()) / (nl + nu)
-            else:
-                mu = 0.0
-
-            # Scaled residual norms
-            pFeasNorm = norm2(pFeas)
-            pResid = pFeasNorm / (1 + self.normb + self.normA + self.normQ)
-            dFeasNorm = norm2(dFeas)
-            dResid = dFeasNorm / (1 + self.normc + self.normA + self.normQ)
-
-            # Relative duality gap
-            dual_gap = mu / (1 + abs(np.dot(c,x)) + self.normA + self.normQ)
-
-            # Overall residual for stopping condition
-            kktRes = max(pResid, dResid, dual_gap)
+            kktRes = self.check_optimality()
             exitOpt = kktRes <= self.stoptol
 
             # Check iteration limit
@@ -614,8 +554,9 @@ class RegQPInteriorPointSolver(object):
             if iter % 20 == 0:
                 self.log.info(self.header)
                 self.log.info('-' * len(self.header))
-            output_line = self.format % (iter, qpObj, pResid, dResid, dual_gap,
-                                         rho_s, delta_r, alpha_p, alpha_d)
+            output_line = self.format % (iter, qpObj, self.pResid, self.dResid,
+                                         self.dual_gap, rho_s, delta_r,
+                                         alpha_p, alpha_d)
             self.log.info(output_line)
 
         # Determine solution time
@@ -644,9 +585,6 @@ class RegQPInteriorPointSolver(object):
 
         # Transfer final values to class members.
         self.iter = iter
-        self.pResid = pResid
-        self.dResid = dResid
-        self.dual_gap = dual_gap
         self.kktRes = kktRes
         self.solve_time = solve_time
         self.status = status
@@ -698,47 +636,40 @@ class RegQPInteriorPointSolver(object):
         The values of x and z are subsequently adjusted to ensure they
         are strictly within their bounds. See [Methrotra, 1992] for details.
         """
-        qp = self.qp
         n = self.n
         m = self.m
         nl = self.nl
         nu = self.nu
+        Lvar = self.qp.Lvar
+        Uvar = self.qp.Uvar
 
         self.log.debug('Computing initial guess')
 
         # Set up augmented system matrix
         self.set_system_matrix(initial_guess=True)
 
-        # Analyze and factorize the system
+        # Analyze and factorize the matrix
         self.LBL = LBLContext(self.H,
             sqd=(self.primal_reg_min > 0.0 and self.dual_reg_min > 0.0))
 
         # Assemble first right-hand side
-        rhs_primal_init = np.zeros(self.sys_size)
-        rhs_primal_init[n:n+m] = self.b
-        rhs_primal_init[n+m:n+m+nl] = qp.Lvar[self.all_lb]
-        rhs_primal_init[n+m+nl:] = qp.Uvar[self.all_ub]
+        self.set_system_rhs(initial_guess=True)
 
         # Solve system and collect solution
-        self.solve_system(rhs_primal_init)
-        x_guess = self.LBL.x[:n].copy()
+        self.solve_system(self.rhs)
+        x_guess, _, _, _ = self.extract_xyz(initial_guess=True)
 
         # Assemble second right-hand side
-        rhs_dual_init = np.zeros(self.sys_size)
-        rhs_dual_init[:n] = -self.c
-        rhs_dual_init[n+m:n+m+nl] = qp.Lvar[self.all_lb]
-        rhs_dual_init[n+m+nl:] = qp.Uvar[self.all_ub]
+        self.set_system_rhs(initial_guess=True, dual=True)
 
         # Solve system and collect solution
-        self.solve_system(rhs_dual_init)
-        y = -self.LBL.x[n:n+m].copy()
-        zL_guess = -self.LBL.x[n+m:n+m+nl].copy()
-        zU_guess = self.LBL.x[n+m+nl:].copy()
+        self.solve_system(self.rhs)
+        _, y, zL_guess, zU_guess = self.extract_xyz(initial_guess=True)
 
         # Use Mehrotra's heuristic to compute a strictly feasible starting
         # point for all x and z
-        rL_guess = x_guess[self.all_lb] - qp.Lvar[self.all_lb]
-        rU_guess = qp.Uvar[self.all_ub] - x_guess[self.all_ub]
+        rL_guess = x_guess[self.all_lb] - Lvar[self.all_lb]
+        rU_guess = Uvar[self.all_ub] - x_guess[self.all_ub]
 
         drL = max(0.0, -1.5*np.min(rL_guess))
         drU = max(0.0, -1.5*np.min(rU_guess))
@@ -760,20 +691,20 @@ class RegQPInteriorPointSolver(object):
         zU = zU_guess + zU_shift
 
         x = x_guess
-        x[self.all_lb] = qp.Lvar[self.all_lb] + rL
-        x[self.all_ub] = qp.Uvar[self.all_ub] - rU
+        x[self.all_lb] = Lvar[self.all_lb] + rL
+        x[self.all_ub] = Uvar[self.all_ub] - rU
 
         # An additional normalization step for the range-bounded variables
         #
         # This normalization prevents the shift computed in rL and rU from
         # taking us outside the feasible range, and yields the same final
         # x value whether we take (Lvar + rL*norm) or (Uvar - rU*norm) as x
-        intervals = qp.Uvar[qp.rangeB] - qp.Lvar[qp.rangeB]
+        intervals = Uvar[self.qp.rangeB] - Lvar[self.qp.rangeB]
         norm_factors = intervals / (intervals + rL_shift + rU_shift)
-        x[qp.rangeB] = qp.Lvar[qp.rangeB] + rL[self.range_in_lb]*norm_factors
+        x[self.qp.rangeB] = Lvar[self.qp.rangeB] + rL[self.range_in_lb]*norm_factors
 
         # Check strict feasibility
-        if not np.all(x > qp.Lvar) or not np.all(x < qp.Uvar) or \
+        if not np.all(x > Lvar) or not np.all(x < Uvar) or \
         not np.all(zL > 0) or not np.all(zU > 0):
             raise ValueError('Initial point not strictly feasible')
 
@@ -789,19 +720,21 @@ class RegQPInteriorPointSolver(object):
         self.log.debug('Computing primal step length')
         xl = self.x[self.all_lb]
         xu = self.x[self.all_ub]
-        l = self.Lvar[self.all_lb]
-        u = self.Uvar[self.all_ub]
+        dxl = dx[self.all_lb]
+        dxu = dx[self.all_ub]
+        l = self.qp.Lvar[self.all_lb]
+        u = self.qp.Uvar[self.all_ub]
 
         if self.nl == 0:
             alphaL_max = 1.0
         else:
-            alphaL = np.where(dx[self.all_lb] < 0, -(xl - l)/dx, 1.)
+            alphaL = np.where(dxl < 0, -(xl - l)/dxl, 1.)
             alphaL_max = alphaL.min()
 
         if self.nu == 0:
             alphaU_max = 1.0
         else:
-            alphaU = np.where(dx[self.all_ub] > 0, (u - xu)/dx, 1.)
+            alphaU = np.where(dxu > 0, (u - xu)/dxu, 1.)
             alphaU_max = alphaU.min()
 
         if min(alphaL_max,alphaU_max) == 1.0:
@@ -892,6 +825,35 @@ class RegQPInteriorPointSolver(object):
         self.H.put(-self.dual_reg, range(n,n+m))
         return
 
+    def set_system_rhs(self, initial_guess=False, **kwargs):
+        """Set up the linear system right-hand side."""
+        n = self.n
+        m = self.m
+        nl = self.nl
+        self.log.debug('Setting up linear system right-hand side')
+
+        if initial_guess:
+            self.rhs[n+m:n+m+nl] = self.qp.Lvar[self.all_lb]
+            self.rhs[n+m+nl:] = self.qp.Uvar[self.all_ub]
+            if not kwargs.get('dual',False):
+                # Primal initial point RHS
+                self.rhs[:n] = 0.
+                self.rhs[n:n+m] = self.b
+            else:
+                # Dual initial point RHS
+                self.rhs[:n] = -self.c
+                self.rhs[n:n+m] = 0.
+        else:
+            sigma = kwargs.get('sigma',0.0)
+            self.rhs[:n] = -self.dFeas
+            self.rhs[n:n+m] = -self.pFeas
+            self.rhs[n+m:n+m+nl] = -(self.zL**0.5)*self.lComp
+            self.rhs[n+m:n+m+nl] += sigma*self.mu*(self.zL**-0.5)
+            self.rhs[n+m+nl:] = (self.zU**0.5)*self.uComp
+            self.rhs[n+m+nl:] -= sigma*self.mu*(self.zU**-0.5)
+
+        return
+
     def solve_system(self, rhs):
         """Solve the augmented system with right-hand side `rhs`.
 
@@ -916,6 +878,55 @@ class RegQPInteriorPointSolver(object):
                 self.cond_est = 1.0
 
         return
+
+    def extract_xyz(self, initial_guess=False):
+        """Return the partitioned solution vector"""
+        n = self.n
+        m = self.m
+        nl = self.nl
+
+        x = self.LBL.x[:n].copy()
+        y = -self.LBL.x[n:n+m].copy()
+        if initial_guess:
+            zL = -self.LBL.x[n+m:n+m+nl].copy()
+            zU = self.LBL.x[n+m+nl:].copy()
+        else:
+            zL = -(self.zL**0.5)*self.LBL.x[n+m:n+m+nl].copy()
+            zU = (self.zU**0.5)*self.LBL.x[n+m+nl:].copy()
+
+        return x,y,zL,zU
+
+    def check_optimality(self):
+        """Compute feasibility and complementarity for the current point"""
+        x = self.x
+        y = self.y
+        zL = self.zL
+        zU = self.zU
+        Lvar = self.qp.Lvar
+        Uvar = self.qp.Uvar
+
+        # Residual and complementarity vectors
+        self.pFeas = self.A*x - self.b
+        self.dFeas = self.Q*x + self.c - y*self.A
+        self.dFeas[self.all_lb] -= zL
+        self.dFeas[self.all_ub] += zU
+        self.lComp = zL*(x[self.all_lb] - Lvar[self.all_lb])
+        self.uComp = zU*(Uvar[self.all_ub] - x[self.all_ub])
+
+        pFeasNorm = norm2(self.pFeas)
+        dFeasNorm = norm2(self.dFeas)
+        if (self.nl + self.nu) > 0:
+            self.mu = (self.lComp.sum() + self.uComp.sum()) / (self.nl + self.nu)
+        else:
+            self.mu = 0.0
+
+        # Scaled residual norms and duality gap
+        self.pResid = pFeasNorm / (1 + self.normb + self.normA + self.normQ)
+        self.dResid = dFeasNorm / (1 + self.normc + self.normA + self.normQ)
+        self.dual_gap = self.mu / (1 + abs(np.dot(self.c,x)) + self.normA + self.normQ)
+
+        # Overall residual for stopping condition
+        return max(self.pResid, self.dResid, self.dual_gap)
 
 
 class RegQPInteriorPointSolver3x3(RegQPInteriorPointSolver):
