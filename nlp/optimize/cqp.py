@@ -103,7 +103,7 @@ class RegQPInteriorPointSolver(object):
             raise TypeError(msg+msg2)
 
         # Grab logger if one was configured.
-        logger_name = kwargs.get('logger_name', 'cqp.solver')
+        logger_name = kwargs.get('logger_name', 'nlp.cqp')
         self.log = logging.getLogger(logger_name)
 
         # Either none, abs, or mc29
