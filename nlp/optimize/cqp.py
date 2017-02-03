@@ -846,10 +846,10 @@ class RegQPInteriorPointSolver(object):
             sigma = kwargs.get('sigma',0.0)
             self.rhs[:n] = -self.dFeas
             self.rhs[n:n+m] = -self.pFeas
-            self.rhs[n+m:n+m+nl] = -(self.zL**0.5)*self.lComp
-            self.rhs[n+m:n+m+nl] += sigma*self.mu*(self.zL**-0.5)
-            self.rhs[n+m+nl:] = (self.zU**0.5)*self.uComp
-            self.rhs[n+m+nl:] -= sigma*self.mu*(self.zU**-0.5)
+            self.rhs[n+m:n+m+nl] = -self.lComp + sigma*self.mu
+            self.rhs[n+m:n+m+nl] *= self.zL**-0.5
+            self.rhs[n+m+nl:] = self.uComp - sigma*self.mu
+            self.rhs[n+m+nl:] *= self.zU**-0.5
 
         return
 
