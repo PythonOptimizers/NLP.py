@@ -203,20 +203,12 @@ class RegQPInteriorPointSolver(object):
         self.itref_threshold = 1.e-5
         self.nitref = 5
 
-        # ** DEV NOTE: This is WAY TOO MUCH to display on one line **
-        # ** to be trimmed later **
-
         # Initialize format strings for display
-        fmt_hdr = '%-4s  %9s' + '  %-8s' * 6 + \
-                  '  %-7s  %-4s  %-4s' + '  %-8s' * 8
-        self.header = fmt_hdr % ('Iter', 'Cost', 'pResid', 'dResid', 'cResid',
-                                 'rGap', 'qNorm', 'rNorm', 'Mu', 'AlPr',
-                                 'AlDu', 'LS Resid', 'RegPr', 'RegDu', 'Rho q',
-                                 'Del r', 'Min(s)', 'Min(z)', 'Max(s)')
-        self.format1 = '%-4d  %9.2e'
-        self.format1 += '  %-8.2e' * 6
-        self.format2 = '  %-7.1e  %-4.2f  %-4.2f'
-        self.format2 += '  %-8.2e' * 8
+        fmt_hdr = '%-4s' + '  %-8s' * 8
+        self.header = fmt_hdr % ('Iter', 'qpObj', 'pFeas', 'dFeas', 'Mu',
+                                 'rho_s', 'delta_r', 'alpha_p', 'alpha_d')
+        self.format = '%-4d' + '  %-8.2e' * 8
+        self.format0 = '%-4d' + '  %-8.2e' * 6 + '  %-8s' * 2
 
         # Additional options to collect
         self.estimate_cond = kwargs.get('estimate_cond', False)
@@ -325,7 +317,6 @@ class RegQPInteriorPointSolver(object):
                            to `Ax = b`
             :zL:           final value of lower-bound multipliers
             :zU:           final value of upper-bound multipliers
-            :obj_value:    final cost
             :iter:         total number of iterations
             :kktRes:     final relative residual
             :solve_time:   time to solve the QP
@@ -333,9 +324,8 @@ class RegQPInteriorPointSolver(object):
             :short_status: short version of status, used for printing.
 
         """
-        qp = self.qp
-        Lvar = qp.Lvar
-        Uvar = qp.Uvar
+        Lvar = self.qp.Lvar
+        Uvar = self.qp.Uvar
 
         # Transfer pointers for convenience.
         A = self.A
@@ -352,120 +342,63 @@ class RegQPInteriorPointSolver(object):
         zL = self.zL
         zU = self.zU
 
-        exitOpt = False
+        # Calculate optimality conditions at initial point:
+        # Residuals and complementarity
+        qpObj = self.q + np.dot(c,x) + 0.5*np.dot(x,Q*x)
+        pFeas = A*x - b
+        dFeas = Q*x + c - y*A - zL + zU
+        lComp = zL*(x[self.all_lb] - Lvar[self.all_lb])
+        uComp = zU*(Uvar[self.all_ub] - x[self.all_ub])
+
+        if (nl + nu) > 0:
+            mu = (lComp.sum() + uComp.sum()) / (nl + nu)
+        else:
+            mu = 0.0
+
+        # Scaled residual norms
+        pFeasNorm = norm2(pFeas)
+        pResid = pFeasNorm / (1 + self.normb + self.normA + self.normQ)
+        dFeasNorm = norm2(dFeas)
+        dResid = dFeasNorm / (1 + self.normc + self.normA + self.normQ)
+
+        # Relative duality gap
+        dual_gap = mu / (1 + abs(np.dot(c,x)) + self.normA + self.normQ)
+
+        # Overall residual for stopping condition
+        kktRes = max(pResid, dResid, dual_gap)
+        exitOpt = kktRes <= self.stoptol
+
+        # Set up other stopping conditions
         exitInfeasP = False
         exitInfeasD = False
         exitIter = False
-        exitReg = False
         iter = 0
+
+        # Compute initial perturbation vectors
+        # Note: r is primal feas. perturbation, s is dual feas. perturbation
+        s = -dFeas / self.primal_reg
+        r = -pFeas / self.dual_reg
+        pr_infeas_count = 0
+        du_infeas_count = 0
+        rho_s = dFeasNorm / (1 + self.normc)
+        rho_s_min = rho_s
+        delta_r = pFeasNorm / (1 + self.normb)
+        delta_r_min = delta_r
+        mu0 = mu
 
         # Display header and initial point info
         self.log.info(self.header)
         self.log.info('-' * len(self.header))
-        output_line = self.format1 % (iter, cx + 0.5 * xQx, pResid,
-                                      dResid, cResid, rgap, qNorm,
-                                      rNorm)
-        output_line += self.format2 % (mu, alpha_p, alpha_d,
-                                       nres, self.primal_reg, self.dual_reg, rho_q,
-                                       del_r, mins, minz, maxs)
+        output_line = self.format0 % (iter, qpObj, pResid, dResid, dual_gap,
+                                     rho_s, delta_r, ' ', ' ')
         self.log.info(output_line)
 
         setup_time = cputime()
 
         # Main loop.
-        while not (exitOpt or exitInfeasP or exitInfeasD or exitIter or exitReg):
+        while not (exitOpt or exitInfeasP or exitInfeasD or exitIter):
 
             iter += 1
-
-            # Display initial header every so often.
-            if iter % 20 == 0:
-                self.log.info(self.header)
-                self.log.info('-' * len(self.header))
-
-            # Compute residuals.
-            pFeas = A*x - b
-            dFeas = Q*x + c - y*A - zL + zU
-            lComp = zL*(x[self.all_lb] - Lvar[self.all_lb])
-            uComp = zU*(Uvar[self.all_ub] - x[self.all_ub])
-
-            # Compute complementarity measure.
-            if (nl + nu) > 0:
-                mu = (lComp.sum() + uComp.sum()) / (nl + nu)
-            else:
-                mu = 0.0
-
-            # Compute residual norms and scaled residual norms.
-            pFeasNorm = norm2(pFeas)
-            pFeasNorm_scaled = pFeasNorm / (1 + self.normb + self.normA + self.normQ)
-            dFeasNorm = norm2(dFeas)
-            dFeasNorm_scaled = dFeasNorm / (1 + self.normc + self.normA + self.normQ)
-
-            # Compute relative duality gap.
-            dual_gap = mu / (1 + abs(np.dot(c,x)) + self.normA + self.normQ)
-
-            # Compute overall residual for stopping condition.
-            kktRes = max(pFeasNorm_scaled, dFeasNorm_scaled, dual_gap)
-
-            # At the first iteration, initialize perturbation vectors
-            # that regularize the problem.
-            # Use r for the primal feasibility and s for the dual feasibility.
-            # Also, initialize some parameters for infeasibility detection
-            if iter == 1:
-                s = -dFeas / self.primal_reg
-                r = -pFeas / self.dual_reg
-                pr_infeas_count = 0
-                du_infeas_count = 0
-                dFeasMin = dFeasNorm
-                pFeasMin = pFeasNorm
-                mu0 = mu
-
-            else:
-
-                self.dual_reg = max(self.dual_reg / 10, self.dual_reg_min)
-                self.primal_reg = max(self.primal_reg / 10, self.primal_reg_min)
-
-                # Check for primal infeasibility
-                if mu < 0.01 * self.stoptol * mu0 and \
-                        pFeasNorm > pFeasMin * (1.e-6 / self.stoptol) :
-                    pr_infeas_count += 1
-                    if pr_infeas_count > 6:
-                        status = 'Problem seems to be (locally) dual'
-                        status += ' infeasible'
-                        short_status = 'dInf'
-                        exitInfeasD = True
-                        continue
-                else:
-                    pr_infeas_count = 0
-
-                # Check for dual infeasibility
-                if mu < 0.01 * self.stoptol * mu0 and \
-                        dFeasNorm > dFeasMin * (1.e-6 / self.stoptol) :
-                    du_infeas_count += 1
-                    if du_infeas_count > 6:
-                        status = 'Problem seems to be (locally) primal'
-                        status += ' infeasible'
-                        short_status = 'pInf'
-                        exitInfeasP = True
-                        continue
-                else:
-                    du_infeas_count = 0
-
-            # Display objective and residual data.
-            output_line = self.format1 % (iter, cx + 0.5 * xQx, pResid,
-                                          dResid, cResid, rgap, qNorm,
-                                          rNorm)
-
-            if kktRes <= self.stoptol:
-                status = 'Optimal solution found'
-                short_status = 'opt'
-                exitOpt = True
-                continue
-
-            if iter >= self.itermax:
-                status = 'Maximum number of iterations reached'
-                short_status = 'iter'
-                exitIter = True
-                continue
 
             # Compute augmented matrix and factorize it, checking for
             # degeneracy along the way
@@ -483,11 +416,9 @@ class RegQPInteriorPointSolver(object):
                     self.update_system_matrix()
                     self.LBL.factorize(self.H)
 
-            # Exit if regularization is unsuccessful.
+            # Exit immediately if regularization is unsuccessful.
             if not self.LBL.isFullRank:
-                status = 'Unable to regularize sufficiently.'
-                short_status = 'degn'
-                exitReg = True
+                self.log.debug('Unable to regularize sufficiently. Exiting')
                 continue
 
             # Compute the right-hand side based on the step computation method
@@ -541,6 +472,11 @@ class RegQPInteriorPointSolver(object):
             dy = -self.LBL.x[n:n+m]
             dzL = -(zL**0.5)*self.LBL.x[n+m:n+m+nl]
             dzU = (zU**0.5)*self.LBL.x[n+m:n+m+nl]
+
+            # Update regularization parameters before calculating the 
+            # step sizes
+            self.dual_reg = max(self.dual_reg / 10, self.dual_reg_min)
+            self.primal_reg = max(self.primal_reg / 10, self.primal_reg_min)
 
             # Compute largest allowed primal and dual stepsizes.
             (alpha_p, index_p, is_up_p) = self.max_primal_step_length(dx)
@@ -610,44 +546,107 @@ class RegQPInteriorPointSolver(object):
                 alpha_p *= tau
                 alpha_d *= tau
 
-            # Display data.
-            output_line += self.format2 % (mu, alpha_p, alpha_d,
-                                           nres, primal_reg, dual_reg, rho_q,
-                                           del_r, mins, minz, maxs)
-            self.log.info(output_line)
-
             # Update iterates and perturbation vectors.
             x += alpha_p * dx
             y += alpha_d * dy
             zL += alpha_d * dzL
             zU += alpha_d * dzU
 
-            s *= (1 - alpha_p)
-            s += alpha_p * dx
-            r *= (1 - alpha_d)
-            r += alpha_d * dy
+            s = (1 - alpha_p)*s + alpha_p*dx
+            r = (1 - alpha_d)*r + alpha_d*dy
             sNorm = norm2(s)
             rNorm = norm2(r)
 
-            dFeasNorm = primal_reg * sNorm / (1 + self.normc)
-            dFeasMin = min(dFeasMin, dFeasNorm)
+            rho_s = self.primal_reg * sNorm / (1 + self.normc)
+            rho_s_min = min(rho_s_min, rho_s)
 
-            pFeasNorm = dual_reg * rNorm / (1 + self.normb)
-            pFeasMin = min(pFeasMin, pFeasNorm)
+            delta_r = self.dual_reg * rNorm / (1 + self.normb)
+            delta_r_min = min(delta_r_min, delta_r)
 
+            # Check for dual infeasibility
+            if mu < 0.01 * self.stoptol * mu0 and \
+                    rho_s > rho_s_min * (1.e-6 / self.stoptol) :
+                du_infeas_count += 1
+                if du_infeas_count > 6:
+                    exitInfeasD = True
+            else:
+                du_infeas_count = 0
+
+            # Check for primal infeasibility
+            if mu < 0.01 * self.stoptol * mu0 and \
+                    delta_r > delta_r_min * (1.e-6 / self.stoptol) :
+                pr_infeas_count += 1
+                if pr_infeas_count > 6:
+                    exitInfeasP = True
+                    # continue
+            else:
+                pr_infeas_count = 0
+
+            # Check for optimality at new point
+            qpObj = self.q + np.dot(c,x) + 0.5*np.dot(x,Q*x)
+            pFeas = A*x - b
+            dFeas = Q*x + c - y*A - zL + zU
+            lComp = zL*(x[self.all_lb] - Lvar[self.all_lb])
+            uComp = zU*(Uvar[self.all_ub] - x[self.all_ub])
+
+            if (nl + nu) > 0:
+                mu = (lComp.sum() + uComp.sum()) / (nl + nu)
+            else:
+                mu = 0.0
+
+            # Scaled residual norms
+            pFeasNorm = norm2(pFeas)
+            pResid = pFeasNorm / (1 + self.normb + self.normA + self.normQ)
+            dFeasNorm = norm2(dFeas)
+            dResid = dFeasNorm / (1 + self.normc + self.normA + self.normQ)
+
+            # Relative duality gap
+            dual_gap = mu / (1 + abs(np.dot(c,x)) + self.normA + self.normQ)
+
+            # Overall residual for stopping condition
+            kktRes = max(pResid, dResid, dual_gap)
+            exitOpt = kktRes <= self.stoptol
+
+            # Check iteration limit
+            exitIter = iter == self.itermax
+
+            # Log updated point info
+            if iter % 20 == 0:
+                self.log.info(self.header)
+                self.log.info('-' * len(self.header))
+            output_line = self.format % (iter, qpObj, pResid, dResid, dual_gap,
+                                         rho_s, delta_r, alpha_p, alpha_d)
+            self.log.info(output_line)
+
+        # Determine solution time
         solve_time = cputime() - setup_time
 
         self.log.info('-' * len(self.header))
 
+        # Resolve why the iteration stopped and print status
+        if exitOpt:
+            status = 'Optimal solution found'
+            short_status = 'opt'
+        elif exitInfeasD:
+            status = 'Problem seems to be (locally) dual infeasible'
+            short_status = 'dInf'
+        elif exitInfeasP:
+            status = 'Problem seems to be (locally) primal infeasible'
+            short_status = 'pInf'
+        elif exitIter:
+            status = 'Maximum number of iterations reached'
+            short_status = 'iter'
+        else:
+            status = 'Problem could not be regularized sufficiently.'
+            short_status = 'degn'
+
+        self.log.info(status)
+
         # Transfer final values to class members.
-        self.x = x
-        self.y = y
-        self.z = z
         self.iter = iter
         self.pResid = pResid
-        self.cResid = cResid
         self.dResid = dResid
-        self.rgap = rgap
+        self.dual_gap = dual_gap
         self.kktRes = kktRes
         self.solve_time = solve_time
         self.status = status
