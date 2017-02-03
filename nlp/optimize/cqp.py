@@ -459,10 +459,10 @@ class RegQPInteriorPointSolver(object):
                         alpha_d *= tau
                 else:
                     mult = 0.01
-                    lComp_temp = (zL + alpha_d*dzL_aff)*(x[self.all_lb] + \
-                        alpha_p*dx_aff[self.all_lb] - Lvar[self.all_lb])
-                    uComp_temp = (zU + alpha_d*dzU_aff)*(Uvar[self.all_ub] - \
-                        x[self.all_ub] - alpha_p*dx_aff[self.all_ub])
+                    lComp_temp = (zL + alpha_d*dzL)*(x[self.all_lb] + \
+                        alpha_p*dx[self.all_lb] - Lvar[self.all_lb])
+                    uComp_temp = (zU + alpha_d*dzU)*(Uvar[self.all_ub] - \
+                        x[self.all_ub] - alpha_p*dx[self.all_ub])
                     mu_temp = (lComp_temp.sum() + uComp_temp.sum()) / (nl + nu)
 
                     # If alpha_p < 1.0, compute a gamma_p such that the
@@ -729,13 +729,13 @@ class RegQPInteriorPointSolver(object):
             alphaL_max = 1.0
         else:
             alphaL = np.where(dxl < 0, -(xl - l)/dxl, 1.)
-            alphaL_max = alphaL.min()
+            alphaL_max = min(1.0, alphaL.min())
 
         if self.nu == 0:
             alphaU_max = 1.0
         else:
             alphaU = np.where(dxu > 0, (u - xu)/dxu, 1.)
-            alphaU_max = alphaU.min()
+            alphaU_max = min(1.0, alphaU.min())
 
         if min(alphaL_max,alphaU_max) == 1.0:
             return (1.0, -1, False)
@@ -759,13 +759,13 @@ class RegQPInteriorPointSolver(object):
             alphaL_max = 1.0
         else:
             alphaL = np.where(dzL < 0, -self.zL/dzL, 1.)
-            alphaL_max = alphaL.min()
+            alphaL_max = min(1.0,alphaL.min())
 
         if self.nu == 0:
             alphaU_max = 1.0
         else:
             alphaU = np.where(dzU < 0, -self.zU/dzU, 1.)
-            alphaU_max = alphaU.min()
+            alphaU_max = min(1.0,alphaU.min())
 
         if min(alphaL_max,alphaU_max) == 1.0:
             return (1.0, -1, False)
@@ -802,7 +802,6 @@ class RegQPInteriorPointSolver(object):
             Lvar = self.qp.Lvar
             Uvar = self.qp.Uvar
             x = self.x
-            y = self.y
             zL = self.zL
             zU = self.zU
 
