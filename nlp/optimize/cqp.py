@@ -94,8 +94,6 @@ class RegQPInteriorPointSolver(object):
                           use a variant of the long-step method.
 
             :stoptol: The convergence tolerance (default: 1.0e-6)
-
-            :check_infeas: Check for an infeasible problem (default: `True`)
         """
         if not isinstance(qp, PySparseSlackModel):
             msg = 'The QP model must be an instance of SlackModel with sparse'
@@ -329,12 +327,6 @@ class RegQPInteriorPointSolver(object):
         """
         Lvar = self.qp.Lvar
         Uvar = self.qp.Uvar
-
-        # Transfer pointers for convenience.
-        A = self.A
-        b = self.b
-        c = self.c
-        Q = self.Q
         nl = self.nl
         nu = self.nu
 
@@ -346,7 +338,6 @@ class RegQPInteriorPointSolver(object):
         zU = self.zU
 
         # Calculate optimality conditions at initial point
-        qpObj = self.q + np.dot(c,x) + 0.5*np.dot(x,Q*x)
         kktRes = self.check_optimality()
         exitOpt = kktRes <= self.stoptol
 
@@ -371,7 +362,7 @@ class RegQPInteriorPointSolver(object):
         # Display header and initial point info
         self.log.info(self.header)
         self.log.info('-' * len(self.header))
-        output_line = self.format0 % (iter, qpObj, self.pResid, self.dResid,
+        output_line = self.format0 % (iter, self.qpObj, self.pResid, self.dResid,
                                      self.dual_gap, rho_s, delta_r, ' ', ' ')
         self.log.info(output_line)
 
@@ -511,15 +502,13 @@ class RegQPInteriorPointSolver(object):
             y += alpha_d * dy
             zL += alpha_d * dzL
             zU += alpha_d * dzU
-
             s = (1 - alpha_p)*s + alpha_p*dx
             r = (1 - alpha_d)*r + alpha_d*dy
+
             sNorm = norm2(s)
             rNorm = norm2(r)
-
             rho_s = self.primal_reg * sNorm / (1 + self.normc)
             rho_s_min = min(rho_s_min, rho_s)
-
             delta_r = self.dual_reg * rNorm / (1 + self.normb)
             delta_r_min = min(delta_r_min, delta_r)
 
@@ -543,7 +532,6 @@ class RegQPInteriorPointSolver(object):
                 pr_infeas_count = 0
 
             # Check for optimality at new point
-            qpObj = self.q + np.dot(c,x) + 0.5*np.dot(x,Q*x)
             kktRes = self.check_optimality()
             exitOpt = kktRes <= self.stoptol
 
@@ -554,7 +542,7 @@ class RegQPInteriorPointSolver(object):
             if iter % 20 == 0:
                 self.log.info(self.header)
                 self.log.info('-' * len(self.header))
-            output_line = self.format % (iter, qpObj, self.pResid, self.dResid,
+            output_line = self.format % (iter, self.qpObj, self.pResid, self.dResid,
                                          self.dual_gap, rho_s, delta_r,
                                          alpha_p, alpha_d)
             self.log.info(output_line)
@@ -645,26 +633,29 @@ class RegQPInteriorPointSolver(object):
 
         self.log.debug('Computing initial guess')
 
+        # Let the class know we are initializing the problem for now
+        self.initial_guess = True
+
         # Set up augmented system matrix
-        self.set_system_matrix(initial_guess=True)
+        self.set_system_matrix()
 
         # Analyze and factorize the matrix
         self.LBL = LBLContext(self.H,
             sqd=(self.primal_reg_min > 0.0 and self.dual_reg_min > 0.0))
 
         # Assemble first right-hand side
-        self.set_system_rhs(initial_guess=True)
+        self.set_system_rhs()
 
         # Solve system and collect solution
         self.solve_system(self.rhs)
-        x_guess, _, _, _ = self.extract_xyz(initial_guess=True)
+        x_guess, _, _, _ = self.extract_xyz()
 
         # Assemble second right-hand side
-        self.set_system_rhs(initial_guess=True, dual=True)
+        self.set_system_rhs(dual=True)
 
         # Solve system and collect solution
         self.solve_system(self.rhs)
-        _, y, zL_guess, zU_guess = self.extract_xyz(initial_guess=True)
+        _, y, zL_guess, zU_guess = self.extract_xyz()
 
         # Use Mehrotra's heuristic to compute a strictly feasible starting
         # point for all x and z
@@ -702,6 +693,9 @@ class RegQPInteriorPointSolver(object):
         intervals = Uvar[self.qp.rangeB] - Lvar[self.qp.rangeB]
         norm_factors = intervals / (intervals + rL_shift + rU_shift)
         x[self.qp.rangeB] = Lvar[self.qp.rangeB] + rL[self.range_in_lb]*norm_factors
+
+        # Initialization complete
+        self.initial_guess = False
 
         # Check strict feasibility
         if not np.all(x > Lvar) or not np.all(x < Uvar) or \
@@ -781,14 +775,14 @@ class RegQPInteriorPointSolver(object):
 
         return (alpha_max, ind_max, is_upper)
 
-    def set_system_matrix(self, initial_guess=False):
+    def set_system_matrix(self):
         """Set up the linear system matrix."""
         n = self.n
         m = self.m
         nl = self.nl
         nu = self.nu
 
-        if initial_guess:
+        if self.initial_guess:
             self.log.debug('Setting up matrix for initial guess')
 
             self.H.put(self.diagQ + self.primal_reg_min**0.5, range(n))
@@ -824,14 +818,14 @@ class RegQPInteriorPointSolver(object):
         self.H.put(-self.dual_reg, range(n,n+m))
         return
 
-    def set_system_rhs(self, initial_guess=False, **kwargs):
+    def set_system_rhs(self, **kwargs):
         """Set up the linear system right-hand side."""
         n = self.n
         m = self.m
         nl = self.nl
         self.log.debug('Setting up linear system right-hand side')
 
-        if initial_guess:
+        if self.initial_guess:
             self.rhs[n+m:n+m+nl] = self.qp.Lvar[self.all_lb]
             self.rhs[n+m+nl:] = self.qp.Uvar[self.all_ub]
             if not kwargs.get('dual',False):
@@ -878,7 +872,7 @@ class RegQPInteriorPointSolver(object):
 
         return
 
-    def extract_xyz(self, initial_guess=False):
+    def extract_xyz(self):
         """Return the partitioned solution vector"""
         n = self.n
         m = self.m
@@ -886,7 +880,7 @@ class RegQPInteriorPointSolver(object):
 
         x = self.LBL.x[:n].copy()
         y = -self.LBL.x[n:n+m].copy()
-        if initial_guess:
+        if self.initial_guess:
             zL = -self.LBL.x[n+m:n+m+nl].copy()
             zU = self.LBL.x[n+m+nl:].copy()
         else:
@@ -905,8 +899,10 @@ class RegQPInteriorPointSolver(object):
         Uvar = self.qp.Uvar
 
         # Residual and complementarity vectors
+        Qx = self.Q*x
+        self.qpObj = self.q + np.dot(self.c,x) + 0.5*np.dot(x,Qx)
         self.pFeas = self.A*x - self.b
-        self.dFeas = self.Q*x + self.c - y*self.A
+        self.dFeas = Qx + self.c - y*self.A
         self.dFeas[self.all_lb] -= zL
         self.dFeas[self.all_ub] += zU
         self.lComp = zL*(x[self.all_lb] - Lvar[self.all_lb])
