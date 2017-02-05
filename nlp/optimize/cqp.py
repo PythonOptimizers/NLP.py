@@ -188,11 +188,11 @@ class RegQPInteriorPointSolver(object):
         self.nitref = 5
 
         # Initialize format strings for display
-        fmt_hdr = '%-4s' + '  %-8s' * 8
+        fmt_hdr = '%-4s  %-9s' + '  %-8s' * 7
         self.header = fmt_hdr % ('Iter', 'qpObj', 'pFeas', 'dFeas', 'Mu',
                                  'rho_s', 'delta_r', 'alpha_p', 'alpha_d')
-        self.format = '%-4d' + '  %-8.2e' * 8
-        self.format0 = '%-4d' + '  %-8.2e' * 6 + '  %-8s' * 2
+        self.format = '%-4d  %-9.2e' + '  %-8.2e' * 7
+        self.format0 = '%-4d  %-9.2e' + '  %-8.2e' * 5 + '  %-8s' * 2
 
         # Additional options to collect
         self.estimate_cond = kwargs.get('estimate_cond', False)
