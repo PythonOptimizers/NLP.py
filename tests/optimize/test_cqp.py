@@ -59,7 +59,7 @@ cqp_logger = config_logger("nlp.cqp","%(name)-8s %(levelname)-5s %(message)s")
 test_prob = SparseHS21()
 test_prob_slack = PySparseSlackModel(test_prob)
 
-solver = RegQPInteriorPointSolver(test_prob_slack,mehrotra_pc=True)
+solver = RegQPInteriorPointSolver(test_prob_slack,mehrotra_pc=False)
 solver.solve()
 print solver.short_status
 print solver.solve_time

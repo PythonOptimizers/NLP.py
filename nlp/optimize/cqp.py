@@ -121,7 +121,6 @@ class RegQPInteriorPointSolver(object):
         self.m = qp.m
         self.nl = qp.nlowerB + qp.nrangeB
         self.nu = qp.nupperB + qp.nrangeB
-        self.sys_size = self.n + self.m + self.nl + self.nu
 
         # Some useful index lists for associating variables with bound
         # multipliers
@@ -151,21 +150,6 @@ class RegQPInteriorPointSolver(object):
         self.normc = norm2(self.c)
         self.normA = self.A.matrix.norm('fro')
         self.normQ = self.Q.matrix.norm('fro')
-
-        # Initialize the augmented system matrix
-        # This matrix object is used both in calculating the starting point
-        # and the steps in the algorithm. Blocks common to all problems,
-        # i.e., the sparse Q and A matrices, are also put in place
-        self.H = PysparseMatrix(size=self.sys_size,
-            sizeHint=2*self.nl + 2*self.nu + self.A.nnz + self.Q.nnz,
-            symmetric=True)
-        self.H[:self.n, :self.n] = self.Q
-        self.H[self.n:self.n+self.m, :self.n] = self.A
-
-        # Initialize RHS
-        self.rhs = np.zeros(self.sys_size)
-
-        # ** DEV NOTE: Moved scaling call to solve function **
 
         # It will be more efficient to keep the diagonal of Q around.
         self.diagQ = self.Q.take(range(self.n))
@@ -331,6 +315,7 @@ class RegQPInteriorPointSolver(object):
         nu = self.nu
 
         # Obtain initial point from Mehrotra's heuristic.
+        self.initialize_system()
         (self.x, self.y, self.zL, self.zU) = self.set_initial_guess()
         x = self.x
         y = self.y
@@ -774,6 +759,23 @@ class RegQPInteriorPointSolver(object):
             is_upper = True
 
         return (alpha_max, ind_max, is_upper)
+
+    def initialize_system(self):
+        """Initialize the system matrix and right-hand side.
+
+        The A and Q blocks of the matrix are also put in place since they
+        are common to all problems.
+        """
+        self.sys_size = self.n + self.m + self.nl + self.nu
+
+        self.H = PysparseMatrix(size=self.sys_size,
+            sizeHint=2*self.nl + 2*self.nu + self.A.nnz + self.Q.nnz,
+            symmetric=True)
+        self.H[:self.n, :self.n] = self.Q
+        self.H[self.n:self.n+self.m, :self.n] = self.A
+
+        self.rhs = np.zeros(self.sys_size)
+        return
 
     def set_system_matrix(self):
         """Set up the linear system matrix."""
