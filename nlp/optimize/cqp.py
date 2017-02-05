@@ -64,8 +64,7 @@ class RegQPInteriorPointSolver(object):
 
         :keywords:
             :scale_type: Perform row and column scaling of the constraint
-                         matrix [Aᴱ 0 ; Aᴵ -I] prior to solution
-                         (default: `none`).
+                         matrix A prior to solution (default: `none`).
 
             :primal_reg_init: Initial value of primal regularization parameter
                               (default: `1.0`).
@@ -384,7 +383,7 @@ class RegQPInteriorPointSolver(object):
                 # Compute affine-scaling step, i.e. with centering = 0.
                 self.set_system_rhs(sigma=0.0)
                 self.solve_system(self.rhs)
-                dx_aff, dy_aff, dzL_aff, dzU_aff = self.extract_xyz()
+                dx_aff, dy_aff, dzL_aff, dzU_aff = self.extract_xyz(sigma=0.0)
 
                 # Compute largest allowed primal and dual stepsizes.
                 (alpha_p, index_p, is_up_p) = self.max_primal_step_length(dx_aff)
@@ -398,16 +397,16 @@ class RegQPInteriorPointSolver(object):
                 mu_aff = (lComp_aff.sum() + uComp_aff.sum()) / (nl + nu)
 
                 # Incorporate predictor information for corrector step.
-                sigma_pc = (mu_aff / self.mu)**3
-                self.set_system_rhs(sigma=sigma_pc)
+                sigma = (mu_aff / self.mu)**3
+                self.set_system_rhs(sigma=sigma)
             else:
                 # Use long-step method: Compute centering parameter.
-                sigma_ls = min(0.1, 100 * self.mu)
-                self.set_system_rhs(sigma=sigma_ls)
+                sigma = min(0.1, 100 * self.mu)
+                self.set_system_rhs(sigma=sigma)
 
             # Solve augmented system.
             self.solve_system(self.rhs)
-            dx, dy, dzL, dzU = self.extract_xyz()
+            dx, dy, dzL, dzU = self.extract_xyz(sigma=sigma)
 
             # Update regularization parameters before calculating the 
             # step sizes
@@ -769,7 +768,7 @@ class RegQPInteriorPointSolver(object):
         self.sys_size = self.n + self.m + self.nl + self.nu
 
         self.H = PysparseMatrix(size=self.sys_size,
-            sizeHint=2*self.nl + 2*self.nu + self.A.nnz + self.Q.nnz,
+            sizeHint=self.nl + self.nu + self.A.nnz + self.Q.nnz + self.sys_size,
             symmetric=True)
         self.H[:self.n, :self.n] = self.Q
         self.H[self.n:self.n+self.m, :self.n] = self.A
@@ -793,6 +792,7 @@ class RegQPInteriorPointSolver(object):
             self.H.put(-1.0, range(n+m, n+m+nl+nu))
             self.H.put(1.0, range(n+m, n+m+nl), self.all_lb)
             self.H.put(1.0, range(n+m+nl, n+m+nl+nu), self.all_ub)
+
         else:
             self.log.debug('Setting up matrix for current iteration')
             Lvar = self.qp.Lvar
@@ -874,7 +874,7 @@ class RegQPInteriorPointSolver(object):
 
         return
 
-    def extract_xyz(self):
+    def extract_xyz(self, **kwargs):
         """Return the partitioned solution vector"""
         n = self.n
         m = self.m
@@ -926,11 +926,11 @@ class RegQPInteriorPointSolver(object):
         return max(self.pResid, self.dResid, self.dual_gap)
 
 
-class RegQPInteriorPointSolver3x3(RegQPInteriorPointSolver):
-    """A 3x3 block variant of the regularized interior-point method.
+class RegQPInteriorPointSolver2x2(RegQPInteriorPointSolver):
+    """A 2x2 block variant of the regularized interior-point method.
 
-    Linear system is based on the 3x3 block system instead of the reduced 2x2
-    block system.
+    Linear system is based on the (reduced) 2x2 block system instead of
+    the 3x3 block system.
     """
 
     def __init__(self, *args, **kwargs):
@@ -940,131 +940,150 @@ class RegQPInteriorPointSolver3x3(RegQPInteriorPointSolver):
             :qp:       a :class:`QPModel` instance.
 
         :keywords:
-            :scale: Perform row and column equilibration of the constraint
-                    matrix [A1 A2] prior to solution (default: `True`).
+            :scale_type: Perform row and column scaling of the constraint
+                         matrix A prior to solution (default: `none`).
 
-            :primal_reg: Initial value of primal regularization parameter
-                    (default: `1.0`).
+            :primal_reg_init: Initial value of primal regularization parameter
+                              (default: `1.0`).
 
-            :dual_reg: Initial value of dual regularization parameter
-                    (default: `1.0`).
+            :primal_reg_min: Minimum value of primal regularization parameter
+                             (default: `1.0e-8`).
+
+            :dual_reg_init: Initial value of dual regularization parameter
+                            (default: `1.0`).
+
+            :dual_reg_min: Minimum value of dual regularization parameter
+                           (default: `1.0e-8`).
 
             :bump_max: Max number of times regularization parameters are
                        increased when a factorization fails (default 5).
 
             :logger_name: Name of a logger to control output.
+
+            :estimate_cond: Estimate the matrix condition number when solving
+                            the linear system (default: `False`)
+
+            :itermax: Max number of iterations. (default: max(100,10*qp.n))
+
+            :mehrotra_pc: Use Mehrotra's predictor-corrector strategy
+                          to update the step (default: `True`) If `False`,
+                          use a variant of the long-step method.
+
+            :stoptol: The convergence tolerance (default: 1.0e-6)
         """
-        super(RegQPInteriorPointSolver3x3, self).__init__(*args, **kwargs)
+        super(RegQPInteriorPointSolver2x2, self).__init__(*args, **kwargs)
 
-    def initialize_kkt_matrix(self):
-        u"""Create and initialize KKT matrix.
+    def initialize_system(self):
+        """Initialize the system matrix and right-hand side.
 
-        [ -(Q+ρI)   0        A1'     0   ]
-        [  0       -ρI       A2'  Z^{1/2}]
-        [  A1       A2       δI      0   ]
-        [  0        Z^{1/2}  0       S   ]
+        The A and Q blocks of the matrix are also put in place since they
+        are common to all problems.
         """
-        m, n = self.A.shape
-        on = self.qp.original_n
-        H = PysparseMatrix(size=2 * n + m - on,
-                           sizeHint=4 * on + m + self.A.nnz + self.Q.nnz,
-                           symmetric=True)
+        self.sys_size = self.n + self.m
 
-        # The (1,1) block will always be Q (save for its diagonal).
-        H[:on, :on] = -self.Q
+        self.H = PysparseMatrix(size=self.sys_size,
+            sizeHint=self.A.nnz + self.Q.nnz + self.sys_size,
+            symmetric=True)
+        self.H[:self.n, :self.n] = self.Q
+        self.H[self.n:self.n+self.m, :self.n] = self.A
 
-        # The (2,1) block will always be A. We store it now once and for all.
-        H[n:n + m, :n] = self.A
-        return H
-
-    def set_initial_guess_system(self):
-        """Set linear system for initial guess."""
-        m, n = self.A.shape
-        on = self.qp.original_n
-        self.H.put(-self.diagQ - 1.0e-4, range(on))
-        self.H.put(-1.0, range(on, n))
-        self.H.put(1.0e-4, range(n, n + m))
-        self.H.put(1.0, range(n + m, 2 * n + m - on))
-        self.H.put(1.0, range(n + m, 2 * n + m - on), range(on, n))
+        self.rhs = np.zeros(self.sys_size)
         return
 
-    def set_initial_guess_rhs(self):
-        """Set right-hand side for initial guess."""
-        m, n = self.A.shape
-        rhs = self.initialize_rhs()
-        rhs[n:n + m] = self.b
-        return rhs
+    def set_system_matrix(self):
+        """Set up the linear system matrix."""
+        n = self.n
+        m = self.m
 
-    def update_initial_guess_rhs(self, rhs):
-        """Update right-hand side for initial guess."""
-        _, n = self.A.shape
-        on = self.qp.original_n
-        rhs[:on] = self.c
-        rhs[on:] = 0.0
+        if self.initial_guess:
+            self.log.debug('Setting up matrix for initial guess')
+
+            new_diag = self.diagQ + self.primal_reg_min**0.5
+            new_diag[self.all_lb] += 1.0
+            new_diag[self.all_ub] += 1.0
+
+            self.H.put(new_diag, range(n))
+            self.H.put(-self.dual_reg_min**0.5, range(n,n+m))
+
+        else:
+            self.log.debug('Setting up matrix for current iteration')
+
+            x_minus_l = self.x[self.all_lb] - self.qp.Lvar[self.all_lb]
+            u_minus_x = self.qp.Uvar[self.all_ub] - self.x[self.all_ub]
+
+            new_diag = self.diagQ + self.primal_reg
+            new_diag[self.all_lb] += self.zL / x_minus_l
+            new_diag[self.all_ub] += self.zU / u_minus_x
+
+            self.H.put(new_diag, range(n))
+            self.H.put(-self.dual_reg_min**0.5, range(n,n+m))
+
         return
 
-    def initialize_rhs(self):
-        """Initialize right-hand side with zeros."""
-        m, n = self.A.shape
-        on = self.qp.original_n
-        return np.zeros(2 * n + m - on)
+    def update_system_matrix(self):
+        """Update the linear system matrix with the new regularization
+        parameters. This is a helper method when checking the system for
+        degeneracy."""
+        self.log.debug('Updating matrix')
+        x_minus_l = self.x[self.all_lb] - self.qp.Lvar[self.all_lb]
+        u_minus_x = self.qp.Uvar[self.all_ub] - self.x[self.all_ub]
 
-    def update_linear_system(self, s, z, primal_reg, dual_reg, **kwargs):
-        """Update linear system."""
-        qp = self.qp
-        n = qp.n
-        m = qp.m
-        on = qp.original_n
-        diagQ = self.diagQ
-        self.H.put(-diagQ - primal_reg, range(on))
-        if primal_reg > 0:
-            self.H.put(-primal_reg, range(on, n))
-        if dual_reg > 0:
-            self.H.put(dual_reg, range(n, n + m))
-        self.H.put(np.sqrt(z), range(n + m, 2 * n + m - on), range(on, n))
-        self.H.put(s, range(n + m, 2 * n + m - on))
+        new_diag = self.diagQ + self.primal_reg
+        new_diag[self.all_lb] += self.zL / x_minus_l
+        new_diag[self.all_ub] += self.zU / u_minus_x
+
+        self.H.put(new_diag, range(n))
+        self.H.put(-self.dual_reg_min**0.5, range(n,n+m))
+        self.H.put(-self.dual_reg, range(n,n+m))
         return
 
-    def set_affine_scaling_rhs(self, rhs, pFeas, dFeas, s, z):
-        """Set rhs for affine-scaling step."""
-        m, n = self.A.shape
-        rhs[:n] = -dFeas
-        rhs[n:n + m] = -pFeas
-        rhs[n + m:] = -s * np.sqrt(z)
+    def set_system_rhs(self, **kwargs):
+        """Set up the linear system right-hand side."""
+        n = self.n
+        m = self.m
+        self.log.debug('Setting up linear system right-hand side')
+
+        if self.initial_guess:
+            self.rhs[:n] = 0.
+            self.rhs[self.all_lb] += self.qp.Lvar[self.all_lb]
+            self.rhs[self.all_ub] += self.qp.Uvar[self.all_ub]
+            if not kwargs.get('dual',False):
+                # Primal initial point RHS
+                self.rhs[n:n+m] = self.b
+            else:
+                # Dual initial point RHS
+                self.rhs[:n] -= self.c
+                self.rhs[n:n+m] = 0.
+        else:
+            sigma = kwargs.get('sigma',0.0)
+            x_minus_l = self.x[self.all_lb] - self.qp.Lvar[self.all_lb]
+            u_minus_x = self.qp.Uvar[self.all_ub] - self.x[self.all_ub]
+
+            self.rhs[:n] = -self.dFeas
+            self.rhs[n:n+m] = -self.pFeas
+            self.rhs[self.all_lb] += -self.zL + sigma*self.mu/x_minus_l
+            self.rhs[self.all_ub] += self.zU - sigma*self.mu/u_minus_x
+
         return
 
-    def get_affine_scaling_dxsyz(self, step, x, s, y, z):
-        """Split `step` into steps along x, s, y and z.
+    def extract_xyz(self, **kwargs):
+        """Return the partitioned solution vector"""
+        n = self.n
+        m = self.m
 
-        his function returns *references*, not copies. Only dz is computed
-        from `step` without being a subvector of `step`.
-        """
-        return self.get_dxsyz(step, x, s, y, z, 0)
+        x = self.LBL.x[:n].copy()
+        y = -self.LBL.x[n:n+m].copy()
+        if self.initial_guess:
+            zL = self.qp.Lvar[self.all_lb] - x[self.all_lb]
+            zU = x[self.all_ub] - self.qp.Uvar[self.all_ub]
+        else:
+            sigma = kwargs.get('sigma',0.0)
+            x_minus_l = self.x[self.all_lb] - self.qp.Lvar[self.all_lb]
+            u_minus_x = self.qp.Uvar[self.all_ub] - self.x[self.all_ub]
 
-    def update_corrector_rhs(self, rhs, s, z, comp):
-        """Update right-hand side for corrector step."""
-        m, n = self.A.shape
-        rhs[n + m:] = -comp / np.sqrt(z)
-        return
+            zL = (-self.zL*(x_minus_l + x[self.all_lb]) + sigma*self.mu)
+            zL /= x_minus_l
+            zU = (-self.zU*(u_minus_x - x[self.all_ub]) + sigma*self.mu)
+            zU /= u_minus_x
 
-    def update_long_step_rhs(self, rhs, pFeas, dFeas, comp, s):
-        """Update right-hand side when using long step."""
-        m, n = self.A.shape
-        rhs[:n] = -dFeas
-        rhs[n:n + m] = -pFeas
-        rhs[n + m:] = -comp
-        return
-
-    def get_dxsyz(self, step, x, s, y, z, comp):
-        """Split `step` into steps along x, s, y and z.
-
-        This function returns *references*, not copies. Only dz is computed
-        from `step` without being a subvector of `step`.
-        """
-        m, n = self.A.shape
-        on = self.qp.original_n
-        dx = step[:n]
-        ds = step[on:n]
-        dy = step[n:n + m]
-        dz = np.sqrt(z) * step[n + m:]
-        return (dx, ds, dy, dz)
+        return x,y,zL,zU

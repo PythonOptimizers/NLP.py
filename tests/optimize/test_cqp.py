@@ -7,7 +7,7 @@ The test problem used here is Hock-Schittkowski 21.
 
 from nlp.model.nlpmodel import NLPModel
 from nlp.model.pysparsemodel import PySparseNLPModel, PySparseSlackModel
-from nlp.optimize.cqp import RegQPInteriorPointSolver
+from nlp.optimize.cqp import RegQPInteriorPointSolver, RegQPInteriorPointSolver2x2
 from nlp.tools.logs import config_logger
 import numpy as np
 import logging
@@ -58,8 +58,14 @@ cqp_logger = config_logger("nlp.cqp","%(name)-8s %(levelname)-5s %(message)s")
 # main script
 test_prob = SparseHS21()
 test_prob_slack = PySparseSlackModel(test_prob)
+use_pc = True
 
-solver = RegQPInteriorPointSolver(test_prob_slack,mehrotra_pc=False)
+solver = RegQPInteriorPointSolver(test_prob_slack,mehrotra_pc=use_pc)
 solver.solve()
 print solver.short_status
 print solver.solve_time
+
+solver2 = RegQPInteriorPointSolver2x2(test_prob_slack,mehrotra_pc=use_pc)
+solver2.solve()
+print solver2.short_status
+print solver2.solve_time
