@@ -253,26 +253,34 @@ class RegQPInteriorPointSolver(object):
             log.debug('%8.2e %8.2e' % (np.min(np.abs(values)),
                                           np.max(np.abs(values))))
 
-            # Find row scaling.
+            row_max = np.zeros(m)
+            col_max = np.zeros(n)
+
+            # Find maximum row values
             for k in range(len(values)):
                 row = irow[k]
                 val = abs(values[k])
-                self.row_scale[row] = min(self.row_scale[row], 1/val)
-            self.row_scale[row_scale == 0.0] = 1.0
+                row_max[row] = max(row_max[row], val)
+            row_max[row_max == 0.0] = 1.0
 
-            log.debug('Max row scaling factor = %8.2e' % np.max(self.row_scale))
+            log.debug('Max row scaling factor = %8.2e' % np.max(row_max))
 
             # Modified A values after row scaling
-            temp_values = values * self.row_scale[irow]
+            temp_values = values / row_max[irow]
 
-            # Find column scaling.
+            # Find maximum column values
             for k in range(len(temp_values)):
                 col = jcol[k]
                 val = abs(temp_values[k])
-                self.col_scale[col] = max(self.col_scale[col], 1/val)
-            self.col_scale[self.col_scale == 0.0] = 1.0
+                col_max[col] = max(col_max[col], val)
+            col_max[col_max == 0.0] = 1.0
 
-            log.debug('Max column scaling factor = %8.2e' % np.max(self.col_scale))
+            log.debug('Max column scaling factor = %8.2e' % np.max(col_max))
+
+            # Invert the computed maximum values to obtain scaling factors
+            # By convention, we multiply the matrices by these scaling factors
+            self.row_scale = 1./row_max
+            self.col_scale = 1./col_max
 
         elif self.scale_type == 'mc29':
 
@@ -288,6 +296,27 @@ class RegQPInteriorPointSolver(object):
             log.info('Scaling option not recognized, no scaling will be applied.')
             self.row_scale = None
             self.col_scale = None
+
+        # Apply the scaling factors to A, b, Q, and c, if available
+        if self.row_scale is not None and self.col_scale is not None:
+            values *= self.row_scale[irow]
+            values *= self.col_scale[jcol]
+            self.A.put(values, irow, jcol)
+
+            (values, irow, jcol) = self.Q.find()
+            values *= self.col_scale[irow]
+            values *= self.col_scale[jcol]
+            self.Q.put(values, irow, jcol)
+
+            self.b *= self.row_scale
+            self.c *= self.col_scale
+
+            # Recompute the norms to account for the problem scaling
+            self.normb = norm2(self.b)
+            self.normc = norm2(self.c)
+            self.normA = self.A.matrix.norm('fro')
+            self.normQ = self.Q.matrix.norm('fro')
+            self.diagQ = self.Q.take(range(self.n))
 
         return
 
@@ -313,8 +342,11 @@ class RegQPInteriorPointSolver(object):
         nl = self.nl
         nu = self.nu
 
-        # Obtain initial point from Mehrotra's heuristic.
+        # Setup the problem
+        self.scale()
         self.initialize_system()
+
+        # Obtain initial point from Mehrotra's heuristic.
         (self.x, self.y, self.zL, self.zU) = self.set_initial_guess()
         x = self.x
         y = self.y
