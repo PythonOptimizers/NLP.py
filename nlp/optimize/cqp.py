@@ -331,10 +331,10 @@ class RegQPInteriorPointSolver(object):
             :zL:           final value of lower-bound multipliers
             :zU:           final value of upper-bound multipliers
             :iter:         total number of iterations
-            :kktRes:     final relative residual
-            :solve_time:   time to solve the QP
-            :status:       string describing the exit status.
-            :short_status: short version of status, used for printing.
+            :kktRes:       final relative residual
+            :tsolve:       time to solve the QP
+            :long_status:  string describing the exit status.
+            :status:       short version of status, used for printing.
 
         """
         Lvar = self.qp.Lvar
@@ -564,35 +564,35 @@ class RegQPInteriorPointSolver(object):
             self.log.info(output_line)
 
         # Determine solution time
-        solve_time = cputime() - setup_time
+        tsolve = cputime() - setup_time
 
         self.log.info('-' * len(self.header))
 
         # Resolve why the iteration stopped and print status
         if exitOpt:
-            status = 'Optimal solution found'
-            short_status = 'opt'
+            long_status = 'Optimal solution found'
+            status = 'opt'
         elif exitInfeasD:
-            status = 'Problem seems to be (locally) dual infeasible'
-            short_status = 'dInf'
+            long_status = 'Problem seems to be (locally) dual infeasible'
+            status = 'dInf'
         elif exitInfeasP:
-            status = 'Problem seems to be (locally) primal infeasible'
-            short_status = 'pInf'
+            long_status = 'Problem seems to be (locally) primal infeasible'
+            status = 'pInf'
         elif exitIter:
-            status = 'Maximum number of iterations reached'
-            short_status = 'iter'
+            long_status = 'Maximum number of iterations reached'
+            status = 'iter'
         else:
-            status = 'Problem could not be regularized sufficiently.'
-            short_status = 'degn'
+            long_status = 'Problem could not be regularized sufficiently.'
+            status = 'degn'
 
-        self.log.info(status)
+        self.log.info(long_status)
 
         # Transfer final values to class members.
         self.iter = iter
         self.kktRes = kktRes
-        self.solve_time = solve_time
+        self.tsolve = tsolve
+        self.long_status = long_status
         self.status = status
-        self.short_status = short_status
 
         return
 
