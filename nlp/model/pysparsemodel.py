@@ -34,7 +34,8 @@ class PySparseNLPModel(NLPModel):
                                  self).jac(*args, **kwargs)
         J = psp(nrow=self.ncon, ncol=self.nvar,
                 sizeHint=vals.size, symmetric=False)
-        J.put(vals, rows, cols)
+        if vals.size > 0:
+            J.put(vals, rows, cols)
         return J
 
 
