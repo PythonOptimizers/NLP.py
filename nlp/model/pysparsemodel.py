@@ -119,9 +119,9 @@ class PySparseSlackModel(SlackModel):
 
         # Insert contribution of general constraints
         if lp:
-            J[:on, :on] = self.model.A()
+            J[:, :on] = self.model.A()
         else:
-            J[:on, :on] = self.model.jac(x[:on])
+            J[:, :on] = self.model.jac(x[:on])
 
         # Create a few index lists
         rlowerC = np.array(range(nlowerC))
