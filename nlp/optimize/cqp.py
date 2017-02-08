@@ -433,17 +433,21 @@ class RegQPInteriorPointSolver(object):
                     alpha_p*dx_aff[self.all_lb] - Lvar[self.all_lb])
                 uComp_aff = (zU + alpha_d*dzU_aff)*(Uvar[self.all_ub] - \
                     x[self.all_ub] - alpha_p*dx_aff[self.all_ub])
-                mu_aff = (lComp_aff.sum() + uComp_aff.sum()) / (nl + nu)
 
                 # Incorporate predictor information for corrector step.
-                sigma = (mu_aff / self.mu)**3
-                self.set_system_rhs(sigma=sigma)
+                if (nl + nu) > 0:
+                    mu_aff = (lComp_aff.sum() + uComp_aff.sum()) / (nl + nu)
+                    sigma = (mu_aff / self.mu)**3
+                else:
+                    mu_aff = 0.0
+                    sigma = 0.0
+
             else:
                 # Use long-step method: Compute centering parameter.
                 sigma = min(0.1, 100 * self.mu)
-                self.set_system_rhs(sigma=sigma)
 
             # Solve augmented system.
+            self.set_system_rhs(sigma=sigma)
             self.solve_system(self.rhs)
             dx, dy, dzL, dzU = self.extract_xyz(sigma=sigma)
 
@@ -671,7 +675,7 @@ class RegQPInteriorPointSolver(object):
 
         # Solve system and collect solution
         self.solve_system(self.rhs)
-        x_guess, _, _, _ = self.extract_xyz()
+        x, _, _, _ = self.extract_xyz()
 
         # Assemble second right-hand side
         self.set_system_rhs(dual=True)
@@ -682,40 +686,48 @@ class RegQPInteriorPointSolver(object):
 
         # Use Mehrotra's heuristic to compute a strictly feasible starting
         # point for all x and z
-        rL_guess = x_guess[self.all_lb] - Lvar[self.all_lb]
-        rU_guess = Uvar[self.all_ub] - x_guess[self.all_ub]
+        if nl > 0:
+            rL_guess = x[self.all_lb] - Lvar[self.all_lb]
+            drL = max(0.0, -1.5*np.min(rL_guess))
+            dzL = max(0.0, -1.5*np.min(zL_guess))
 
-        drL = max(0.0, -1.5*np.min(rL_guess))
-        drU = max(0.0, -1.5*np.min(rU_guess))
-        dzL = max(0.0, -1.5*np.min(zL_guess))
-        dzU = max(0.0, -1.5*np.min(zU_guess))
+            rL_shift = drL + 0.5*np.dot(rL_guess + drL, zL_guess + dzL) / \
+                ((zL_guess + dzL).sum())
+            zL_shift = dzL + 0.5*np.dot(rL_guess + drL, zL_guess + dzL) / \
+                ((rL_guess + drL).sum())
 
-        rL_shift = drL + 0.5*np.dot(rL_guess + drL, zL_guess + dzL) / \
-            ((zL_guess + dzL).sum())
-        zL_shift = dzL + 0.5*np.dot(rL_guess + drL, zL_guess + dzL) / \
-            ((rL_guess + drL).sum())
-        rU_shift = drU + 0.5*np.dot(rU_guess + drU, zU_guess + dzU) / \
-            ((zU_guess + dzU).sum())
-        zU_shift = dzU + 0.5*np.dot(rU_guess + drU, zU_guess + dzU) / \
-            ((rU_guess + drU).sum())
+            rL = rL_guess + rL_shift
+            zL = zL_guess + zL_shift
+            x[self.all_lb] = Lvar[self.all_lb] + rL
+        else:
+            zL = zL_guess
 
-        rL = rL_guess + rL_shift
-        rU = rU_guess + rU_shift
-        zL = zL_guess + zL_shift
-        zU = zU_guess + zU_shift
+        if nu > 0:
+            rU_guess = Uvar[self.all_ub] - x[self.all_ub]
 
-        x = x_guess
-        x[self.all_lb] = Lvar[self.all_lb] + rL
-        x[self.all_ub] = Uvar[self.all_ub] - rU
+            drU = max(0.0, -1.5*np.min(rU_guess))
+            dzU = max(0.0, -1.5*np.min(zU_guess))
+
+            rU_shift = drU + 0.5*np.dot(rU_guess + drU, zU_guess + dzU) / \
+                ((zU_guess + dzU).sum())
+            zU_shift = dzU + 0.5*np.dot(rU_guess + drU, zU_guess + dzU) / \
+                ((rU_guess + drU).sum())
+
+            rU = rU_guess + rU_shift
+            zU = zU_guess + zU_shift
+            x[self.all_ub] = Uvar[self.all_ub] - rU
+        else:
+            zU = zU_guess
 
         # An additional normalization step for the range-bounded variables
         #
         # This normalization prevents the shift computed in rL and rU from
         # taking us outside the feasible range, and yields the same final
         # x value whether we take (Lvar + rL*norm) or (Uvar - rU*norm) as x
-        intervals = Uvar[self.qp.rangeB] - Lvar[self.qp.rangeB]
-        norm_factors = intervals / (intervals + rL_shift + rU_shift)
-        x[self.qp.rangeB] = Lvar[self.qp.rangeB] + rL[self.range_in_lb]*norm_factors
+        if nl > 0 and nu > 0:
+            intervals = Uvar[self.qp.rangeB] - Lvar[self.qp.rangeB]
+            norm_factors = intervals / (intervals + rL_shift + rU_shift)
+            x[self.qp.rangeB] = Lvar[self.qp.rangeB] + rL[self.range_in_lb]*norm_factors
 
         # Initialization complete
         self.initial_guess = False
