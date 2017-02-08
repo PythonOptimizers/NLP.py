@@ -200,6 +200,13 @@ class RegQPInteriorPointSolver(object):
         self.stoptol = kwargs.get('stoptol', 1.0e-6)
         self.mehrotra_pc = kwargs.get('mehrotra_pc', True)
 
+        # Values to set in case of a problem failure
+        self.status = 'fail'
+        self.iter = 0
+        self.tsolve = 0.0
+        self.kktRes = 0.0
+        self.qpObj = 0.0
+
         return
 
     def scale(self):
