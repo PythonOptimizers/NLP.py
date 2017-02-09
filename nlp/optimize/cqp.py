@@ -107,6 +107,7 @@ class RegQPInteriorPointSolver(object):
         self.scale_type = kwargs.get('scale_type', 'none')
 
         self.qp = qp
+        print qp        # Let the user know we have started
 
         # Solver cannot support QPs with fixed variables at this time
         if qp.nfixedB > 0:
@@ -753,17 +754,22 @@ class RegQPInteriorPointSolver(object):
         dxu = dx[self.all_ub]
         l = self.qp.Lvar[self.all_lb]
         u = self.qp.Uvar[self.all_ub]
+        eps = 1.e-20
 
         if self.nl == 0:
             alphaL_max = 1.0
         else:
-            alphaL = np.where(dxl < 0, -(xl - l)/dxl, 1.)
+            # If dxl == 0., shift it slightly to prevent division by zero
+            dxl_mod = np.where(dxl == 0., eps, dxl)
+            alphaL = np.where(dxl < 0, -(xl - l)/dxl_mod, 1.)
             alphaL_max = min(1.0, alphaL.min())
 
         if self.nu == 0:
             alphaU_max = 1.0
         else:
-            alphaU = np.where(dxu > 0, (u - xu)/dxu, 1.)
+            # If dxu == 0., shift it slightly to prevent division by zero
+            dxu_mod = np.where(dxu == 0., -eps, dxu)
+            alphaU = np.where(dxu > 0, (u - xu)/dxu_mod, 1.)
             alphaU_max = min(1.0, alphaU.min())
 
         if min(alphaL_max,alphaU_max) == 1.0:
