@@ -689,8 +689,8 @@ class RegQPInteriorPointSolver(object):
         # point for all x and z
         if nl > 0:
             rL_guess = x[self.all_lb] - Lvar[self.all_lb]
-            drL = max(0.0, -1.5*np.min(rL_guess))
-            dzL = max(0.0, -1.5*np.min(zL_guess))
+            drL = 1.5 + max(0.0, -1.5*np.min(rL_guess))
+            dzL = 1.5 + max(0.0, -1.5*np.min(zL_guess))
 
             rL_shift = drL + 0.5*np.dot(rL_guess + drL, zL_guess + dzL) / \
                 ((zL_guess + dzL).sum())
@@ -706,8 +706,8 @@ class RegQPInteriorPointSolver(object):
         if nu > 0:
             rU_guess = Uvar[self.all_ub] - x[self.all_ub]
 
-            drU = max(0.0, -1.5*np.min(rU_guess))
-            dzU = max(0.0, -1.5*np.min(zU_guess))
+            drU = 1.5 + max(0.0, -1.5*np.min(rU_guess))
+            dzU = 1.5 + max(0.0, -1.5*np.min(zU_guess))
 
             rU_shift = drU + 0.5*np.dot(rU_guess + drU, zU_guess + dzU) / \
                 ((zU_guess + dzU).sum())
