@@ -797,17 +797,22 @@ class RegQPInteriorPointSolver(object):
     def max_dual_step_length(self, dzL, dzU):
         """Compute the maximum step to the boundary in the dual variables."""
         self.log.debug('Computing dual step length')
+        eps = 1.e-20
 
         if self.nl == 0:
             alphaL_max = 1.0
         else:
-            alphaL = np.where(dzL < 0, -self.zL/dzL, 1.)
+            # If dzL == 0., shift it slightly to prevent division by zero
+            dzL_mod = np.where(dzL == 0., eps, dzL)
+            alphaL = np.where(dzL < 0, -self.zL/dzL_mod, 1.)
             alphaL_max = min(1.0,alphaL.min())
 
         if self.nu == 0:
             alphaU_max = 1.0
         else:
-            alphaU = np.where(dzU < 0, -self.zU/dzU, 1.)
+            # If dzU == 0., shift it slightly to prevent division by zero
+            dzU_mod = np.where(dzU == 0., -eps, dzU)
+            alphaU = np.where(dzU < 0, -self.zU/dzU_mod, 1.)
             alphaU_max = min(1.0,alphaU.min())
 
         if min(alphaL_max,alphaU_max) == 1.0:
