@@ -76,7 +76,7 @@ class SlackModel(NLPModel):
 
         # Update effective number of variables and constraints
         n = self.original_n + n_slacks
-        m = self.original_m + model.nrangeC
+        m = self.original_m
 
         Lvar = -np.infty * np.ones(n)
         Uvar = +np.infty * np.ones(n)
