@@ -416,7 +416,7 @@ class RegQPInteriorPointSolver(object):
             # Exit immediately if regularization is unsuccessful.
             if not self.LBL.isFullRank:
                 self.log.debug('Unable to regularize sufficiently. Exiting')
-                continue
+                break
 
             # Compute the right-hand side based on the step computation method
             if self.mehrotra_pc:
@@ -880,6 +880,8 @@ class RegQPInteriorPointSolver(object):
         """Update the linear system matrix with the new regularization
         parameters. This is a helper method when checking the system for
         degeneracy."""
+        n = self.n
+        m = self.m
         self.log.debug('Updating matrix')
         self.H.put(self.diagQ + self.primal_reg, range(n))
         self.H.put(-self.dual_reg, range(n,n+m))
@@ -1097,6 +1099,8 @@ class RegQPInteriorPointSolver2x2(RegQPInteriorPointSolver):
         new_diag[self.all_lb] += self.zL / x_minus_l
         new_diag[self.all_ub] += self.zU / u_minus_x
 
+        n = self.n
+        m = self.m
         self.H.put(new_diag, range(n))
         self.H.put(-self.dual_reg_min**0.5, range(n,n+m))
         self.H.put(-self.dual_reg, range(n,n+m))
