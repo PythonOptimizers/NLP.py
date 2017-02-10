@@ -500,7 +500,11 @@ class RegQPInteriorPointSolver(object):
                             gamma_p -= (x[index_p] - Lvar[index_p])
                             gamma_p /= (alpha_p*dx[index_p])
 
-                        alpha_p *= max(1 - mult, gamma_p)
+                        # If mu_temp is very small, gamma_p = 1. is possible due to
+                        # a cancellation error in the gamma_p calculation above.
+                        # Therefore, set a maximum value of alpha_p < 1 to prevent
+                        # division-by-zero errors later in the program.
+                        alpha_p *= min(max(1 - mult, gamma_p), 1. - 1.e-16)
 
                     # If alpha_d < 1.0, compute a gamma_d such that the
                     # complementarity of the updated (x,z) pair is mult*mu_temp
@@ -518,7 +522,11 @@ class RegQPInteriorPointSolver(object):
                             gamma_d -= zL[ref_index]
                             gamma_d /= (alpha_d*dzL[ref_index])
 
-                        alpha_d *= max(1 - mult, gamma_d)
+                        # If mu_temp is very small, gamma_d = 1. is possible due to
+                        # a cancellation error in the gamma_d calculation above.
+                        # Therefore, set a maximum value of alpha_d < 1 to prevent
+                        # division-by-zero errors later in the program.
+                        alpha_d *= min(max(1 - mult, gamma_d), 1. - 1.e-16)
 
             else:
                 # Use the standard fraction-to-the-boundary rule
