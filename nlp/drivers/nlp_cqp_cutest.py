@@ -66,8 +66,8 @@ for name in args.name_list:
         name = name[:-4]
 
     prob = PySparseCUTEstModel(name)
-    # prob.compute_scaling_obj()
-    # prob.compute_scaling_cons()
+    prob.compute_scaling_obj()
+    prob.compute_scaling_cons()
 
     slack_prob = PySparseSlackModel(prob)
     cqp = CQP(slack_prob, mehrotra_pc=args.use_pc, scale_type=args.use_scale)
