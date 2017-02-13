@@ -11,8 +11,6 @@ For references on these methods see
 import logging
 from nlp.model.augmented_lagrangian import AugmentedLagrangian
 from nlp.model.augmented_lagrangian import QuasiNewtonAugmentedLagrangian
-# from nlp.model.augmented_lagrangian import StructuredQuasiNewtonAugmentedLagrangian
-from nlp.model.qnmodel import QuasiNewtonModel
 from nlp.optimize.pcg import TruncatedCG
 from nlp.tools.exceptions import UserExitRequest
 from nlp.tools.utils import project, where
