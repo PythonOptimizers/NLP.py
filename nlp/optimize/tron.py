@@ -265,25 +265,21 @@ class TRON(object):
                               radius=self.tr.radius,
                               abstol=tol)
 
-            step = self.solver.step
+            step = np.zeros(x.size)
+            step[free_vars] = self.solver.step
             iters += self.solver.niter
 
-            # Exit if the solver took no additional steps
+            # Exit immediately if the solver took no additional steps
             if self.solver.niter == 0:
                 exitOptimal = True
                 info = 4
+                break
 
             # Use a projected search to obtain the next iterate
-            (xfree, proj_step) = self.projected_linesearch(x[free_vars],
-                                                           l[free_vars],
-                                                           u[free_vars],
-                                                           gfree, step, ZHZ,
-                                                           alpha=1.0)
+            (x, s) = self.projected_linesearch(x, l, u, g, s,
+                                               step, H, alpha=1.0)
 
-            # Update the minimizer and the step.
             # Note that s now contains x[k+1] - x[0]
-            x[free_vars] = xfree
-            s[free_vars] += proj_step
 
             # Compute the gradient grad q(x[k+1]) = g + H*(x[k+1] - x[0])
             # of q at x[k+1] for the free variables.
@@ -309,7 +305,7 @@ class TRON(object):
         self.log.debug("leaving projected_newton_step with info=%d", info)
         return (x, s, iters, info)
 
-    def projected_linesearch(self, x, l, u, g, d, H, alpha=1.0):
+    def projected_linesearch(self, x, l, u, g, s0, d, H, alpha=1.0):
         u"""Use a projected search to compute a satisfactory step.
 
         This step must satisfy a sufficient decrease condition for the
@@ -319,13 +315,17 @@ class TRON(object):
 
         where H=Hᵀ and g is a vector. Given the parameter α, the step is
 
-           s[α] = P[x + α d] - x,
+           s[α] = s₀ + P[x + α d] - x,
 
         where d is the search direction and P the projection into the
-        box [l, u]. The final step s = s[α] satisfies the sufficient decrease
+        box [l, u]. The final step s = s[α] satisfies the descent direction
         condition
 
-           q(s) ≤ μ₀ gᵀs,
+           gᵀs < 0
+
+        and the sufficient decrease condition
+
+           q(s) ≤ q(s₀) + μ₀ (g + Hs₀)ᵀ(P[x + α d] - x),
 
         where μ₀ ∈ (0, 1).
 
@@ -341,22 +341,37 @@ class TRON(object):
         # Find the smallest break-point on the ray x + α d.
         (_, brptmin, _) = breakpoints(x, d, l, u)
         self.log.debug("nearest  breakpoint: %7.1e", brptmin)
+        if brptmin == 0.0:
+            raise ValueError("Zero breakpoint detected")
+
+        # Check that d is a descent direction from s = s0
+        Hs0 = H * s0
+        g0 = g + Hs0        # Gradient at s0
+        gtd = np.dot(g0,d)
+        if gtd >= 0.0:
+            msg = "Provided d is not a descent direction: slope = %8.1e" % gtd
+            raise ValueError(msg)
+
+        # Compute q(s0)
+        q0 = 0.5 * np.dot(Hs0, s0) + np.dot(g,s0)
 
         # Reduce alpha until the sufficient decrease condition is
-        # satisfied or x + α w is feasible.
+        # satisfied or x + α d is feasible.
 
         search = True
         while search and alpha > brptmin:
 
-            # Calculate P[x + alpha*w] - x and check the sufficient
-            # decrease condition.
+            # Calculate P[x + alpha*d] - x and check the descent
+            # direction and sufficient decrease conditions.
             nsteps += 1
 
-            s = projected_step(x, alpha * d, l, u)
+            d_proj = projected_step(x, alpha * d, l, u)
+            s = s0 + d_proj
             Hs = H * s
             gts = np.dot(g, s)
+            gtd = np.dot(g0, d_proj)
             q = .5 * np.dot(Hs, s) + gts
-            if q <= mu0 * gts:
+            if q <= q0 + mu0 * gtd and gts < 0.0:
                 search = False
             else:
                 alpha *= interpf
@@ -369,7 +384,7 @@ class TRON(object):
             alpha = brptmin
 
         # Compute the final iterate and step.
-        s = projected_step(x, alpha * d, l, u)
+        s = s0 + projected_step(x, alpha * d, l, u)
         x = project(x + alpha * d, l, u)
         return (x, s)
 
