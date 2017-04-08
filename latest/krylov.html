@@ -1,0 +1,342 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Iterative Solution of Systems of Linear Equations &mdash; NLP.py: An Object-Oriented Environment for Large-Scale Optimization</title>
+  
+
+  
+  
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/julia.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="NLP.py: An Object-Oriented Environment for Large-Scale Optimization" href="index.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="contents.html" class="icon icon-home"> NLP.py
+          
+
+          
+          </a>
+          <h1>NLP.py</h1>
+
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installing.html">Installation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modeling.html">Modeling in NLP.py</a></li>
+<li class="toctree-l1"><a class="reference internal" href="globalization.html">Globalization Techniques</a></li>
+<li class="toctree-l1"><a class="reference internal" href="optim.html">Complete Solvers</a></li>
+</ul>
+
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="contents.html">NLP.py</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="contents.html">Docs</a> &raquo;</li>
+        
+      <li>Iterative Solution of Systems of Linear Equations</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            
+              <a href="https://github.com/PythonOptimizers/NLP.py/blob/master/doc/source/krylov.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="iterative-solution-of-systems-of-linear-equations">
+<span id="krylov-page"></span><h1>Iterative Solution of Systems of Linear Equations<a class="headerlink" href="#iterative-solution-of-systems-of-linear-equations" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="the-pcg-module">
+<h2>The <a class="reference internal" href="#module-pcg" title="pcg"><code class="xref py py-mod docutils literal"><span class="pre">pcg</span></code></a> Module<a class="headerlink" href="#the-pcg-module" title="Permalink to this headline">¶</a></h2>
+<span class="target" id="module-pcg"><span id="pcg-section"></span></span><p>A pure Python/numpy implementation of the Steihaug-Toint
+truncated preconditioned conjugate gradient algorithm as described in</p>
+<blockquote>
+<div>T. Steihaug, <em>The conjugate gradient method and trust regions in large scale
+optimization</em>, SIAM Journal on Numerical Analysis <strong>20</strong> (3), pp. 626-637,
+1983.</div></blockquote>
+<dl class="class">
+<dt id="pcg.TruncatedCG">
+<em class="property">class </em><code class="descclassname">pcg.</code><code class="descname">TruncatedCG</code><span class="sig-paren">(</span><em>qp</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pcg.TruncatedCG" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<dl class="method">
+<dt id="pcg.TruncatedCG.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>qp</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pcg.TruncatedCG.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Solve the quadratic trust-region subproblem</p>
+<blockquote>
+<div>minimize    g&#8217;s + 1/2 s&#8217;Hs
+subject to  s&#8217;s  &lt;=  radius</div></blockquote>
+<p>by means of the truncated conjugate gradient algorithm (aka the
+Steihaug-Toint algorithm). The notation <cite>x&#8217;y</cite> denotes the dot
+product of vectors <cite>x</cite> and <cite>y</cite>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><table class="first docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">qp:</th><td class="field-body">an instance of the <code class="xref py py-class docutils literal"><span class="pre">QPModel</span></code> class.
+The Hessian H must be a symmetric linear
+operator of appropriate size, but not necessarily
+positive definite.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">logger_name:</th><td class="field-body">name of a logger object that can be used during the
+iterations                         (default None)</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><p>Upon return, the following attributes are set:</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">step:</th><td class="field-body">final step,</td>
+</tr>
+<tr class="field-even field"><th class="field-name">niter:</th><td class="field-body">number of iterations,</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">step_norm:</th><td class="field-body">Euclidian norm of the step,</td>
+</tr>
+<tr class="field-even field"><th class="field-name">dir:</th><td class="field-body">direction of infinite descent (if radius=None and
+H is not positive definite),</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">onBoundary:</th><td class="field-body">set to True if trust-region boundary was hit,</td>
+</tr>
+<tr class="field-even field"><th class="field-name">infDescent:</th><td class="field-body">set to True if a direction of infinite descent was found</td>
+</tr>
+</tbody>
+</table>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The algorithm stops as soon as the preconditioned norm of the gradient
+falls under</p>
+<blockquote>
+<div>max( abstol, reltol * g0 )</div></blockquote>
+<p>where g0 is the preconditioned norm of the initial gradient (or the
+Euclidian norm if no preconditioner is given), or as soon as the
+iterates cross the boundary of the trust region.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pcg.TruncatedCG.post_iteration">
+<code class="descname">post_iteration</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pcg.TruncatedCG.post_iteration" title="Permalink to this definition">¶</a></dt>
+<dd><p>Subclass and override this method to implement custom post-iteration
+actions. This method will be called at the end of each CG iteration.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pcg.TruncatedCG.solve">
+<code class="descname">solve</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pcg.TruncatedCG.solve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Solve the trust-region subproblem.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">s0:</th><td class="field-body">initial guess (default: [0,0,...,0]),</td>
+</tr>
+<tr class="field-even field"><th class="field-name">radius:</th><td class="field-body">the trust-region radius (default: None),</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">abstol:</th><td class="field-body">absolute stopping tolerance (default: 1.0e-8),</td>
+</tr>
+<tr class="field-even field"><th class="field-name">reltol:</th><td class="field-body">relative stopping tolerance (default: 1.0e-6),</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">maxiter:</th><td class="field-body">maximum number of iterations (default: 2n),</td>
+</tr>
+<tr class="field-even field"><th class="field-name">prec:</th><td class="field-body">a user-defined preconditioner.</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="the-projkrylov-module">
+<h2>The <code class="xref py py-mod docutils literal"><span class="pre">projKrylov</span></code> Module<a class="headerlink" href="#the-projkrylov-module" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="the-ppcg-module">
+<h2>The <code class="xref py py-mod docutils literal"><span class="pre">ppcg</span></code> Module<a class="headerlink" href="#the-ppcg-module" title="Permalink to this headline">¶</a></h2>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Sylvain Arreckx, Dominique Orban and Nikolaj Van Omme.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.2',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

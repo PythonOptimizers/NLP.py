@@ -1,0 +1,757 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Complete Solvers &mdash; NLP.py: An Object-Oriented Environment for Large-Scale Optimization</title>
+  
+
+  
+  
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/julia.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="NLP.py: An Object-Oriented Environment for Large-Scale Optimization" href="index.html"/>
+        <link rel="prev" title="Globalization Techniques" href="globalization.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="contents.html" class="icon icon-home"> NLP.py
+          
+
+          
+          </a>
+          <h1>NLP.py</h1>
+
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installing.html">Installation</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="modeling.html">Modeling in NLP.py</a></li>
+<li class="toctree-l1"><a class="reference internal" href="globalization.html">Globalization Techniques</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Complete Solvers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#linear-programming">Linear Programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#convex-quadratic-programming">Convex Quadratic Programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#unconstrained-programming">Unconstrained Programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#bound-constrained-programming">Bound-Constrained Programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#general-nonlinear-programming">General Nonlinear Programming</a></li>
+</ul>
+</li>
+</ul>
+
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="contents.html">NLP.py</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="contents.html">Docs</a> &raquo;</li>
+        
+      <li>Complete Solvers</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            
+              <a href="https://github.com/PythonOptimizers/NLP.py/blob/master/doc/source/optim.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="complete-solvers">
+<span id="optimize-page"></span><h1>Complete Solvers<a class="headerlink" href="#complete-solvers" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="linear-programming">
+<span id="solvers-section"></span><h2>Linear Programming<a class="headerlink" href="#linear-programming" title="Permalink to this headline">¶</a></h2>
+<p>The linear programming problem can be stated in standard form as</p>
+<div class="math">
+\[\min_{x \in \mathbb{R}^n} \ c^T x \quad \text{subject to} \ Ax=b, \ x \geq
+0,\]</div>
+<p>for some matrix <span class="math">\(A\)</span>. It is typical to reformulate arbitrary linear
+programs as an equivalent linear program in standard form. However, in the next
+solver, they are reformulated in so-called <code class="docutils literal"><span class="pre">slack</span> <span class="pre">form</span></code> using the
+<cite>SlackFramework</cite> module. See <span class="xref std std-ref">slacks-section</span>.</p>
+</div>
+<div class="section" id="convex-quadratic-programming">
+<h2>Convex Quadratic Programming<a class="headerlink" href="#convex-quadratic-programming" title="Permalink to this headline">¶</a></h2>
+<p>The convex quadratic programming problem can be stated in standard form as</p>
+<div class="math">
+\[\min_{x \in \mathbb{R}^n} \ c^T x + \tfrac{1}{2} x^T Q x \quad \text{subject to} \ Ax=b, \ x \geq
+0,\]</div>
+<p>for some matrix <span class="math">\(A\)</span> and some square symmetric positive semi-definite
+matrix <span class="math">\(Q\)</span>. It is typical to reformulate arbitrary quadratic
+programs as an equivalent quadratic program in standard form. However, in the next
+solver, they are reformulated in so-called <code class="docutils literal"><span class="pre">slack</span> <span class="pre">form</span></code> using the
+<cite>SlackFramework</cite> module. See <span class="xref std std-ref">slacks-section</span>.</p>
+</div>
+<div class="section" id="unconstrained-programming">
+<h2>Unconstrained Programming<a class="headerlink" href="#unconstrained-programming" title="Permalink to this headline">¶</a></h2>
+<p>The unconstrained programming problem can be stated as</p>
+<div class="math">
+\[\min_{x \in \mathbb{R}^n} \ f(x)\]</div>
+<p>for some smooth function <span class="math">\(f: \mathbb{R}^n \to \R\)</span>. Typically, <span class="math">\(f\)</span>
+is required to be twice continuously differentiable.</p>
+<p>The <cite>trunk</cite> solver requires access to exact first and second derivatives of
+<span class="math">\(f\)</span>. If minimizes <span class="math">\(f\)</span> by solving a sequence of trust-region
+subproblems, i.e., problems of the form</p>
+<div class="math">
+\[\min_{d \in \mathbb{R}^n} \ g_k^T d + \tfrac{1}{2} d^T H_k d \quad
+\text{s.t.} \ \|d\| \leq \Delta_k,\]</div>
+<p>where <span class="math">\(g_k = \nabla f(x_k)\)</span>, <span class="math">\(H_k = \nabla^2 f(x_k)\)</span> and
+<span class="math">\(\Delta_k &gt; 0\)</span> is the current trust-region radius.</p>
+<span class="target" id="module-trunk"></span><p>TRUNK: Trust-Region Method for Unconstrained Programming.</p>
+<ol class="upperalpha simple" start="4">
+<li>Orban            Montreal Sept. 2003</li>
+</ol>
+<dl class="class">
+<dt id="trunk.Trunk">
+<em class="property">class </em><code class="descclassname">trunk.</code><code class="descname">Trunk</code><span class="sig-paren">(</span><em>nlp</em>, <em>tr</em>, <em>tr_solver</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trunk.Trunk" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<p>Abstract trust-region method for unconstrained optimization.</p>
+<p>A stationary point of the unconstrained problem</p>
+<blockquote>
+<div>minimize f(x)</div></blockquote>
+<p>is identified by solving a sequence of trust-region constrained quadratic
+subproblems</p>
+<blockquote>
+<div>min  gᵀs + ½ s&#8217;Hs  subject to  ‖s‖ ≤ Δ.</div></blockquote>
+<dl class="method">
+<dt id="trunk.Trunk.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>nlp</em>, <em>tr</em>, <em>tr_solver</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trunk.Trunk.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Instantiate a trust-region solver for <code class="docutils literal"><span class="pre">nlp</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><table class="first docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">nlp:</th><td class="field-body">a <code class="xref py py-class docutils literal"><span class="pre">NLPModel</span></code> instance.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">tr:</th><td class="field-body">a <code class="xref py py-class docutils literal"><span class="pre">TrustRegion</span></code> instance.</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">tr_solver:</th><td class="field-body">a trust-region solver to be passed as argument to
+the <code class="xref py py-class docutils literal"><span class="pre">TrustRegionSolver</span></code> constructor.</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">x0:</th><td class="field-body">starting point                     (<code class="docutils literal"><span class="pre">nlp.x0</span></code>)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">reltol:</th><td class="field-body">relative stopping tolerance        (<code class="docutils literal"><span class="pre">nlp.stop_d</span></code>)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">abstol:</th><td class="field-body">absolute stopping tolerance        (1.0e-6)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">maxiter:</th><td class="field-body">maximum number of iterations       (max(1000,10n))</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">inexact:</th><td class="field-body">use inexact Newton stopping tol    (<code class="docutils literal"><span class="pre">False</span></code>)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">ny:</th><td class="field-body">apply Nocedal/Yuan linesearch      (<code class="docutils literal"><span class="pre">False</span></code>)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">nbk:</th><td class="field-body">max number of backtracking steps in Nocedal/Yuan
+linesearch                         (5)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">monotone:</th><td class="field-body">use monotone descent strategy      (<code class="docutils literal"><span class="pre">False</span></code>)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">n_non_monotone:</th><td class="field-body">number of iterations for which non-strict descent
+is tolerated if <code class="docutils literal"><span class="pre">monotone=False</span></code> (25)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">logger_name:</th><td class="field-body">name of a logger object that can be used in the post
+iteration                          (<code class="docutils literal"><span class="pre">None</span></code>)</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Once a <code class="docutils literal"><span class="pre">Trunk</span></code> object has been instantiated and the problem is
+set up, solve problem by issuing a call to <code class="docutils literal"><span class="pre">TRNK.solve()</span></code>.
+The algorithm stops as soon as the Euclidian norm of the gradient falls
+below</p>
+<blockquote>
+<div><code class="docutils literal"><span class="pre">max(abstol,</span> <span class="pre">reltol</span> <span class="pre">*</span> <span class="pre">g0)</span></code></div></blockquote>
+<p>where <code class="docutils literal"><span class="pre">g0</span></code> is the Euclidian norm of the initial gradient.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="trunk.Trunk.post_iteration">
+<code class="descname">post_iteration</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trunk.Trunk.post_iteration" title="Permalink to this definition">¶</a></dt>
+<dd><p>Perform work at the end of an iteration.</p>
+<p>Use this method for preconditioners that need updating,
+e.g., a limited-memory BFGS preconditioner.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="trunk.Trunk.precon">
+<code class="descname">precon</code><span class="sig-paren">(</span><em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trunk.Trunk.precon" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generic preconditioning method&#8212;must be overridden.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="trunk.Trunk.solve">
+<code class="descname">solve</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trunk.Trunk.solve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Solve.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">maxiter:</th><td class="field-body">maximum number of iterations.</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<p>All other keyword arguments are passed directly to the constructor of
+the trust-region solver.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="trunk.QNTrunk">
+<em class="property">class </em><code class="descclassname">trunk.</code><code class="descname">QNTrunk</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trunk.QNTrunk" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#trunk.Trunk" title="trunk.Trunk"><code class="xref py py-class docutils literal"><span class="pre">trunk.Trunk</span></code></a></p>
+<dl class="method">
+<dt id="trunk.QNTrunk.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trunk.QNTrunk.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="trunk.QNTrunk.post_iteration">
+<code class="descname">post_iteration</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trunk.QNTrunk.post_iteration" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="trunk.QNTrunk.precon">
+<code class="descname">precon</code><span class="sig-paren">(</span><em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trunk.QNTrunk.precon" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generic preconditioning method&#8212;must be overridden.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="trunk.QNTrunk.solve">
+<code class="descname">solve</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trunk.QNTrunk.solve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Solve.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">maxiter:</th><td class="field-body">maximum number of iterations.</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<p>All other keyword arguments are passed directly to the constructor of
+the trust-region solver.</p>
+</dd></dl>
+
+</dd></dl>
+
+<p>The L-BFGS method only requires access to exact first derivatives of
+<span class="math">\(f\)</span> and maintains its own approximation to the second derivatives.</p>
+<span class="target" id="module-lbfgs"></span><p>The limited-memory BFGS linesearch method for unconstrained optimization.</p>
+<dl class="class">
+<dt id="lbfgs.LBFGS">
+<em class="property">class </em><code class="descclassname">lbfgs.</code><code class="descname">LBFGS</code><span class="sig-paren">(</span><em>model</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#lbfgs.LBFGS" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<p>Solve unconstrained problems with the limited-memory BFGS method.</p>
+<dl class="method">
+<dt id="lbfgs.LBFGS.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>model</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#lbfgs.LBFGS.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Instantiate a L-BFGS solver for <code class="docutils literal"><span class="pre">model</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><table class="first docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">model:</th><td class="field-body">a <code class="docutils literal"><span class="pre">QuasiNewtonModel</span></code> based on <code class="docutils literal"><span class="pre">InverseLBFGSOperator</span></code></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">maxiter:</th><td class="field-body">maximum number of iterations (default: max(10n, 1000))</td>
+</tr>
+<tr class="field-even field"><th class="field-name">atol:</th><td class="field-body">absolute stopping tolerance (default: 1.0e-8)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">rtol:</th><td class="field-body">relative stopping tolerance (default: 1.0e-6)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">logger_name:</th><td class="field-body">name of a logger (default: &#8216;nlp.lbfgs&#8217;)</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="lbfgs.LBFGS.post_iteration">
+<code class="descname">post_iteration</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#lbfgs.LBFGS.post_iteration" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bookkeeping at the end of a general iteration.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="lbfgs.LBFGS.setup_linesearch">
+<code class="descname">setup_linesearch</code><span class="sig-paren">(</span><em>line_model</em>, <em>step0</em><span class="sig-paren">)</span><a class="headerlink" href="#lbfgs.LBFGS.setup_linesearch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set up linesearch for the line model with the given initial step.</p>
+<p>By default, use an <code class="docutils literal"><span class="pre">ArmijoWolfeLineSearch</span></code>.
+Override this method to use a different line search.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="lbfgs.LBFGS.solve">
+<code class="descname">solve</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#lbfgs.LBFGS.solve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Solve model with the L-BFGS method.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="lbfgs.WolfeLBFGS">
+<em class="property">class </em><code class="descclassname">lbfgs.</code><code class="descname">WolfeLBFGS</code><span class="sig-paren">(</span><em>model</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#lbfgs.WolfeLBFGS" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#lbfgs.LBFGS" title="lbfgs.LBFGS"><code class="xref py py-class docutils literal"><span class="pre">lbfgs.LBFGS</span></code></a></p>
+<p>L-BFGS with a strong Wolfe linesearch.</p>
+<dl class="method">
+<dt id="lbfgs.WolfeLBFGS.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>model</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#lbfgs.WolfeLBFGS.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Instantiate a L-BFGS solver for <code class="docutils literal"><span class="pre">model</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><table class="first docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">model:</th><td class="field-body">a <code class="docutils literal"><span class="pre">QuasiNewtonModel</span></code> based on <code class="docutils literal"><span class="pre">InverseLBFGSOperator</span></code></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">maxiter:</th><td class="field-body">maximum number of iterations (default: max(10n, 1000))</td>
+</tr>
+<tr class="field-even field"><th class="field-name">atol:</th><td class="field-body">absolute stopping tolerance (default: 1.0e-8)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">rtol:</th><td class="field-body">relative stopping tolerance (default: 1.0e-6)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">logger_name:</th><td class="field-body">name of a logger (default: &#8216;nlp.lbfgs&#8217;)</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="lbfgs.WolfeLBFGS.post_iteration">
+<code class="descname">post_iteration</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#lbfgs.WolfeLBFGS.post_iteration" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bookkeeping at the end of a general iteration.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="lbfgs.WolfeLBFGS.setup_linesearch">
+<code class="descname">setup_linesearch</code><span class="sig-paren">(</span><em>line_model</em>, <em>step0</em><span class="sig-paren">)</span><a class="headerlink" href="#lbfgs.WolfeLBFGS.setup_linesearch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set up linesearch for the line model with the given initial step.</p>
+<p>This variant uses the strong Wolfe linesearch of Moré and Thuente.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="lbfgs.WolfeLBFGS.solve">
+<code class="descname">solve</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#lbfgs.WolfeLBFGS.solve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Solve model with the L-BFGS method.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="bound-constrained-programming">
+<h2>Bound-Constrained Programming<a class="headerlink" href="#bound-constrained-programming" title="Permalink to this headline">¶</a></h2>
+<p>The unconstrained programming problem can be stated as</p>
+<div class="math">
+\[\min_{x \in \R^n} \ f(x) \quad \text{s.t.} \ x_i \geq 0 \ (i \in
+\mathcal{B})\]</div>
+<p>for some smooth function <span class="math">\(f: \R^n \to \R\)</span>. Typically, <span class="math">\(f\)</span>
+is required to be twice continuously differentiable.</p>
+<span class="target" id="module-tron"></span><p>Trust-Region Method for Bound-Constrained Programming.</p>
+<p>A pure Python/Numpy implementation of TRON as described in</p>
+<p>Chih-Jen Lin and Jorge J. Moré, <em>Newton&#8217;s Method for Large Bound-
+Constrained Optimization Problems</em>, SIAM J. Optim., 9(4), 1100–1127, 1999.</p>
+<dl class="class">
+<dt id="tron.TRON">
+<em class="property">class </em><code class="descclassname">tron.</code><code class="descname">TRON</code><span class="sig-paren">(</span><em>model</em>, <em>tr_solver</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#tron.TRON" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<p>Trust-region Newton method for bound-constrained problems.</p>
+<dl class="method">
+<dt id="tron.TRON.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>model</em>, <em>tr_solver</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#tron.TRON.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Instantiate a trust-region solver for a bound-constrained problem.</p>
+<p>The model should have the general form</p>
+<blockquote>
+<div>min f(x)  subject to l ≤ x ≤ u.</div></blockquote>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><table class="first docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">model:</th><td class="field-body">a <code class="xref py py-class docutils literal"><span class="pre">NLPModel</span></code> instance.</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">x0:</th><td class="field-body">starting point                     (<code class="docutils literal"><span class="pre">model.x0</span></code>)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">reltol:</th><td class="field-body">relative stopping tolerance        (1.0e-5)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">abstol:</th><td class="field-body">absolute stopping tolerance        (1.0e-12)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">maxiter:</th><td class="field-body">maximum number of iterations       (max(1000,10n))</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">maxfuncall:</th><td class="field-body">maximum number of objective function evaluations
+(1000)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">ny:</th><td class="field-body">perform backtracking linesearch when trust-region
+step is rejected                   (<code class="docutils literal"><span class="pre">False</span></code>)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">logger_name:</th><td class="field-body">name of a logger object that can be used in the post
+iteration                          (<code class="docutils literal"><span class="pre">None</span></code>)</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="tron.TRON.cauchy">
+<code class="descname">cauchy</code><span class="sig-paren">(</span><em>x</em>, <em>g</em>, <em>H</em>, <em>l</em>, <em>u</em>, <em>delta</em>, <em>alpha</em><span class="sig-paren">)</span><a class="headerlink" href="#tron.TRON.cauchy" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute a Cauchy step.</p>
+<p>This step must satisfy a trust region constraint and a sufficient
+decrease condition. The Cauchy step is computed for the quadratic</p>
+<blockquote>
+<div>q(s) = gᵀs + ½ sᵀHs,</div></blockquote>
+<p>where H=Hᵀ and g is a vector. Given a parameter α, the Cauchy step is</p>
+<blockquote>
+<div>s[α] = P[x - α g] - x,</div></blockquote>
+<p>with P the projection into the box [l, u].
+The Cauchy step satisfies the trust-region constraint and the
+sufficient decrease condition</p>
+<blockquote>
+<div>‖s‖ ≤ Δ,      q(s) ≤ μ₀ gᵀs,</div></blockquote>
+<p>where μ₀ ∈ (0, 1).</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="tron.TRON.post_iteration">
+<code class="descname">post_iteration</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#tron.TRON.post_iteration" title="Permalink to this definition">¶</a></dt>
+<dd><p>Override this method to perform work at the end of an iteration.</p>
+<p>For example, use this method for preconditioners that need updating,
+e.g., a limited-memory BFGS preconditioner.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="tron.TRON.precon">
+<code class="descname">precon</code><span class="sig-paren">(</span><em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#tron.TRON.precon" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generic preconditioning method&#8212;must be overridden.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="tron.TRON.projected_linesearch">
+<code class="descname">projected_linesearch</code><span class="sig-paren">(</span><em>x</em>, <em>l</em>, <em>u</em>, <em>g</em>, <em>d</em>, <em>H</em>, <em>alpha=1.0</em><span class="sig-paren">)</span><a class="headerlink" href="#tron.TRON.projected_linesearch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Use a projected search to compute a satisfactory step.</p>
+<p>This step must satisfy a sufficient decrease condition for the
+quadratic</p>
+<blockquote>
+<div>q(s) = gᵀs + ½ sᵀHs,</div></blockquote>
+<p>where H=Hᵀ and g is a vector. Given the parameter α, the step is</p>
+<blockquote>
+<div>s[α] = P[x + α d] - x,</div></blockquote>
+<p>where d is the search direction and P the projection into the
+box [l, u]. The final step s = s[α] satisfies the sufficient decrease
+condition</p>
+<blockquote>
+<div>q(s) ≤ μ₀ gᵀs,</div></blockquote>
+<p>where μ₀ ∈ (0, 1).</p>
+<p>The search direction d must be a descent direction for the quadratic q
+at x such that the quadratic is decreasing along the ray  x + α d
+for 0 ≤ α ≤ 1.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="tron.TRON.projected_newton_step">
+<code class="descname">projected_newton_step</code><span class="sig-paren">(</span><em>x</em>, <em>g</em>, <em>H</em>, <em>delta</em>, <em>l</em>, <em>u</em>, <em>s</em>, <em>cgtol</em>, <em>itermax</em><span class="sig-paren">)</span><a class="headerlink" href="#tron.TRON.projected_newton_step" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate a sequence of approximate minimizers to the QP subproblem.</p>
+<blockquote>
+<div>min q(x) subject to  l ≤ x ≤ u</div></blockquote>
+<p>where q(x₀ + s) = gᵀs + ½ sᵀHs,</p>
+<p>x₀ is a base point provided by the user, H=Hᵀ and g is a vector.</p>
+<p>At each stage we have an approximate minimizer xₖ, and generate
+a direction pₖ by using a preconditioned conjugate gradient
+method on the subproblem</p>
+<blockquote>
+<div>min {q(xₖ + p) | ‖p‖ ≤ Δ, s(fixed)=0 },</div></blockquote>
+<p>where fixed is the set of variables fixed at xₖ and Δ is the
+trust-region bound. Given pₖ, the next minimizer is generated by a
+projected search.</p>
+<p>The starting point for this subroutine is x₁ = x₀ + s, where
+s is the Cauchy step.</p>
+<dl class="docutils">
+<dt>Returned status is one of the following:</dt>
+<dd><dl class="first docutils">
+<dt>info = 1  Convergence. The final step s satisfies</dt>
+<dd>‖(g + H s)[free]‖ ≤ cgtol ‖g[free]‖, and the
+final x is an approximate minimizer in the face defined
+by the free variables.</dd>
+<dt>info = 2  Termination. The trust region bound does not allow</dt>
+<dd>further progress: ‖pₖ‖ = Δ.</dd>
+</dl>
+<p>info = 3  Failure to converge within itermax iterations.</p>
+<dl class="last docutils">
+<dt>info = 4  The trust region solver could make no further progress</dt>
+<dd>on the problem, i.e. the computed step is zero. 
+Return with the current point.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="tron.TRON.solve">
+<code class="descname">solve</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tron.TRON.solve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Solve method.</p>
+<p>All keyword arguments are passed directly to the constructor of the
+trust-region solver.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="general-nonlinear-programming">
+<h2>General Nonlinear Programming<a class="headerlink" href="#general-nonlinear-programming" title="Permalink to this headline">¶</a></h2>
+<p>The general nonlinear programming problem can be stated as</p>
+<div class="math">
+\[\begin{split}\begin{array}{ll}
+  \min_{x \in \mathbb{R}^n} &amp; f(x) \\
+  \text{s.t.} &amp; h(x) = 0, \\
+              &amp; c(x) \geq 0,
+\end{array}\end{split}\]</div>
+<p>for smooth functions <span class="math">\(f\)</span>, <span class="math">\(h\)</span> and <span class="math">\(c\)</span>.</p>
+<div class="admonition-todo admonition" id="index-0">
+<p class="first admonition-title">Todo</p>
+<p class="last">Insert this module.</p>
+</div>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="globalization.html" class="btn btn-neutral" title="Globalization Techniques" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Sylvain Arreckx, Dominique Orban and Nikolaj Van Omme.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.2',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

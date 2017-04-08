@@ -1,0 +1,891 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Globalization Techniques &mdash; NLP.py: An Object-Oriented Environment for Large-Scale Optimization</title>
+  
+
+  
+  
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/julia.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="NLP.py: An Object-Oriented Environment for Large-Scale Optimization" href="index.html"/>
+        <link rel="next" title="Complete Solvers" href="optim.html"/>
+        <link rel="prev" title="Modeling in NLP.py" href="modeling.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="contents.html" class="icon icon-home"> NLP.py
+          
+
+          
+          </a>
+          <h1>NLP.py</h1>
+
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installing.html">Installation</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="modeling.html">Modeling in NLP.py</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Globalization Techniques</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#linesearch-methods">Linesearch Methods</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#the-linesearch-module">The <code class="docutils literal"><span class="pre">linesearch</span></code> Module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#the-pyswolfe-module">The <code class="docutils literal"><span class="pre">pyswolfe</span></code> Module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#the-pymswolfe-module">The <code class="docutils literal"><span class="pre">pymswolfe</span></code> Module</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#trust-region-methods">Trust-Region Methods</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#the-trustregion-module">The <code class="docutils literal"><span class="pre">trustregion</span></code> Module</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="optim.html">Complete Solvers</a></li>
+</ul>
+
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="contents.html">NLP.py</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="contents.html">Docs</a> &raquo;</li>
+        
+      <li>Globalization Techniques</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            
+              <a href="https://github.com/PythonOptimizers/NLP.py/blob/master/doc/source/globalization.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="globalization-techniques">
+<span id="globalization-page"></span><h1>Globalization Techniques<a class="headerlink" href="#globalization-techniques" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="linesearch-methods">
+<h2>Linesearch Methods<a class="headerlink" href="#linesearch-methods" title="Permalink to this headline">¶</a></h2>
+<p>The <cite>linesearch</cite> module in NLP.py implements a few typical line searches, i.e.,
+given the current iterate <span class="math">\(x_k\)</span> along with the value <span class="math">\(f(x_k)\)</span>, the
+gradient <span class="math">\(\nabla f(x_k)\)</span> and the search direction <span class="math">\(d_k\)</span>, they
+return a stepsize <span class="math">\(\alpha_k &gt; 0\)</span> such that <span class="math">\(x_k + \alpha_k d_k\)</span>
+is an improved iterate in a certain sense. Typical conditions to be satisfied
+by <span class="math">\(\alpha_k\)</span> include the <code class="docutils literal"><span class="pre">Armijo</span> <span class="pre">condition</span></code></p>
+<div class="math">
+\[f(x_k + \alpha_k d_k) \leq f(x_k) + \beta \alpha_k \nabla f(x_k)^T d_k\]</div>
+<p>for some <span class="math">\(\beta \in (0,1)\)</span>, the <code class="docutils literal"><span class="pre">Wolfe</span> <span class="pre">conditions</span></code>, which consist in
+the Armijo condition supplemented with</p>
+<div class="math">
+\[\nabla f(x_k + \alpha_k d_k)^T d_k \geq \gamma \nabla f(x_k)^T d_k\]</div>
+<p>for some <span class="math">\(\gamma \in (0,\beta)\)</span>, and the <code class="docutils literal"><span class="pre">strong</span> <span class="pre">Wolfe</span> <span class="pre">conditions</span></code>,
+which consist in the Armijo condition supplemented with</p>
+<div class="math">
+\[|\nabla f(x_k + \alpha_k d_k)^T d_k| \leq \gamma |\nabla f(x_k)^T d_k|\]</div>
+<p>for some <span class="math">\(\gamma \in (0,\beta)\)</span>.</p>
+<div class="section" id="the-linesearch-module">
+<h3>The <a class="reference internal" href="#module-linesearch" title="linesearch"><code class="xref py py-mod docutils literal"><span class="pre">linesearch</span></code></a> Module<a class="headerlink" href="#the-linesearch-module" title="Permalink to this headline">¶</a></h3>
+<span class="target" id="module-linesearch"><span id="linesearch-section"></span></span><p>A general linesearch framework.</p>
+<dl class="class">
+<dt id="linesearch.LineSearch">
+<em class="property">class </em><code class="descclassname">linesearch.</code><code class="descname">LineSearch</code><span class="sig-paren">(</span><em>linemodel</em>, <em>name='Generic Linesearch'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#linesearch.LineSearch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<p>A generic linesearch class.</p>
+<p>Most methods of this class should be overridden by subclassing.</p>
+<dl class="method">
+<dt id="linesearch.LineSearch.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>linemodel</em>, <em>name='Generic Linesearch'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#linesearch.LineSearch.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize a linesearch method.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><table class="first docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">linemodel:</th><td class="field-body"><code class="docutils literal"><span class="pre">C1LineModel</span></code> or <code class="docutils literal"><span class="pre">C2LineModel</span></code> instance</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">step:</th><td class="field-body">initial step size (default: 1.0)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">value:</th><td class="field-body">initial function value (computed if not supplied)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">slope:</th><td class="field-body">initial slope (computed if not supplied)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">trial_value:</th><td class="field-body">function value at <cite>x + t*d</cite>
+(computed if not supplied)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">name:</th><td class="field-body">linesearch procedure name.</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="linesearch.LineSearch.check_slope">
+<code class="descname">check_slope</code><span class="sig-paren">(</span><em>slope</em><span class="sig-paren">)</span><a class="headerlink" href="#linesearch.LineSearch.check_slope" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check is supplied direction is a descent direction.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.LineSearch.iterate">
+<code class="descname">iterate</code><a class="headerlink" href="#linesearch.LineSearch.iterate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return current full-space iterate.</p>
+<p>While not normally needed by the linesearch procedure, it is here so it
+can be recovered on exit and doesn&#8217;t need to be recomputed.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.LineSearch.linemodel">
+<code class="descname">linemodel</code><a class="headerlink" href="#linesearch.LineSearch.linemodel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return underlying line model.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.LineSearch.name">
+<code class="descname">name</code><a class="headerlink" href="#linesearch.LineSearch.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return linesearch procedure name.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="linesearch.LineSearch.next">
+<code class="descname">next</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#linesearch.LineSearch.next" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.LineSearch.slope">
+<code class="descname">slope</code><a class="headerlink" href="#linesearch.LineSearch.slope" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return initial merit function slope in search direction.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.LineSearch.step">
+<code class="descname">step</code><a class="headerlink" href="#linesearch.LineSearch.step" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return current step size.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.LineSearch.stepmin">
+<code class="descname">stepmin</code><a class="headerlink" href="#linesearch.LineSearch.stepmin" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return minimum permitted step size.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.LineSearch.trial_value">
+<code class="descname">trial_value</code><a class="headerlink" href="#linesearch.LineSearch.trial_value" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return current merit function value.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.LineSearch.value">
+<code class="descname">value</code><a class="headerlink" href="#linesearch.LineSearch.value" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return initial merit function value.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="linesearch.ArmijoLineSearch">
+<em class="property">class </em><code class="descclassname">linesearch.</code><code class="descname">ArmijoLineSearch</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#linesearch.ArmijoLineSearch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#linesearch.LineSearch" title="linesearch.LineSearch"><code class="xref py py-class docutils literal"><span class="pre">linesearch.LineSearch</span></code></a></p>
+<p>Armijo backtracking linesearch.</p>
+<dl class="method">
+<dt id="linesearch.ArmijoLineSearch.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#linesearch.ArmijoLineSearch.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Instantiate an Armijo backtracking linesearch.</p>
+<p>The search stops as soon as a step size t is found such that</p>
+<blockquote>
+<div>ϕ(t) &lt;= ϕ(0) + t * ftol * ϕ&#8217;(0)</div></blockquote>
+<p>where 0 &lt; ftol &lt; 1 and ϕ&#8217;(0) is the directional derivative of
+a merit function f in the descent direction d. true.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">ftol:</th><td class="field-body">constant used in Armijo condition (default: 1.0e-4)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">bkmax:</th><td class="field-body">maximum number of backtracking steps (default: 20)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">decr:</th><td class="field-body">factor by which to reduce the steplength
+during the backtracking (default: 1.5).</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.ArmijoLineSearch.bk">
+<code class="descname">bk</code><a class="headerlink" href="#linesearch.ArmijoLineSearch.bk" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.ArmijoLineSearch.bkmax">
+<code class="descname">bkmax</code><a class="headerlink" href="#linesearch.ArmijoLineSearch.bkmax" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="linesearch.ArmijoLineSearch.check_slope">
+<code class="descname">check_slope</code><span class="sig-paren">(</span><em>slope</em><span class="sig-paren">)</span><a class="headerlink" href="#linesearch.ArmijoLineSearch.check_slope" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check is supplied direction is a descent direction.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.ArmijoLineSearch.decr">
+<code class="descname">decr</code><a class="headerlink" href="#linesearch.ArmijoLineSearch.decr" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.ArmijoLineSearch.ftol">
+<code class="descname">ftol</code><a class="headerlink" href="#linesearch.ArmijoLineSearch.ftol" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.ArmijoLineSearch.iterate">
+<code class="descname">iterate</code><a class="headerlink" href="#linesearch.ArmijoLineSearch.iterate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return current full-space iterate.</p>
+<p>While not normally needed by the linesearch procedure, it is here so it
+can be recovered on exit and doesn&#8217;t need to be recomputed.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.ArmijoLineSearch.linemodel">
+<code class="descname">linemodel</code><a class="headerlink" href="#linesearch.ArmijoLineSearch.linemodel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return underlying line model.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.ArmijoLineSearch.name">
+<code class="descname">name</code><a class="headerlink" href="#linesearch.ArmijoLineSearch.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return linesearch procedure name.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="linesearch.ArmijoLineSearch.next">
+<code class="descname">next</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#linesearch.ArmijoLineSearch.next" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.ArmijoLineSearch.slope">
+<code class="descname">slope</code><a class="headerlink" href="#linesearch.ArmijoLineSearch.slope" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return initial merit function slope in search direction.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.ArmijoLineSearch.step">
+<code class="descname">step</code><a class="headerlink" href="#linesearch.ArmijoLineSearch.step" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return current step size.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.ArmijoLineSearch.stepmin">
+<code class="descname">stepmin</code><a class="headerlink" href="#linesearch.ArmijoLineSearch.stepmin" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return minimum permitted step size.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.ArmijoLineSearch.trial_value">
+<code class="descname">trial_value</code><a class="headerlink" href="#linesearch.ArmijoLineSearch.trial_value" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return current merit function value.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="linesearch.ArmijoLineSearch.value">
+<code class="descname">value</code><a class="headerlink" href="#linesearch.ArmijoLineSearch.value" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return initial merit function value.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="the-pyswolfe-module">
+<h3>The <code class="xref py py-mod docutils literal"><span class="pre">pyswolfe</span></code> Module<a class="headerlink" href="#the-pyswolfe-module" title="Permalink to this headline">¶</a></h3>
+<span class="target" id="module-wolfe"><span id="pyswolfe-section"></span></span><p>Strong Wolfe linesearch.</p>
+<p>A translation of the original Fortran implementation of the Moré and Thuente
+linesearch ensuring satisfaction of the strong Wolfe conditions.</p>
+<p>The method is described in</p>
+<p>J. J. Moré and D. J. Thuente
+Line search algorithms with guaranteed sufficient decrease
+ACM Transactions on Mathematical Software (TOMS)
+Volume 20 Issue 3, pp 286-0307, 1994
+DOI <a class="reference external" href="http://dx.doi.org/10.1145/192115.192132">http://dx.doi.org/10.1145/192115.192132</a></p>
+<dl class="class">
+<dt id="wolfe.StrongWolfeLineSearch">
+<em class="property">class </em><code class="descclassname">wolfe.</code><code class="descname">StrongWolfeLineSearch</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#wolfe.StrongWolfeLineSearch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">nlp.ls.linesearch.LineSearch</span></code></p>
+<p>Moré-Thuente linesearch for the strong Wolfe conditions.</p>
+<blockquote>
+<div><blockquote>
+<div>ϕ(t)   ≤ ϕ(0) + ftol * t * ϕ&#8217;(0)  (Armijo condition)</div></blockquote>
+<p><a href="#id1"><span class="problematic" id="id2">|ϕ&#8217;(t)|</span></a> ≤ gtol * <a href="#id3"><span class="problematic" id="id4">|ϕ&#8217;(0)|</span></a>           (curvature condition)</p>
+</div></blockquote>
+<p>where 0 &lt; ftol &lt; gtol &lt; 1.</p>
+<dl class="method">
+<dt id="wolfe.StrongWolfeLineSearch.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Instantiate a strong Wolfe linesearch procedure.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">ftol:</th><td class="field-body">constant used in Armijo condition (1.0e-4)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">gtol:</th><td class="field-body">constant used in curvature condition (0.9)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">xtol:</th><td class="field-body">minimal relative step bracket length (1.0e-10)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">lb:</th><td class="field-body">initial lower bound of the bracket</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">ub:</th><td class="field-body">initial upper bound of the bracket</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="wolfe.StrongWolfeLineSearch.check_slope">
+<code class="descname">check_slope</code><span class="sig-paren">(</span><em>slope</em><span class="sig-paren">)</span><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.check_slope" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check is supplied direction is a descent direction.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.ftol">
+<code class="descname">ftol</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.ftol" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.gtol">
+<code class="descname">gtol</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.gtol" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.iterate">
+<code class="descname">iterate</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.iterate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return current full-space iterate.</p>
+<p>While not normally needed by the linesearch procedure, it is here so it
+can be recovered on exit and doesn&#8217;t need to be recomputed.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.lb">
+<code class="descname">lb</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.lb" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.linemodel">
+<code class="descname">linemodel</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.linemodel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return underlying line model.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.name">
+<code class="descname">name</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return linesearch procedure name.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="wolfe.StrongWolfeLineSearch.next">
+<code class="descname">next</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.next" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.slope">
+<code class="descname">slope</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.slope" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return initial merit function slope in search direction.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.step">
+<code class="descname">step</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.step" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return current step size.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.stepmin">
+<code class="descname">stepmin</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.stepmin" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return minimum permitted step size.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.trial_slope">
+<code class="descname">trial_slope</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.trial_slope" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.trial_value">
+<code class="descname">trial_value</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.trial_value" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return current merit function value.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.ub">
+<code class="descname">ub</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.ub" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.value">
+<code class="descname">value</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.value" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return initial merit function value.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="wolfe.StrongWolfeLineSearch.xtol">
+<code class="descname">xtol</code><a class="headerlink" href="#wolfe.StrongWolfeLineSearch.xtol" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="the-pymswolfe-module">
+<h3>The <a class="reference internal" href="#module-pymswolfe" title="pymswolfe"><code class="xref py py-mod docutils literal"><span class="pre">pymswolfe</span></code></a> Module<a class="headerlink" href="#the-pymswolfe-module" title="Permalink to this headline">¶</a></h3>
+<span class="target" id="module-pymswolfe"><span id="pymswolfe-section"></span></span><p>PyMSWolfe: Jorge Nocedal&#8217;s modified More and Thuente linesearch
+guaranteeing satisfaction of the strong Wolfe conditions.</p>
+<dl class="class">
+<dt id="pymswolfe.StrongWolfeLineSearch">
+<em class="property">class </em><code class="descclassname">pymswolfe.</code><code class="descname">StrongWolfeLineSearch</code><span class="sig-paren">(</span><em>f</em>, <em>x</em>, <em>g</em>, <em>d</em>, <em>obj</em>, <em>grad</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pymswolfe.StrongWolfeLineSearch" title="Permalink to this definition">¶</a></dt>
+<dd><p>A general-purpose linesearch procedure enforcing the strong
+Wolfe conditions</p>
+<p>f(x+td) &lt;= f(x) + ftol * t * &lt;g(x),d&gt;    (Armijo condition)</p>
+<div class="line-block">
+<div class="line">&lt;g(x+td),d&gt; | &lt;= gtol * | &lt;g(x),d&gt; |   (curvature condition)</div>
+</div>
+<p>This is a Python interface to Jorge Nocedal&#8217;s modification of
+the More and Thuente linesearch. Usage of this class is slightly
+different from the original More and Thuente linesearch.</p>
+<p>Instantiate as follows</p>
+<p>SWLS = StrongWolfeLineSearch(f, x, g, d, obj, grad)</p>
+<p>where</p>
+<ul class="simple">
+<li>f     is the objective value at the current iterate x</li>
+<li>x     is the current iterate</li>
+<li>g     is the objective gradient at the current iterate x</li>
+<li>d     is the current search direction</li>
+<li><dl class="first docutils">
+<dt>obj   is a scalar function used to evaluate the value of</dt>
+<dd>the objective at a given point</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>grad  is a scalar function used to evaluate the gradient</dt>
+<dd>of the objective at a given point.</dd>
+</dl>
+</li>
+</ul>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">ftol:</th><td class="field-body">the constant used in the Armijo condition (1e-4)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">gtol:</th><td class="field-body">the constant used in the curvature condition (0.9)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">xtol:</th><td class="field-body">a minimal relative step bracket length (1e-16)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">stp:</th><td class="field-body">an initial step value (1.0)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">stpmin:</th><td class="field-body">the initial lower bound of the bracket (1e-20)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">stpmax:</th><td class="field-body">the initial upper bound of the bracket (1e+20)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">maxfev:</th><td class="field-body">the maximum number of function evaluations permitted (20)</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<p>To ensure existence of a step satisfying the strong Wolfe
+conditions, d should be a descent direction for f at x and
+ftol &lt;= gtol.</p>
+<p>The final value of the step will be held in SWLS.stp</p>
+<p>After the search, SWLS.armijo will be set to True if the step
+computed satisfies the Armijo condition and SWLS.curvature will
+be set to True if the step satisfies the curvature condition.</p>
+<dl class="method">
+<dt id="pymswolfe.StrongWolfeLineSearch.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>f</em>, <em>x</em>, <em>g</em>, <em>d</em>, <em>obj</em>, <em>grad</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pymswolfe.StrongWolfeLineSearch.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="pymswolfe.StrongWolfeLineSearch.search">
+<code class="descname">search</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pymswolfe.StrongWolfeLineSearch.search" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="trust-region-methods">
+<h2>Trust-Region Methods<a class="headerlink" href="#trust-region-methods" title="Permalink to this headline">¶</a></h2>
+<p>Trust-region methods are an alternative to linesearch methods as a mechanism to
+enforce global convergence, i.e., <span class="math">\(lim \nabla f(x_k) = 0\)</span>. In
+trust-region methods, a quadratic model is approximately minimized at each
+iteration subject to a trust-region constraint:</p>
+<div class="math">
+\[\begin{split}\begin{align*}
+    \min_{d \in \mathbb{R}^n} &amp; g_k^T d + \tfrac{1}{2} d^T H_k d \\
+    \text{s.t.} &amp; \|d\| \leq \Delta_k,
+\end{align*}\end{split}\]</div>
+<p>where <span class="math">\(g_k = \nabla f(x_k)\)</span>, <span class="math">\(H_k \approx \nabla^2 f(x_k)\)</span> and
+<span class="math">\(\Delta_k &gt; 0\)</span> is the current trust-region radius.</p>
+<div class="section" id="the-trustregion-module">
+<h3>The <a class="reference internal" href="#module-trustregion" title="trustregion"><code class="xref py py-mod docutils literal"><span class="pre">trustregion</span></code></a> Module<a class="headerlink" href="#the-trustregion-module" title="Permalink to this headline">¶</a></h3>
+<span class="target" id="module-trustregion"><span id="trustregion-section"></span></span><p>Class definition for Trust-Region Algorithm and Management.</p>
+<dl class="class">
+<dt id="trustregion.TrustRegion">
+<em class="property">class </em><code class="descclassname">trustregion.</code><code class="descname">TrustRegion</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trustregion.TrustRegion" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<p>A trust-region management class.</p>
+<dl class="method">
+<dt id="trustregion.TrustRegion.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trustregion.TrustRegion.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Instantiate an object allowing management of a trust region.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">radius:</th><td class="field-body">Initial trust-region radius (default: 1.0)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">eta1:</th><td class="field-body">Step acceptance threshold   (default: 0.01)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">eta2:</th><td class="field-body">Radius increase threshold   (default: 0.99)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">gamma1:</th><td class="field-body">Radius decrease factor      (default: 1/3)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">gamma2:</th><td class="field-body">Radius increase factor      (default: 2.5)</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Subclass and override <a class="reference internal" href="#trustregion.TrustRegion.update_radius" title="trustregion.TrustRegion.update_radius"><code class="xref py py-meth docutils literal"><span class="pre">update_radius()</span></code></a> to implement custom
+trust-region management rules.</p>
+<p>See, e.g.,</p>
+<p>A. R. Conn, N. I. M. Gould and Ph. L. Toint, Trust-Region Methods,
+MP01 MPS-SIAM Series on Optimization, 2000.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="trustregion.TrustRegion.ratio">
+<code class="descname">ratio</code><span class="sig-paren">(</span><em>f</em>, <em>f_trial</em>, <em>m</em>, <em>check_positive=True</em><span class="sig-paren">)</span><a class="headerlink" href="#trustregion.TrustRegion.ratio" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the ratio of actual versus predicted reduction.</p>
+<p>rho = (f - f_trial)/(-m).</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="trustregion.TrustRegion.reset_radius">
+<code class="descname">reset_radius</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#trustregion.TrustRegion.reset_radius" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reset radius to original value.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="trustregion.TrustRegion.update_radius">
+<code class="descname">update_radius</code><span class="sig-paren">(</span><em>ratio</em>, <em>step_norm</em><span class="sig-paren">)</span><a class="headerlink" href="#trustregion.TrustRegion.update_radius" title="Permalink to this definition">¶</a></dt>
+<dd><p>Update the trust-region radius.</p>
+<p>The rule implemented by this method is:</p>
+<p>radius = gamma1 * step_norm      if ared/pred &lt;  eta1
+radius = gamma2 * radius         if ared/pred &gt;= eta2
+radius unchanged otherwise,</p>
+<p>where ared/pred is the quotient computed by <a class="reference internal" href="#trustregion.TrustRegion.ratio" title="trustregion.TrustRegion.ratio"><code class="xref py py-meth docutils literal"><span class="pre">ratio()</span></code></a>.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="trustregion.TrustRegionSolver">
+<em class="property">class </em><code class="descclassname">trustregion.</code><code class="descname">TrustRegionSolver</code><span class="sig-paren">(</span><em>qp</em>, <em>cg_solver</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trustregion.TrustRegionSolver" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<p>A generic class for implementing solvers for the trust-region subproblem.</p>
+<p>minimize q(d)  subject to  ||d|| &lt;= radius,</p>
+<p>where q(d) is a quadratic function, not necessarily convex.</p>
+<p>The trust-region constraint <cite>||d|| &lt;= radius</cite> can be defined in any
+norm although most derived classes currently implement the Euclidian
+norm only. Note however that any elliptical norm may be used via a
+preconditioner.</p>
+<p>For more information on trust-region methods, see</p>
+<p>A. R. Conn, N. I. M. Gould and Ph. L. Toint, Trust-Region Methods,
+MP01 MPS-SIAM Series on Optimization, 2000.</p>
+<dl class="method">
+<dt id="trustregion.TrustRegionSolver.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>qp</em>, <em>cg_solver</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trustregion.TrustRegionSolver.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Basic solver for a quadratic trust-region subproblem.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">qp:</th><td class="field-body">a <code class="docutils literal"><span class="pre">QPModel</span></code> instance</td>
+</tr>
+<tr class="field-even field"><th class="field-name">cg_solver:</th><td class="field-body">a <cite>class</cite> to be instantiated and used as solver for the
+trust-region problem.</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="trustregion.TrustRegionSolver.m">
+<code class="descname">m</code><a class="headerlink" href="#trustregion.TrustRegionSolver.m" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the value of the quadratic model.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="trustregion.TrustRegionSolver.model_value">
+<code class="descname">model_value</code><a class="headerlink" href="#trustregion.TrustRegionSolver.model_value" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the value of the quadratic model.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="trustregion.TrustRegionSolver.niter">
+<code class="descname">niter</code><a class="headerlink" href="#trustregion.TrustRegionSolver.niter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the number of iterations made by the solver.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="trustregion.TrustRegionSolver.qp">
+<code class="descname">qp</code><a class="headerlink" href="#trustregion.TrustRegionSolver.qp" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the <code class="docutils literal"><span class="pre">QPModel</span></code> instance.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="trustregion.TrustRegionSolver.solve">
+<code class="descname">solve</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#trustregion.TrustRegionSolver.solve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Solve the trust-region subproblem.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="trustregion.TrustRegionSolver.step">
+<code class="descname">step</code><a class="headerlink" href="#trustregion.TrustRegionSolver.step" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the step computed by the solver.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="trustregion.TrustRegionSolver.step_norm">
+<code class="descname">step_norm</code><a class="headerlink" href="#trustregion.TrustRegionSolver.step_norm" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the norm of the step computed by the solver.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="optim.html" class="btn btn-neutral float-right" title="Complete Solvers" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="modeling.html" class="btn btn-neutral" title="Modeling in NLP.py" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Sylvain Arreckx, Dominique Orban and Nikolaj Van Omme.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.2',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

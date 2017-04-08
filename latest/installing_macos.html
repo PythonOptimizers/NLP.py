@@ -1,0 +1,357 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Build instructions for Mac OS/X users &mdash; NLP.py: An Object-Oriented Environment for Large-Scale Optimization</title>
+  
+
+  
+  
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/julia.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="NLP.py: An Object-Oriented Environment for Large-Scale Optimization" href="index.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="contents.html" class="icon icon-home"> NLP.py
+          
+
+          
+          </a>
+          <h1>NLP.py</h1>
+
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installing.html">Installation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modeling.html">Modeling in NLP.py</a></li>
+<li class="toctree-l1"><a class="reference internal" href="globalization.html">Globalization Techniques</a></li>
+<li class="toctree-l1"><a class="reference internal" href="optim.html">Complete Solvers</a></li>
+</ul>
+
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="contents.html">NLP.py</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="contents.html">Docs</a> &raquo;</li>
+        
+      <li>Build instructions for Mac OS/X users</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            
+              <a href="https://github.com/PythonOptimizers/NLP.py/blob/master/doc/source/installing_macos.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="build-instructions-for-mac-os-x-users">
+<h1>Build instructions for Mac OS/X users<a class="headerlink" href="#build-instructions-for-mac-os-x-users" title="Permalink to this headline">¶</a></h1>
+<p>If you require one of ASL, <code class="docutils literal"><span class="pre">pyadolc</span></code>, <code class="docutils literal"><span class="pre">pycppad</span></code>, MUMPS, qr_mumps or
+SuiteSparse, installing <code class="docutils literal"><span class="pre">NLP.py</span></code> will be much easier if you use
+<a class="reference external" href="https://brew.sh">Homebrew</a>. Follow the instructions to install
+Homebrew and import the <em>science</em> formulas:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">brew</span> <span class="n">tap</span> <span class="n">homebrew</span><span class="o">/</span><span class="n">science</span>
+</pre></div>
+</div>
+<div class="section" id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h2>
+<p>Install <code class="docutils literal"><span class="pre">numpy</span></code> and <code class="docutils literal"><span class="pre">PyKrylov</span></code>:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="n">numpy</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="n">git</span><span class="o">+</span><span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">PythonOptimizers</span><span class="o">/</span><span class="n">pykrylov</span><span class="o">.</span><span class="n">git</span><span class="nd">@develop</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="optional-dependencies">
+<h2>Optional Dependencies<a class="headerlink" href="#optional-dependencies" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="sparse-matrix-storage">
+<h3>Sparse Matrix Storage<a class="headerlink" href="#sparse-matrix-storage" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="cysparse">
+<h4>CySparse<a class="headerlink" href="#cysparse" title="Permalink to this headline">¶</a></h4>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="n">git</span><span class="o">+</span><span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">PythonOptimizers</span><span class="o">/</span><span class="n">cysparse</span><span class="o">.</span><span class="n">git</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="pysparse">
+<h4>PySparse<a class="headerlink" href="#pysparse" title="Permalink to this headline">¶</a></h4>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="n">git</span><span class="o">+</span><span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">optimizers</span><span class="o">/</span><span class="n">pysparse</span><span class="o">.</span><span class="n">git</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="scipy">
+<h3>SciPy<a class="headerlink" href="#scipy" title="Permalink to this headline">¶</a></h3>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="n">scipy</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="derivatives-computation">
+<h3>Derivatives Computation<a class="headerlink" href="#derivatives-computation" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="asl">
+<h4>ASL<a class="headerlink" href="#asl" title="Permalink to this headline">¶</a></h4>
+<p>The ASL will allow <a class="reference external" href="http://www.ampl.com">AMPL</a> models to be loaded in
+<code class="docutils literal"><span class="pre">NLP.py</span></code> after they have been decoded to a <code class="docutils literal"><span class="pre">.nl</span></code> file. Creating the
+<code class="docutils literal"><span class="pre">.nl</span></code> file for anything else than small models requires an AMPL
+license. A few sample <code class="docutils literal"><span class="pre">.nl</span></code> files are included with <code class="docutils literal"><span class="pre">NLP.py</span></code>. The
+ASL will compute sparse first and second derivatives.</p>
+<p>The ASL may be installed from Homebrew:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">brew</span> <span class="n">install</span> <span class="n">asl</span>
+</pre></div>
+</div>
+<p>Specify the location of the ASL in <code class="docutils literal"><span class="pre">setup.cfg</span></code>:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">echo</span> <span class="s2">&quot;[ASL]&quot;</span> <span class="o">&gt;</span> <span class="n">site</span><span class="o">.</span><span class="n">cfg</span>
+<span class="n">echo</span> <span class="s2">&quot;asl_dir = $(brew --prefix asl)&quot;</span> <span class="o">&gt;&gt;</span> <span class="n">site</span><span class="o">.</span><span class="n">cfg</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="adol-c">
+<h4>ADOL-C<a class="headerlink" href="#adol-c" title="Permalink to this headline">¶</a></h4>
+<p>ADOL-C will allow models to be coded up directly in Python and sparse
+first and second derivatives to be computed via automatic
+differentiation. This is the preferred way to model large-scale problems
+in Python. First install ADOL-C:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">brew</span> <span class="n">install</span> <span class="n">adol</span><span class="o">-</span><span class="n">c</span>  <span class="c1"># will also install Colpack</span>
+<span class="n">brew</span> <span class="n">install</span> <span class="n">boost</span><span class="o">-</span><span class="n">python</span>
+</pre></div>
+</div>
+<p>Then install <code class="docutils literal"><span class="pre">pyadolc</span></code>:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span>cd $HOME  # or another local
+git clone https://github.com/b45ch1/pyadolc.git &amp;&amp; cd pyadolc
+python setup.py install  # press [Enter] when prompted
+</pre></div>
+</div>
+</div>
+<div class="section" id="cppad">
+<h4>CppAD<a class="headerlink" href="#cppad" title="Permalink to this headline">¶</a></h4>
+<p>CppAD will allow models to be coded up directly in Python and <em>dense</em>
+first and second derivatives to be computed via automatic
+differentiation.</p>
+<p>First install CppAD:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">brew</span> <span class="n">install</span> <span class="n">cppad</span> <span class="p">[</span><span class="o">--</span><span class="k">with</span><span class="o">-</span><span class="n">adol</span><span class="o">-</span><span class="n">c</span><span class="p">]</span> <span class="o">--</span><span class="k">with</span><span class="o">-</span><span class="n">openmp</span>
+</pre></div>
+</div>
+<p>Then install <code class="docutils literal"><span class="pre">pycppad</span></code>:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="n">git</span><span class="o">+</span><span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">b45ch1</span><span class="o">/</span><span class="n">pycppad</span><span class="o">.</span><span class="n">git</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="algopy">
+<h4>AlgoPy<a class="headerlink" href="#algopy" title="Permalink to this headline">¶</a></h4>
+<p>AlgoPy will allow models to be coded up directly in Python and <em>dense</em>
+first and second derivatives to be computed via automatic
+differentiation.</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="n">algopy</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="factorizations">
+<h3>Factorizations<a class="headerlink" href="#factorizations" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="hsl-py">
+<h4>HSL.py<a class="headerlink" href="#hsl-py" title="Permalink to this headline">¶</a></h4>
+<p>Follow instructions at <a class="reference external" href="https://github.com/PythonOptimizers/HSL.py">https://github.com/PythonOptimizers/HSL.py</a></p>
+</div>
+<div class="section" id="mumps-py">
+<h4>MUMPS.py<a class="headerlink" href="#mumps-py" title="Permalink to this headline">¶</a></h4>
+<p>Follow instructions at <a class="reference external" href="https://github.com/PythonOptimizers/MUMPS.py">https://github.com/PythonOptimizers/MUMPS.py</a></p>
+</div>
+<div class="section" id="qr-mumps-py">
+<h4>qr_mumps.py<a class="headerlink" href="#qr-mumps-py" title="Permalink to this headline">¶</a></h4>
+<p>Follow instructions at <a class="reference external" href="https://github.com/PythonOptimizers/qr_mumps.py">https://github.com/PythonOptimizers/qr_mumps.py</a></p>
+</div>
+<div class="section" id="suitesparse-py">
+<h4>SuiteSparse.py<a class="headerlink" href="#suitesparse-py" title="Permalink to this headline">¶</a></h4>
+<p>Follow instructions at
+<a class="reference external" href="https://github.com/PythonOptimizers/SuiteSparse.py">https://github.com/PythonOptimizers/SuiteSparse.py</a></p>
+</div>
+</div>
+</div>
+<div class="section" id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permalink to this headline">¶</a></h2>
+<p>If you encounter build errors while installing <code class="docutils literal"><span class="pre">pyadolc</span></code>, edit and
+change <code class="docutils literal"><span class="pre">setup.py</span></code> as follows:</p>
+<div class="code diff highlight-default"><div class="highlight"><pre><span></span><span class="n">diff</span> <span class="o">--</span><span class="n">git</span> <span class="n">a</span><span class="o">/</span><span class="n">setup</span><span class="o">.</span><span class="n">py</span> <span class="n">b</span><span class="o">/</span><span class="n">setup</span><span class="o">.</span><span class="n">py</span>
+<span class="n">index</span> <span class="mf">5e6</span><span class="n">e695</span><span class="o">..</span><span class="mi">68</span><span class="n">f5c68</span> <span class="mi">100644</span>
+<span class="o">---</span> <span class="n">a</span><span class="o">/</span><span class="n">setup</span><span class="o">.</span><span class="n">py</span>
+<span class="o">+++</span> <span class="n">b</span><span class="o">/</span><span class="n">setup</span><span class="o">.</span><span class="n">py</span>
+<span class="o">@@</span> <span class="o">-</span><span class="mi">36</span><span class="p">,</span><span class="mi">7</span> <span class="o">+</span><span class="mi">36</span><span class="p">,</span><span class="mi">7</span> <span class="o">@@</span> <span class="n">colpack_lib_path1</span>    <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">COLPACK_DIR</span><span class="p">,</span> <span class="s1">&#39;lib&#39;</span><span class="p">)</span>
+ <span class="n">colpack_lib_path2</span>    <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">COLPACK_DIR</span><span class="p">,</span> <span class="s1">&#39;lib64&#39;</span><span class="p">)</span>
+
+ <span class="c1"># ADAPT THIS TO FIT YOUR SYSTEM</span>
+<span class="o">-</span><span class="n">extra_compile_args</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;-std=c++11 -ftemplate-depth-100 -DBOOST_PYTHON_DYNAMIC_LIB&#39;</span><span class="p">]</span>
+<span class="o">+</span><span class="n">extra_compile_args</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;-std=c++11 -stdlib=libc++ -mmacosx-version-min=10.9 -ftemplate-depth-100 -DBOOST_PYTHON_DYNAMIC_LIB&#39;</span><span class="p">]</span>
+ <span class="n">include_dirs</span> <span class="o">=</span> <span class="p">[</span><span class="n">get_numpy_include_dirs</span><span class="p">()[</span><span class="mi">0</span><span class="p">],</span> <span class="n">boost_include_path</span><span class="p">,</span> <span class="n">adolc_include_path</span><span class="p">,</span> <span class="n">colpack_include_path</span><span class="p">]</span>
+ <span class="n">library_dirs</span> <span class="o">=</span> <span class="p">[</span><span class="n">boost_library_path1</span><span class="p">,</span> <span class="n">boost_library_path2</span><span class="p">,</span> <span class="n">adolc_library_path1</span><span class="p">,</span> <span class="n">adolc_library_path2</span><span class="p">,</span> <span class="n">colpack_lib_path1</span><span class="p">,</span> <span class="n">colpack_lib_path2</span><span class="p">]</span>
+ <span class="n">libraries</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;boost_python&#39;</span><span class="p">,</span><span class="s1">&#39;adolc&#39;</span><span class="p">,</span> <span class="s1">&#39;ColPack&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Sylvain Arreckx, Dominique Orban and Nikolaj Van Omme.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.2',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

@@ -1,0 +1,316 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Introduction &mdash; NLP.py: An Object-Oriented Environment for Large-Scale Optimization</title>
+  
+
+  
+  
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/julia.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="NLP.py: An Object-Oriented Environment for Large-Scale Optimization" href="index.html"/>
+        <link rel="next" title="Installing NLP.py" href="installing.html"/>
+        <link rel="prev" title="NLP.py documentation" href="contents.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="contents.html" class="icon icon-home"> NLP.py
+          
+
+          
+          </a>
+          <h1>NLP.py</h1>
+
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#structure-of-nlp-py">Structure of NLP.py</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#supplying-derivatives">Supplying derivatives</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#matrix-storage-schemes">Matrix storage schemes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#modeling">Modeling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#passing-models-to-solvers">Passing models to solvers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#designing-solvers">Designing solvers</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="installing.html">Installation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modeling.html">Modeling in NLP.py</a></li>
+<li class="toctree-l1"><a class="reference internal" href="globalization.html">Globalization Techniques</a></li>
+<li class="toctree-l1"><a class="reference internal" href="optim.html">Complete Solvers</a></li>
+</ul>
+
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="contents.html">NLP.py</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="contents.html">Docs</a> &raquo;</li>
+        
+      <li>Introduction</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            
+              <a href="https://github.com/PythonOptimizers/NLP.py/blob/master/doc/source/introduction.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h1>
+<p>NLP.py is a <a class="reference external" href="http://www.python.org">Python</a> package for numerical <a class="reference external" href="http://en.wikipedia.org/wiki/Mathematical_programming">optimization</a>.  It aims to provide
+a toolbox for solving <a class="reference external" href="http://en.wikipedia.org/wiki/Linear_programming">linear</a> and <a class="reference external" href="http://en.wikipedia.org/wiki/Nonlinear_programming">nonlinear programming</a> problems that is both
+easy to use and extensible.</p>
+<p>NLP.py combines the capabilities of the mature <a class="reference external" href="http://www.ampl.com">AMPL</a>
+modeling language with the high-quality numerical resources and object-oriented
+power of the Python programming language.  This combination makes NLP.py an
+excellent tool to prototype and test optimization algorithms, and also a great
+teaching aid for optimization.</p>
+<p>NLP.py can read optimization problems coded in the AMPL modeling language.  All
+aspects of a problem can be examined and the problem solved.  Individual
+objective and constraint functions, together with their derivatives (if they
+exist) can be accessed transparently through an object-oriented framework.</p>
+<p>NLP.py is extensible and new algorithms can be built by assembling the supplied
+building blocks, or by creating new building blocks.  Existing building blocks
+include procedures for solving symmetric (possibly indefinite) linear systems
+via symmetric factorizations or preconditioned iterative solvers, iterative
+methods for linear least-squares problems, minimization methods for constrained
+and unconstrained optimization, and much more.</p>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>NLP.py is a collection of tools and interfaces for implementing and prototyping
+optimization algorithms. It is a set of Python modules and classes that support
+sparse matrices, nonlinear optimization methods, and the efficient solution of
+large sparse linear systems, especially those occuring in the course of
+optimization algorithms (e.g., symmetric indefinite systems).</p>
+<p>The purpose of NLP.py is to offer an environment in which implementing, testing,
+prototyping, experimenting with, and modifying and creating innovative
+optimization algorithms for large-scale constrained problems is a moderately
+easy task. We feel that the environment should be useful, simple, and intuitive
+enough that programmers need only concentrate on the logic of the algorithm
+instead of the intricacies of the programming language. We believe that NLP.py is
+appropriate for teaching, for learning, and also for bleeding edge research in
+large-scale numerical optimization. This is achieved by providing the heavy-duty
+number-crunching procedures in fast, low-level languages such as C, Fortran 77,
+and Fortran 90/95.</p>
+<p>NLP.py aims to</p>
+<ul class="simple">
+<li>represent the bleeding edge of research in numerical (differentiable or not)
+optimization,</li>
+<li>provide a number of low-level tools upon which algorithms may be built, with
+the intent of solving potentially large problems,</li>
+<li>use sparse matrix data structures to do so,</li>
+<li>provide tools that are useful in the assessment of the performance of
+optimization algorithms.</li>
+</ul>
+</div>
+<div class="section" id="structure-of-nlp-py">
+<h2>Structure of NLP.py<a class="headerlink" href="#structure-of-nlp-py" title="Permalink to this headline">¶</a></h2>
+<p>NLP.py may be viewed as a collection of tools written in Python and interfaces to core libraries written with the <a class="reference external" href="http://cython.org">Cython</a> extension of Python. Cython is a superset of Python that facilitates interfacing with libraries that expose a C API and allows users to type variables. Because Cython code is compiled, it results in increased performance, yet remains easier to maintain and update than C or C++. Thanks to the strong connection between Python and Cython, core libraries appear transparently to the user as regular Python objects.</p>
+<p>A solid sparse linear algebra library is essential if one is to solve large-scale sparse problems efficiently.
+The library of choice in NLP.py is <a class="reference external" href="https://github.com/PythonOptimizers/cysparse">CySparse</a>, but several other libraries are also supported to varying degrees.</p>
+<p>The components of NLP.py revolve around the main tasks with which one is confronted in both modeling and algorithmic design:</p>
+<div class="section" id="supplying-derivatives">
+<h3>Supplying derivatives<a class="headerlink" href="#supplying-derivatives" title="Permalink to this headline">¶</a></h3>
+<p>The first important decision about a model is whether derivatives are available and in the affirmative, whether they will be implemented by hand, supplied by an automatic differentiation engine, or approximated using, say, finite differences or a quasi-Newton scheme.</p>
+</div>
+<div class="section" id="matrix-storage-schemes">
+<h3>Matrix storage schemes<a class="headerlink" href="#matrix-storage-schemes" title="Permalink to this headline">¶</a></h3>
+<p>If it is anticipated that a solver will require Jacobians and/or Hessians, a user must decide how they should be stored—e.g., as dense arrays, sparse matrices in a specific storage format, or implicitly as linear operators. The choice of storage scheme is closely related to what types of operations a solver will need to perform with matrices, e.g., construct block saddle-point systems, and what linear algebra kernels will be used during the iterations.</p>
+</div>
+<div class="section" id="modeling">
+<h3>Modeling<a class="headerlink" href="#modeling" title="Permalink to this headline">¶</a></h3>
+<p>Models are represented as Python objects that derive from one or two base classes. The object-oriented design of NLP.py dictates that a model results by inheritance from a model class defining the provenance of derivatives with another model class specifying a matrix storage scheme. For instance, multiple model classes obtain their derivatives from ADOL-C—one per matrix storage scheme—and all derive from a base class named AdolcModel. Similarly, multiple model classes store matrices according to one of the formats available in the CySparse library—one per derivative provider, and all derive from a base class named CySparseModel. For instance, a CySparseAdolcModel class could be defined as inheriting from both AdolcModel and CySparseModel.</p>
+</div>
+<div class="section" id="passing-models-to-solvers">
+<h3>Passing models to solvers<a class="headerlink" href="#passing-models-to-solvers" title="Permalink to this headline">¶</a></h3>
+<p>The choice of a solver depends on multiple factors, including the matrix storage scheme, but more importantly, the structure of the problem. In NLP.py, several solvers are available and correspond to several types of problems. There are solvers for unconstrained optimization, linear and convex quadratic optimization, equality-constrained convex or nonconvex optimization, problems with complementarity constraints, and general problems featuring a mixture of equality constraints, inequality constraints and bounds. A main driver that may be called from the command line is supplied with each solver for problems written in the AMPL modeling language. The <a class="reference external" href="https://github.com/PythonOptimizers/pykrylov">PyKrylov</a> companion package supplies several iterative solvers for linear least-squares problems, including regularized problems and problems with a trust-region constraint.</p>
+</div>
+<div class="section" id="designing-solvers">
+<h3>Designing solvers<a class="headerlink" href="#designing-solvers" title="Permalink to this headline">¶</a></h3>
+<p>Optimization researchers must often make implementation choices that strike a balance between performance, adherence to theoretical requirements and ease of implementation. An example that comes to mind is a linesearch-based method in which the search must ensure satisfaction of the strong Wolfe conditions. Implementing such a linesearch is far more involved than implementing a simple Armijo backtracking search. The latter may not satisfy the assumptions necessary for convergence, but may still perform well in practice. Similarly, a trust-region method that relies on models using exact second derivatives may perform well, but what if a quasi-Newton approximation is used instead? What if we wish to terminate the iterations early if a condition depending on external factors is satisfied? What if we wish to experiment with a different merit function? It seems important for researchers to be able to experiment easily and swap a linesearch procedure for another, swap a model with exact second derivatives for a quasi-Newton model, and so forth.</p>
+<div class="figure">
+<img alt="_images/complete.png" src="_images/complete.png" />
+</div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="installing.html" class="btn btn-neutral float-right" title="Installing NLP.py" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="contents.html" class="btn btn-neutral" title="NLP.py documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Sylvain Arreckx, Dominique Orban and Nikolaj Van Omme.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.2',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

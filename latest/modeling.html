@@ -1,0 +1,1785 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Modeling in NLP.py &mdash; NLP.py: An Object-Oriented Environment for Large-Scale Optimization</title>
+  
+
+  
+  
+
+  
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700' rel='stylesheet' type='text/css'>
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/julia.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="NLP.py: An Object-Oriented Environment for Large-Scale Optimization" href="index.html"/>
+        <link rel="next" title="Globalization Techniques" href="globalization.html"/>
+        <link rel="prev" title="Installing NLP.py" href="installing.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="contents.html" class="icon icon-home"> NLP.py
+          
+
+          
+          </a>
+          <h1>NLP.py</h1>
+
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installing.html">Installation</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Modeling in NLP.py</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#modeling-with-nlpmodel-objects">Modeling with <cite>NLPModel</cite> Objects</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-nlpmodel">The <code class="docutils literal"><span class="pre">nlp</span></code> Module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example">Example</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#models-in-the-ampl-modeling-language">Models in the AMPL Modeling Language</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-amplmodel">The <code class="docutils literal"><span class="pre">amplpy</span></code> Module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id1">Example</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#python-models-with-automatic-differentiation">Python Models with Automatic Differentiation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-adolcmodel">The <code class="docutils literal"><span class="pre">adolcmodel</span></code> Module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-cppadmodel">The <code class="docutils literal"><span class="pre">cppadmodel</span></code> Module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-algopymodel">The <code class="docutils literal"><span class="pre">algopymodel</span></code> Module</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#reformulating-models">Reformulating Models</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-snlp">The <code class="docutils literal"><span class="pre">snlp</span></code> Module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id4">Example</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#inheritance-diagrams">Inheritance Diagrams</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="globalization.html">Globalization Techniques</a></li>
+<li class="toctree-l1"><a class="reference internal" href="optim.html">Complete Solvers</a></li>
+</ul>
+
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="contents.html">NLP.py</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="contents.html">Docs</a> &raquo;</li>
+        
+      <li>Modeling in NLP.py</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            
+              <a href="https://github.com/PythonOptimizers/NLP.py/blob/master/doc/source/modeling.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="modeling-in-nlp-py">
+<span id="model-page"></span><h1>Modeling in NLP.py<a class="headerlink" href="#modeling-in-nlp-py" title="Permalink to this headline">¶</a></h1>
+<p id="nlp">The general problem consists in minimizing an objective <span class="math">\(f(x)\)</span> subject to
+general constraints and bounds:</p>
+<div class="math">
+\[\begin{split}c_i(x) = a_i,                 &amp; \qquad i = 1, \ldots, m, \\
+g_j^L \leq g_j(x) \leq g_j^U, &amp; \qquad j = 1, \ldots, p, \\
+x_k^L \leq x_k \leq x_k^U,    &amp; \qquad k = 1, \ldots, n,\end{split}\]</div>
+<p>where some or all lower bounds <span class="math">\(g_j^L\)</span> and <span class="math">\(x_k^L\)</span> may be equal to
+<span class="math">\(-\infty\)</span>, and some or all upper bounds <span class="math">\(g_j^U\)</span> and <span class="math">\(x_k^U\)</span>
+may be equal to <span class="math">\(+\infty\)</span>.</p>
+<div class="section" id="modeling-with-nlpmodel-objects">
+<span id="nlp-section"></span><h2>Modeling with <cite>NLPModel</cite> Objects<a class="headerlink" href="#modeling-with-nlpmodel-objects" title="Permalink to this headline">¶</a></h2>
+<p><cite>NLPModel</cite> objects are the most basic type of model. They require that functions and their derivatives be coded explicitly.</p>
+<div class="section" id="module-nlpmodel">
+<span id="the-nlp-module"></span><h3>The <code class="xref py py-mod docutils literal"><span class="pre">nlp</span></code> Module<a class="headerlink" href="#module-nlpmodel" title="Permalink to this headline">¶</a></h3>
+<p>Abstract base classes to represent continuous optimization models.</p>
+<dl class="class">
+<dt id="nlpmodel.NLPModel">
+<em class="property">class </em><code class="descclassname">nlpmodel.</code><code class="descname">NLPModel</code><span class="sig-paren">(</span><em>n</em>, <em>m=0</em>, <em>name='Generic'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<p>Abstract continuous optimization model.</p>
+<p>The model features methods to evaluate the objective and constraints,
+and their derivatives. Instances of the general class do not do anything
+interesting; they must be subclassed and specialized.</p>
+<dl class="method">
+<dt id="nlpmodel.NLPModel.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>n</em>, <em>m=0</em>, <em>name='Generic'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize a model with <cite>n</cite> variables and <cite>m</cite> constraints.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><table class="first docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">n:</th><td class="field-body">number of variables</td>
+</tr>
+<tr class="field-even field"><th class="field-name">m:</th><td class="field-body">number of general (non bound) constraints (default: 0)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">name:</th><td class="field-body">model name (default: &#8216;Generic&#8217;)</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">x0:</th><td class="field-body">initial point (default: all 0)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">pi0:</th><td class="field-body">vector of initial multipliers (default: all 0)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Lvar:</th><td class="field-body">vector of lower bounds on the variables
+(default: all -Infinity)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Uvar:</th><td class="field-body">vector of upper bounds on the variables
+(default: all +Infinity)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Lcon:</th><td class="field-body">vector of lower bounds on the constraints
+(default: all -Infinity)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Ucon:</th><td class="field-body">vector of upper bounds on the constraints
+(default: all +Infinity)</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.at_optimality">
+<code class="descname">at_optimality</code><span class="sig-paren">(</span><em>x</em>, <em>z</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.at_optimality" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check whether the KKT residuals meet the stopping conditions.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.bounds">
+<code class="descname">bounds</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.bounds" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the vector with components x[i]-Lvar[i] or Uvar[i]-x[i].</p>
+<p>Bound constraints on the problem variables are then equivalent to
+bounds(x) &gt;= 0. The bounds are odered as follows:</p>
+<p>[lowerB | upperB | rangeB (lower) | rangeB (upper) ].</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.complementarity">
+<code class="descname">complementarity</code><span class="sig-paren">(</span><em>x</em>, <em>y</em>, <em>z</em>, <em>c=None</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.complementarity" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate the complementarity residuals at (x,y,z).</p>
+<p>If <cite>c</cite> is specified, it should conform to <a class="reference internal" href="#nlpmodel.NLPModel.cons_pos" title="nlpmodel.NLPModel.cons_pos"><code class="xref py py-meth docutils literal"><span class="pre">cons_pos()</span></code></a> and the
+multipliers <cite>y</cite> should appear in the same order. The multipliers <cite>z</cite>
+should conform to <code class="xref py py-meth docutils literal"><span class="pre">get_bounds()</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">cy:</th><td class="field-body">complementarity residual for general constraints</td>
+</tr>
+<tr class="field-even field"><th class="field-name">xz:</th><td class="field-body">complementarity residual for bound constraints.</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.compute_scaling_cons">
+<code class="descname">compute_scaling_cons</code><span class="sig-paren">(</span><em>x=None</em>, <em>g_max=100.0</em>, <em>reset=False</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.compute_scaling_cons" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute constraint scaling.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">x:</th><td class="field-body">Determine scaling by evaluating functions at this
+point. Default is to use <code class="xref py py-attr docutils literal"><span class="pre">self.x0</span></code>.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">g_max:</th><td class="field-body">Maximum allowed gradient. Default: <code class="xref py py-attr docutils literal"><span class="pre">g_max</span> <span class="pre">=</span> <span class="pre">1e2</span></code>.</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">reset:</th><td class="field-body">Set to <cite>True</cite> to unscale the problem.</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.compute_scaling_obj">
+<code class="descname">compute_scaling_obj</code><span class="sig-paren">(</span><em>x=None</em>, <em>g_max=100.0</em>, <em>reset=False</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.compute_scaling_obj" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute objective scaling.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">x:</th><td class="field-body">Determine scaling by evaluating functions at this
+point. Default is to use <code class="xref py py-attr docutils literal"><span class="pre">self.x0</span></code>.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">g_max:</th><td class="field-body">Maximum allowed gradient. Default: <code class="xref py py-attr docutils literal"><span class="pre">g_max</span> <span class="pre">=</span> <span class="pre">1e2</span></code>.</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">reset:</th><td class="field-body">Set to <cite>True</cite> to unscale the problem.</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The procedure used here closely
+follows IPOPT&#8217;s behavior; see Section 3.8 of</p>
+<blockquote>
+<div>Waecther and Biegler, &#8216;On the implementation of an
+interior-point filter line-search algorithm for large-scale
+nonlinear programming&#8217;, Math. Prog. A (106), pp.25-57, 2006</div></blockquote>
+<p>which is a scalar rescaling that ensures the inf-norm of the
+gradient (at x) isn&#8217;t larger than &#8216;g_max&#8217;.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.cons">
+<code class="descname">cons</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.cons" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate vector of constraints at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.cons_pos">
+<code class="descname">cons_pos</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.cons_pos" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convenience function to return constraints as non negative ones.</p>
+<p>Constraints are reformulated as</p>
+<blockquote>
+<div>ci(x) - ai  = 0  for i in equalC
+ci(x) - Li &gt;= 0  for i in lowerC + rangeC
+Ui - ci(x) &gt;= 0  for i in upperC + rangeC.</div></blockquote>
+<p>The constraints appear in natural order, except for the fact that the
+&#8216;upper side&#8217; of range constraints is appended to the list.</p>
+<p>Scaling should be applied in cons().</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.display_basic_info">
+<code class="descname">display_basic_info</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.display_basic_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Display vital statistics about the current model.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.dual_feasibility">
+<code class="descname">dual_feasibility</code><span class="sig-paren">(</span><em>x</em>, <em>y</em>, <em>z</em>, <em>g=None</em>, <em>J=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.dual_feasibility" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate the dual feasibility residual at (x,y,z).</p>
+<p>The argument <cite>J</cite>, if supplied, should be a linear operator representing
+the constraints Jacobian. It should conform to either <a class="reference internal" href="#nlpmodel.NLPModel.jac" title="nlpmodel.NLPModel.jac"><code class="xref py py-meth docutils literal"><span class="pre">jac()</span></code></a> or
+<a class="reference internal" href="#nlpmodel.NLPModel.jac_pos" title="nlpmodel.NLPModel.jac_pos"><code class="xref py py-meth docutils literal"><span class="pre">jac_pos()</span></code></a> depending on the value of <cite>all_pos</cite> (see below).</p>
+<p>The multipliers <cite>z</cite> should conform to <code class="xref py py-meth docutils literal"><span class="pre">get_bounds()</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">obj_weight:</th><td class="field-body">weight of the objective gradient in dual feasibility.
+Set to zero to check Fritz-John conditions instead
+of KKT conditions. (default: 1.0)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">all_pos:</th><td class="field-body">if <cite>True</cite>, indicates that the multipliers <cite>y</cite> conform
+to <a class="reference internal" href="#nlpmodel.NLPModel.jac_pos" title="nlpmodel.NLPModel.jac_pos"><code class="xref py py-meth docutils literal"><span class="pre">jac_pos()</span></code></a>. If <cite>False</cite>, <cite>y</cite> conforms to
+<a class="reference internal" href="#nlpmodel.NLPModel.jac" title="nlpmodel.NLPModel.jac"><code class="xref py py-meth docutils literal"><span class="pre">jac()</span></code></a>. In all cases, <cite>y</cite> should be appropriately
+ordered. If the positional argument <cite>J</cite> is specified,
+it must be consistent with the layout of <cite>y</cite>.
+(default: <cite>True</cite>)</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.get_stopping_tolerances">
+<code class="descname">get_stopping_tolerances</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.get_stopping_tolerances" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return current stopping tolerances.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.ghivprod">
+<code class="descname">ghivprod</code><span class="sig-paren">(</span><em>x</em>, <em>g</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.ghivprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate individual dot products (g, Hi*v).</p>
+<p>Evaluate the vector of dot products (g, Hi*v) where Hi is the Hessian
+of the i-th constraint at x, i = 1, ..., ncon.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.grad">
+<code class="descname">grad</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.grad" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate the objective gradient at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.hess">
+<code class="descname">hess</code><span class="sig-paren">(</span><em>x</em>, <em>z=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.hess" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate Lagrangian Hessian at (x, z).</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.hiprod">
+<code class="descname">hiprod</code><span class="sig-paren">(</span><em>i</em>, <em>x</em>, <em>p</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.hiprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constraint Hessian-vector product.</p>
+<p>Evaluate matrix-vector product between the Hessian of the i-th
+constraint at x and p.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.hop">
+<code class="descname">hop</code><span class="sig-paren">(</span><em>x</em>, <em>z=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.hop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Obtain Lagrangian Hessian at (x, z) as a linear operator.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.hprod">
+<code class="descname">hprod</code><span class="sig-paren">(</span><em>x</em>, <em>z</em>, <em>p</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.hprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Hessian-vector product.</p>
+<p>Evaluate matrix-vector product between the Hessian of the Lagrangian at
+(x, z) and p.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.icons">
+<code class="descname">icons</code><span class="sig-paren">(</span><em>i</em>, <em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.icons" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate i-th constraint at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.igrad">
+<code class="descname">igrad</code><span class="sig-paren">(</span><em>i</em>, <em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.igrad" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evalutate i-th dense constraint gradient at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.jac">
+<code class="descname">jac</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.jac" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate constraints Jacobian at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.jac_pos">
+<code class="descname">jac_pos</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.jac_pos" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate the Jacobian of <a class="reference internal" href="#nlpmodel.NLPModel.cons_pos" title="nlpmodel.NLPModel.cons_pos"><code class="xref py py-meth docutils literal"><span class="pre">cons_pos()</span></code></a> at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.jop">
+<code class="descname">jop</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.jop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Obtain Jacobian at x as a linear operator.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.jop_pos">
+<code class="descname">jop_pos</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.jop_pos" title="Permalink to this definition">¶</a></dt>
+<dd><p>Jacobian of <a class="reference internal" href="#nlpmodel.NLPModel.cons_pos" title="nlpmodel.NLPModel.cons_pos"><code class="xref py py-meth docutils literal"><span class="pre">cons_pos()</span></code></a> at x as a linear operator.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.jprod">
+<code class="descname">jprod</code><span class="sig-paren">(</span><em>x</em>, <em>p</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.jprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate Jacobian-vector product at x with p.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.jtprod">
+<code class="descname">jtprod</code><span class="sig-paren">(</span><em>x</em>, <em>p</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.jtprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate transposed-Jacobian-vector product at x with p.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.kkt_residuals">
+<code class="descname">kkt_residuals</code><span class="sig-paren">(</span><em>x</em>, <em>y</em>, <em>z</em>, <em>c=None</em>, <em>g=None</em>, <em>J=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.kkt_residuals" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the first-order residuals.</p>
+<p>There is no check on the sign of the multipliers unless <cite>check</cite> is set
+to <cite>True</cite>. Keyword arguments not specified below are passed directly to
+<a class="reference internal" href="#nlpmodel.NLPModel.primal_feasibility" title="nlpmodel.NLPModel.primal_feasibility"><code class="xref py py-meth docutils literal"><span class="pre">primal_feasibility()</span></code></a>, <a class="reference internal" href="#nlpmodel.NLPModel.dual_feasibility" title="nlpmodel.NLPModel.dual_feasibility"><code class="xref py py-meth docutils literal"><span class="pre">dual_feasibility()</span></code></a> and
+<a class="reference internal" href="#nlpmodel.NLPModel.complementarity" title="nlpmodel.NLPModel.complementarity"><code class="xref py py-meth docutils literal"><span class="pre">complementarity()</span></code></a>.</p>
+<p>If <cite>J</cite> is specified, it should conform to <a class="reference internal" href="#nlpmodel.NLPModel.jac_pos" title="nlpmodel.NLPModel.jac_pos"><code class="xref py py-meth docutils literal"><span class="pre">jac_pos()</span></code></a> and the
+multipliers <cite>y</cite> should be consistent with the Jacobian.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">check:</th><td class="field-body">check sign of multipliers.</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">kkt:</th><td class="field-body">KKT residuals as a KKTresidual instance.</td>
+</tr>
+</tbody>
+</table>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.lag">
+<code class="descname">lag</code><span class="sig-paren">(</span><em>x</em>, <em>z</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.lag" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate Lagrangian at (x, z).</p>
+<p>The constraints and bounds are assumed to be ordered as in
+<a class="reference internal" href="#nlpmodel.NLPModel.cons_pos" title="nlpmodel.NLPModel.cons_pos"><code class="xref py py-meth docutils literal"><span class="pre">cons_pos()</span></code></a> and <a class="reference internal" href="#nlpmodel.NLPModel.bounds" title="nlpmodel.NLPModel.bounds"><code class="xref py py-meth docutils literal"><span class="pre">bounds()</span></code></a>.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.lin">
+<code class="descname">lin</code><a class="headerlink" href="#nlpmodel.NLPModel.lin" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the indices of linear constraints.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.m">
+<code class="descname">m</code><a class="headerlink" href="#nlpmodel.NLPModel.m" title="Permalink to this definition">¶</a></dt>
+<dd><p>Number of constraints (excluding bounds).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.n">
+<code class="descname">n</code><a class="headerlink" href="#nlpmodel.NLPModel.n" title="Permalink to this definition">¶</a></dt>
+<dd><p>Number of variables.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.name">
+<code class="descname">name</code><a class="headerlink" href="#nlpmodel.NLPModel.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Problem name.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.ncon">
+<code class="descname">ncon</code><a class="headerlink" href="#nlpmodel.NLPModel.ncon" title="Permalink to this definition">¶</a></dt>
+<dd><p>Number of constraints (excluding bounds).</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.net">
+<code class="descname">net</code><a class="headerlink" href="#nlpmodel.NLPModel.net" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the indices of network constraints.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.nlin">
+<code class="descname">nlin</code><a class="headerlink" href="#nlpmodel.NLPModel.nlin" title="Permalink to this definition">¶</a></dt>
+<dd><p>Number of linear constraints.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.nln">
+<code class="descname">nln</code><a class="headerlink" href="#nlpmodel.NLPModel.nln" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the indices of nonlinear constraints.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.nnet">
+<code class="descname">nnet</code><a class="headerlink" href="#nlpmodel.NLPModel.nnet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Number of network constraints.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.nnln">
+<code class="descname">nnln</code><a class="headerlink" href="#nlpmodel.NLPModel.nnln" title="Permalink to this definition">¶</a></dt>
+<dd><p>Number of nonlinear constraints.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.nvar">
+<code class="descname">nvar</code><a class="headerlink" href="#nlpmodel.NLPModel.nvar" title="Permalink to this definition">¶</a></dt>
+<dd><p>Number of variables.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.obj">
+<code class="descname">obj</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.obj" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate the objective function at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.primal_feasibility">
+<code class="descname">primal_feasibility</code><span class="sig-paren">(</span><em>x</em>, <em>c=None</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.primal_feasibility" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate the primal feasibility residual at x.</p>
+<p>If <cite>c</cite> is given, it should conform to <a class="reference internal" href="#nlpmodel.NLPModel.cons_pos" title="nlpmodel.NLPModel.cons_pos"><code class="xref py py-meth docutils literal"><span class="pre">cons_pos()</span></code></a>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.set_stopping_tolerances">
+<code class="descname">set_stopping_tolerances</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.set_stopping_tolerances" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set stopping tolerances.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="nlpmodel.NLPModel.sigrad">
+<code class="descname">sigrad</code><span class="sig-paren">(</span><em>i</em>, <em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nlpmodel.NLPModel.sigrad" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate i-th sparse constraint gradient at x.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.stop_c">
+<code class="descname">stop_c</code><a class="headerlink" href="#nlpmodel.NLPModel.stop_c" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tolerance on complementarity.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.stop_d">
+<code class="descname">stop_d</code><a class="headerlink" href="#nlpmodel.NLPModel.stop_d" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tolerance on dual feasibility.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="nlpmodel.NLPModel.stop_p">
+<code class="descname">stop_p</code><a class="headerlink" href="#nlpmodel.NLPModel.stop_p" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tolerance on primal feasibility.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="example">
+<h3>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h3>
+<div class="admonition-todo admonition" id="index-0">
+<p class="first admonition-title">Todo</p>
+<p class="last">Insert example.</p>
+</div>
+</div>
+</div>
+<div class="section" id="models-in-the-ampl-modeling-language">
+<span id="amplpy-section"></span><h2>Models in the AMPL Modeling Language<a class="headerlink" href="#models-in-the-ampl-modeling-language" title="Permalink to this headline">¶</a></h2>
+<p><cite>AmplModel</cite> objects are convenient in that the model is written in the AMPL modeling language, and the AMPL Solver Library takes care of evaluating derivatives for us.</p>
+<p>See the <a class="reference external" href="http://www.ampl.com">AMPL home page</a> for more information on the
+AMPL algebraic modeling language.</p>
+<div class="section" id="module-amplmodel">
+<span id="the-amplpy-module"></span><h3>The <code class="xref py py-mod docutils literal"><span class="pre">amplpy</span></code> Module<a class="headerlink" href="#module-amplmodel" title="Permalink to this headline">¶</a></h3>
+<p>Python interface to the AMPL modeling language.</p>
+<dl class="class">
+<dt id="amplmodel.AmplModel">
+<em class="property">class </em><code class="descclassname">amplmodel.</code><code class="descname">AmplModel</code><span class="sig-paren">(</span><em>stub</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">nlp.model.nlpmodel.NLPModel</span></code></p>
+<p>AmplModel creates an instance of an AMPL model.</p>
+<p>If the <cite>nl</cite> file is already available, simply call <cite>AmplModel(stub)</cite> where
+the string <cite>stub</cite> is the name of the model. For instance:
+<cite>AmplModel(&#8216;elec&#8217;)</cite>. If only the <cite>.mod</cite> file is available, set the
+positional parameter <cite>neednl</cite> to <cite>True</cite> so AMPL generates the <cite>nl</cite> file, as
+in <cite>AmplModel(&#8216;elec.mod&#8217;, data=&#8217;elec.dat&#8217;, neednl=True)</cite>.</p>
+<p>Among important attributes of this class are <code class="xref py py-attr docutils literal"><span class="pre">nvar</span></code>, the number of
+variables, <code class="xref py py-attr docutils literal"><span class="pre">ncon</span></code>, the number of constraints, and <code class="xref py py-attr docutils literal"><span class="pre">nbounds</span></code>,
+the number of variables subject to at least one bound constraint.</p>
+<dl class="method">
+<dt id="amplmodel.AmplModel.A">
+<code class="descname">A</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.A" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate sparse Jacobian of the linear part of the constraints.</p>
+<p>Useful to obtain constraint matrix when problem
+is a linear programming problem.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>stub</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.cons">
+<code class="descname">cons</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.cons" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate vector of constraints at x.</p>
+<p>Returns a Numpy array.
+The constraints appear in natural order. To order them as follows</p>
+<ol class="arabic simple">
+<li>equalities</li>
+<li>lower bound only</li>
+<li>upper bound only</li>
+<li>range constraints,</li>
+</ol>
+<p>use the <cite>permC</cite> permutation vector.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.cost">
+<code class="descname">cost</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.cost" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate sparse cost vector.</p>
+<p>Useful when problem is a linear program.
+Return a sparse vector. This method changes the sign of the cost vector
+if the problem is a maximization problem.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.display_basic_info">
+<code class="descname">display_basic_info</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.display_basic_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Display vital statistics about the current model.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.get_pi0">
+<code class="descname">get_pi0</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.get_pi0" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.ghivprod">
+<code class="descname">ghivprod</code><span class="sig-paren">(</span><em>x</em>, <em>g</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.ghivprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate individual dot products (g, Hi(x)*v).</p>
+<p>Evaluate the vector of dot products (g, Hi(x)*v) where Hi(x) is the
+Hessian of the i-th constraint at point x, i=1..m.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.grad">
+<code class="descname">grad</code><span class="sig-paren">(</span><em>x</em>, <em>obj_num=0</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.grad" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate objective gradient at x.</p>
+<p>Returns a Numpy array. This method changes the sign of the objective
+gradient if the problem is a maximization problem.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.hess">
+<code class="descname">hess</code><span class="sig-paren">(</span><em>x</em>, <em>z=None</em>, <em>obj_num=0</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.hess" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate Hessian.</p>
+<p>Evaluate sparse lower triangular Lagrangian Hessian at (x, z).
+By convention, the Lagrangian has the form L = f - c&#8217;z.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.hiprod">
+<code class="descname">hiprod</code><span class="sig-paren">(</span><em>x</em>, <em>i</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.hiprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constraint Hessian-vector product.</p>
+<p>Returns a Numpy array.
+Bug: x is ignored. See hprod above.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.hprod">
+<code class="descname">hprod</code><span class="sig-paren">(</span><em>x</em>, <em>z</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.hprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Hessian-vector product.</p>
+<p>Evaluate matrix-vector product H(x,z) * v, where H is the Hessian of
+the Lagrangian evaluated at the primal-dual pair (x,z).
+Zero multipliers can be specified as an array of zeros or as <cite>None</cite>.</p>
+<p>Returns a Numpy array.</p>
+<p>Bug: x is ignored, and is determined as the point at which the
+objective or gradient were last evaluated.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Keywords:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">obj_weight:</th><td class="field-body">Add a weight to the Hessian of the objective function.
+By default, the weight is one. Setting it to zero
+allows to exclude the Hessian of the objective from
+the Hessian of the Lagrangian.</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.icons">
+<code class="descname">icons</code><span class="sig-paren">(</span><em>i</em>, <em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.icons" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate value of i-th constraint at x.</p>
+<p>Returns a floating-point number.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.igrad">
+<code class="descname">igrad</code><span class="sig-paren">(</span><em>i</em>, <em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.igrad" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate dense gradient of i-th constraint at x.</p>
+<p>Returns a Numpy array.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.irow">
+<code class="descname">irow</code><span class="sig-paren">(</span><em>i</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.irow" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate sparse gradient of the linear part of the i-th constraint.</p>
+<p>Useful to obtain constraint rows when problem
+is a linear programming problem.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.islp">
+<code class="descname">islp</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.islp" title="Permalink to this definition">¶</a></dt>
+<dd><p>Determine whether problem is a linear programming problem.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.jac">
+<code class="descname">jac</code><span class="sig-paren">(</span><em>x</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.jac" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate sparse Jacobian of constraints at x.</p>
+<p>Returns a sparse matrix in coordinate format.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.jac_pos">
+<code class="descname">jac_pos</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.jac_pos" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convenience function to evaluate the Jacobian matrix of the constraints
+reformulated as</p>
+<blockquote>
+<div>ci(x) = ai     for i in equalC
+ci(x) - Li &gt;= 0  for i in lowerC
+ci(x) - Li &gt;= 0  for i in rangeC
+Ui - ci(x) &gt;= 0  for i in upperC
+Ui - ci(x) &gt;= 0  for i in rangeC.</div></blockquote>
+<p>The gradients of the general constraints appear in &#8216;natural&#8217; order,
+i.e., in the order in which they appear in the problem. The gradients
+of range constraints appear in two places: first in the &#8216;natural&#8217;
+location and again after all other general constraints, with a flipped
+sign to account for the upper bound on those constraints.</p>
+<p>The overall Jacobian of the new constraints thus has the form</p>
+<p>[ J ]
+[-JR]</p>
+<p>This is a <cite>(m + nrangeC)</cite>-by-<cite>n</cite> matrix, where <cite>J</cite> is the Jacobian
+of the general constraints in the order above in which the sign of
+the &#8216;less than&#8217; constraints is flipped, and <cite>JR</cite> is the Jacobian of
+the &#8216;less than&#8217; side of range constraints.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.jop">
+<code class="descname">jop</code><span class="sig-paren">(</span><em>x</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.jop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Jacobian at x as a linear operator.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.jprod">
+<code class="descname">jprod</code><span class="sig-paren">(</span><em>x</em>, <em>p</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.jprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate Jacobian-vector product at x with p.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.jtprod">
+<code class="descname">jtprod</code><span class="sig-paren">(</span><em>x</em>, <em>p</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.jtprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate transposed-Jacobian-vector product at x with p.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.obj">
+<code class="descname">obj</code><span class="sig-paren">(</span><em>x</em>, <em>obj_num=0</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.obj" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate objective function value at x.</p>
+<p>Returns a floating-point number. This method changes the sign of the
+objective value if the problem is a maximization problem.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.set_x">
+<code class="descname">set_x</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.set_x" title="Permalink to this definition">¶</a></dt>
+<dd><p>Freeze independent variables.</p>
+<p>Set <cite>x</cite> as current value for subsequent calls
+to <a class="reference internal" href="#amplmodel.AmplModel.obj" title="amplmodel.AmplModel.obj"><code class="xref py py-meth docutils literal"><span class="pre">obj()</span></code></a>, <a class="reference internal" href="#amplmodel.AmplModel.grad" title="amplmodel.AmplModel.grad"><code class="xref py py-meth docutils literal"><span class="pre">grad()</span></code></a>, <a class="reference internal" href="#amplmodel.AmplModel.jac" title="amplmodel.AmplModel.jac"><code class="xref py py-meth docutils literal"><span class="pre">jac()</span></code></a>, etc. If several
+of <a class="reference internal" href="#amplmodel.AmplModel.obj" title="amplmodel.AmplModel.obj"><code class="xref py py-meth docutils literal"><span class="pre">obj()</span></code></a>, <a class="reference internal" href="#amplmodel.AmplModel.grad" title="amplmodel.AmplModel.grad"><code class="xref py py-meth docutils literal"><span class="pre">grad()</span></code></a>, <a class="reference internal" href="#amplmodel.AmplModel.jac" title="amplmodel.AmplModel.jac"><code class="xref py py-meth docutils literal"><span class="pre">jac()</span></code></a>, ..., will be called with the
+same argument <cite>x</cite>, it may be more efficient to first call <cite>set_x(x)</cite>.
+In AMPL, <a class="reference internal" href="#amplmodel.AmplModel.obj" title="amplmodel.AmplModel.obj"><code class="xref py py-meth docutils literal"><span class="pre">obj()</span></code></a>, <a class="reference internal" href="#amplmodel.AmplModel.grad" title="amplmodel.AmplModel.grad"><code class="xref py py-meth docutils literal"><span class="pre">grad()</span></code></a>, etc., normally check whether their
+argument has changed since the last call. Calling <cite>set_x()</cite> skips this
+check.</p>
+<p>See also <a class="reference internal" href="#amplmodel.AmplModel.unset_x" title="amplmodel.AmplModel.unset_x"><code class="xref py py-meth docutils literal"><span class="pre">unset_x()</span></code></a>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.sgrad">
+<code class="descname">sgrad</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.sgrad" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate sparse objective gradient at x.</p>
+<p>Returns a sparse vector. This method changes the sign of the objective
+gradient if the problem is a maximization problem.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.sigrad">
+<code class="descname">sigrad</code><span class="sig-paren">(</span><em>i</em>, <em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.sigrad" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate sparse gradient of i-th constraint at x.</p>
+<p>Returns a sparse vector representing the sparse gradient
+in coordinate format.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.unset_x">
+<code class="descname">unset_x</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.unset_x" title="Permalink to this definition">¶</a></dt>
+<dd><p>Release independent variables.</p>
+<p>Reinstates the default behavior of <a class="reference internal" href="#amplmodel.AmplModel.obj" title="amplmodel.AmplModel.obj"><code class="xref py py-meth docutils literal"><span class="pre">obj()</span></code></a>, <a class="reference internal" href="#amplmodel.AmplModel.grad" title="amplmodel.AmplModel.grad"><code class="xref py py-meth docutils literal"><span class="pre">grad()</span></code></a>, <cite>jac</cite>,
+etc., which is to check whether their argument has changed since the
+last call.</p>
+<p>See also <a class="reference internal" href="#amplmodel.AmplModel.set_x" title="amplmodel.AmplModel.set_x"><code class="xref py py-meth docutils literal"><span class="pre">set_x()</span></code></a>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="amplmodel.AmplModel.writesol">
+<code class="descname">writesol</code><span class="sig-paren">(</span><em>x</em>, <em>z</em>, <em>msg</em><span class="sig-paren">)</span><a class="headerlink" href="#amplmodel.AmplModel.writesol" title="Permalink to this definition">¶</a></dt>
+<dd><p>Write primal-dual solution and message msg to <cite>stub.sol</cite>.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="id1">
+<h3>Example<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-default"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre>  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+ 11
+ 12
+ 13
+ 14
+ 15
+ 16
+ 17
+ 18
+ 19
+ 20
+ 21
+ 22
+ 23
+ 24
+ 25
+ 26
+ 27
+ 28
+ 29
+ 30
+ 31
+ 32
+ 33
+ 34
+ 35
+ 36
+ 37
+ 38
+ 39
+ 40
+ 41
+ 42
+ 43
+ 44
+ 45
+ 46
+ 47
+ 48
+ 49
+ 50
+ 51
+ 52
+ 53
+ 54
+ 55
+ 56
+ 57
+ 58
+ 59
+ 60
+ 61
+ 62
+ 63
+ 64
+ 65
+ 66
+ 67
+ 68
+ 69
+ 70
+ 71
+ 72
+ 73
+ 74
+ 75
+ 76
+ 77
+ 78
+ 79
+ 80
+ 81
+ 82
+ 83
+ 84
+ 85
+ 86
+ 87
+ 88
+ 89
+ 90
+ 91
+ 92
+ 93
+ 94
+ 95
+ 96
+ 97
+ 98
+ 99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118</pre></div></td><td class="code"><div class="highlight"><pre><span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+
+<span class="sd">&quot;&quot;&quot;Test for amplmodel module.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">nlp.model.amplmodel</span> <span class="k">import</span> <span class="n">AmplModel</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="n">nargs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">nargs</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;Please specify problem name&#39;</span><span class="p">)</span>
+    <span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="n">problem_name</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+<span class="c1"># Create a model</span>
+<span class="nb">print</span> <span class="s1">&#39;Problem&#39;</span><span class="p">,</span> <span class="n">problem_name</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">AmplModel</span><span class="p">(</span><span class="n">problem_name</span><span class="p">)</span>
+
+<span class="c1"># Query the model</span>
+<span class="n">x0</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">x0</span>
+<span class="n">pi0</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">pi0</span>
+<span class="n">nvar</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">nvar</span>
+<span class="n">ncon</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">ncon</span>
+<span class="nb">print</span> <span class="s1">&#39;There are </span><span class="si">%d</span><span class="s1"> variables and </span><span class="si">%d</span><span class="s1"> constraints&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">nvar</span><span class="p">,</span> <span class="n">ncon</span><span class="p">)</span>
+
+<span class="n">np</span><span class="o">.</span><span class="n">set_printoptions</span><span class="p">(</span><span class="n">precision</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">79</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">edgeitems</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+
+<span class="nb">print</span> <span class="s1">&#39;Initial point: &#39;</span><span class="p">,</span> <span class="n">x0</span>
+<span class="nb">print</span> <span class="s1">&#39;Lower bounds on x: &#39;</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">Lvar</span>
+<span class="nb">print</span> <span class="s1">&#39;Upper bounds on x: &#39;</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">Uvar</span>
+<span class="nb">print</span> <span class="s1">&#39;f(x0) = &#39;</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">obj</span><span class="p">(</span><span class="n">x0</span><span class="p">)</span>
+<span class="n">g0</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">x0</span><span class="p">)</span>
+<span class="nb">print</span> <span class="s1">&#39;∇f(x0) = &#39;</span><span class="p">,</span> <span class="n">g0</span>
+
+<span class="k">if</span> <span class="n">ncon</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="nb">print</span> <span class="s1">&#39;Initial multipliers: &#39;</span><span class="p">,</span> <span class="n">pi0</span>
+    <span class="nb">print</span> <span class="s1">&#39;Lower constraint bounds: &#39;</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">Lcon</span>
+    <span class="nb">print</span> <span class="s1">&#39;Upper constraint bounds: &#39;</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">Ucon</span>
+    <span class="nb">print</span> <span class="s1">&#39;c(x0) = &#39;</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">cons</span><span class="p">(</span><span class="n">x0</span><span class="p">)</span>
+
+<span class="n">jvals</span><span class="p">,</span> <span class="n">jrows</span><span class="p">,</span> <span class="n">jcols</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">jac</span><span class="p">(</span><span class="n">x0</span><span class="p">)</span>
+<span class="n">hvals</span><span class="p">,</span> <span class="n">hrows</span><span class="p">,</span> <span class="n">hcols</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">hess</span><span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="n">pi0</span><span class="p">)</span>
+<span class="nb">print</span>
+<span class="nb">print</span> <span class="s1">&#39; nnzJ = &#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">jvals</span><span class="p">)</span>
+<span class="nb">print</span> <span class="s1">&#39; nnzH = &#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">hvals</span><span class="p">)</span>
+
+<span class="nb">print</span> <span class="s1">&#39;J(x0) = (in coordinate format)&#39;</span>
+<span class="nb">print</span> <span class="s1">&#39;vals: &#39;</span><span class="p">,</span> <span class="n">jvals</span>
+<span class="nb">print</span> <span class="s1">&#39;rows: &#39;</span><span class="p">,</span> <span class="n">jrows</span>
+<span class="nb">print</span> <span class="s1">&#39;cols: &#39;</span><span class="p">,</span> <span class="n">jcols</span>
+<span class="nb">print</span> <span class="s1">&#39;Hessian (lower triangle in coordinate format):&#39;</span>
+<span class="nb">print</span> <span class="s1">&#39;vals: &#39;</span><span class="p">,</span> <span class="n">hvals</span>
+<span class="nb">print</span> <span class="s1">&#39;rows: &#39;</span><span class="p">,</span> <span class="n">hrows</span>
+<span class="nb">print</span> <span class="s1">&#39;cols: &#39;</span><span class="p">,</span> <span class="n">hcols</span>
+
+<span class="k">if</span> <span class="n">ncon</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="nb">print</span>
+    <span class="nb">print</span> <span class="s1">&#39; Evaluating constraints individually, sparse gradients&#39;</span>
+    <span class="nb">print</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">ncon</span><span class="p">,</span> <span class="mi">5</span><span class="p">)):</span>
+    <span class="n">ci</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">icons</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">x0</span><span class="p">)</span>
+    <span class="nb">print</span> <span class="s1">&#39;c</span><span class="si">%d</span><span class="s1">(x0) = </span><span class="si">%-g</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">ci</span><span class="p">)</span>
+    <span class="n">sgi</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">sigrad</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">x0</span><span class="p">)</span>
+    <span class="n">k</span> <span class="o">=</span> <span class="n">sgi</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+    <span class="n">ssgi</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">k</span><span class="p">))):</span>
+        <span class="n">ssgi</span><span class="p">[</span><span class="n">k</span><span class="p">[</span><span class="n">j</span><span class="p">]]</span> <span class="o">=</span> <span class="n">sgi</span><span class="p">[</span><span class="n">k</span><span class="p">[</span><span class="n">j</span><span class="p">]]</span>
+    <span class="nb">print</span> <span class="s1">&#39;∇c</span><span class="si">%d</span><span class="s1">(x0) = &#39;</span> <span class="o">%</span> <span class="n">i</span><span class="p">,</span> <span class="n">ssgi</span>
+
+<span class="nb">print</span>
+<span class="nb">print</span> <span class="s1">&#39; Testing matrix-vector product:&#39;</span>
+<span class="nb">print</span>
+
+<span class="n">e</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">nvar</span><span class="p">)</span>
+<span class="n">He</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">hprod</span><span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="n">pi0</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+<span class="nb">print</span> <span class="s1">&#39;He = &#39;</span><span class="p">,</span> <span class="n">He</span>
+
+<span class="nb">print</span>
+<span class="nb">print</span> <span class="s1">&#39; Testing objective scaling:&#39;</span>
+<span class="nb">print</span>
+
+<span class="nb">print</span> <span class="s1">&#39;Maximum/Minimum gradient (unscaled): </span><span class="si">%12.5e</span><span class="s1"> / </span><span class="si">%12.5e</span><span class="s1">&#39;</span> \
+      <span class="o">%</span> <span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">g0</span><span class="p">)),</span> <span class="nb">min</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">g0</span><span class="p">)))</span>
+<span class="n">model</span><span class="o">.</span><span class="n">compute_scaling_obj</span><span class="p">()</span>  <span class="c1"># default is to use x0</span>
+<span class="n">g</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">x0</span><span class="p">)</span>
+<span class="nb">print</span> <span class="s1">&#39;Maximum/Minimum gradient ( scaled): </span><span class="si">%12.5e</span><span class="s1"> / </span><span class="si">%12.5e</span><span class="s1">&#39;</span> \
+      <span class="o">%</span> <span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">g</span><span class="p">)),</span> <span class="nb">min</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">g</span><span class="p">)))</span>
+<span class="n">model</span><span class="o">.</span><span class="n">compute_scaling_obj</span><span class="p">(</span><span class="n">reset</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">g</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">x0</span><span class="p">)</span>
+<span class="nb">print</span> <span class="s1">&#39;... after a reset ...&#39;</span>
+<span class="nb">print</span> <span class="s1">&#39;Maximum/Minimum gradient (unscaled): </span><span class="si">%12.5e</span><span class="s1"> / </span><span class="si">%12.5e</span><span class="s1">&#39;</span> \
+      <span class="o">%</span> <span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">g</span><span class="p">)),</span> <span class="nb">min</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">g</span><span class="p">)))</span>
+
+<span class="nb">print</span>
+<span class="nb">print</span> <span class="s1">&#39; Testing constraint scaling:&#39;</span>
+<span class="nb">print</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">xrange</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">ncon</span><span class="p">,</span> <span class="mi">5</span><span class="p">)):</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">compute_scaling_cons</span><span class="p">(</span><span class="n">reset</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sgi</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">sigrad</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">x0</span><span class="p">)</span>
+    <span class="n">imax</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">sgi</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">abs</span><span class="p">(</span><span class="n">sgi</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">x</span><span class="p">)))</span>
+    <span class="n">imin</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">sgi</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">abs</span><span class="p">(</span><span class="n">sgi</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">x</span><span class="p">)))</span>
+    <span class="nb">print</span> <span class="s1">&#39;Constraint </span><span class="si">%3i</span><span class="s1">: &#39;</span> <span class="o">%</span> <span class="n">i</span><span class="p">,</span>
+    <span class="nb">print</span> <span class="s1">&#39; Max/Min gradient (unscaled): </span><span class="si">%12.5e</span><span class="s1"> (</span><span class="si">%3i</span><span class="s1">) / </span><span class="si">%12.5e</span><span class="s1"> (</span><span class="si">%3i</span><span class="s1">)&#39;</span> \
+        <span class="o">%</span> <span class="p">(</span><span class="n">sgi</span><span class="p">[</span><span class="n">imax</span><span class="p">],</span> <span class="n">imax</span><span class="p">,</span> <span class="n">sgi</span><span class="p">[</span><span class="n">imin</span><span class="p">],</span> <span class="n">imin</span><span class="p">)</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">compute_scaling_cons</span><span class="p">()</span>
+    <span class="n">sgi</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">sigrad</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">x0</span><span class="p">)</span>
+    <span class="n">imax</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">sgi</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">abs</span><span class="p">(</span><span class="n">sgi</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">x</span><span class="p">)))</span>
+    <span class="n">imin</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">sgi</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">abs</span><span class="p">(</span><span class="n">sgi</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">x</span><span class="p">)))</span>
+    <span class="nb">print</span> <span class="s1">&#39;Constraint </span><span class="si">%3i</span><span class="s1">: &#39;</span> <span class="o">%</span> <span class="n">i</span><span class="p">,</span>
+    <span class="nb">print</span> <span class="s1">&#39; Max/Min gradient ( scaled): </span><span class="si">%12.5e</span><span class="s1"> (</span><span class="si">%3i</span><span class="s1">) / </span><span class="si">%12.5e</span><span class="s1"> (</span><span class="si">%3i</span><span class="s1">)&#39;</span> \
+        <span class="o">%</span> <span class="p">(</span><span class="n">sgi</span><span class="p">[</span><span class="n">imax</span><span class="p">],</span> <span class="n">imax</span><span class="p">,</span> <span class="n">sgi</span><span class="p">[</span><span class="n">imin</span><span class="p">],</span> <span class="n">imin</span><span class="p">)</span>
+
+<span class="c1"># Output &quot;solution&quot;</span>
+<span class="n">model</span><span class="o">.</span><span class="n">writesol</span><span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="n">pi0</span><span class="p">,</span> <span class="s1">&#39;And the winner is&#39;</span><span class="p">)</span>
+
+</pre></div>
+</td></tr></table></div>
+</div>
+</div>
+<div class="section" id="python-models-with-automatic-differentiation">
+<h2>Python Models with Automatic Differentiation<a class="headerlink" href="#python-models-with-automatic-differentiation" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="module-adolcmodel">
+<span id="the-adolcmodel-module"></span><h3>The <a class="reference internal" href="#module-adolcmodel" title="adolcmodel"><code class="xref py py-mod docutils literal"><span class="pre">adolcmodel</span></code></a> Module<a class="headerlink" href="#module-adolcmodel" title="Permalink to this headline">¶</a></h3>
+<p>Models where derivatives are computed by ADOL-C.</p>
+<dl class="class">
+<dt id="adolcmodel.AdolcModel">
+<em class="property">class </em><code class="descclassname">adolcmodel.</code><code class="descname">AdolcModel</code><span class="sig-paren">(</span><em>n</em>, <em>m=0</em>, <em>name='Adolc-Generic'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#adolcmodel.AdolcModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">nlp.model.nlpmodel.NLPModel</span></code></p>
+<p>Model with derivatives computed by ADOL-C.</p>
+<p>A class to represent optimization problems in which derivatives
+are computed via algorithmic differentiation through ADOL-C. By
+default, the Jacobian and Hessian are returned in dense format.
+See the documentation of <cite>NLPModel</cite> for further information.</p>
+<dl class="method">
+<dt id="adolcmodel.AdolcModel.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>n</em>, <em>m=0</em>, <em>name='Adolc-Generic'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#adolcmodel.AdolcModel.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize a model with <cite>n</cite> variables and <cite>m</cite> constraints.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="adolcmodel.AdolcModel.con_trace_id">
+<code class="descname">con_trace_id</code><a class="headerlink" href="#adolcmodel.AdolcModel.con_trace_id" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the trace id for the constraints.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="adolcmodel.AdolcModel.cons_pos_trace_id">
+<code class="descname">cons_pos_trace_id</code><a class="headerlink" href="#adolcmodel.AdolcModel.cons_pos_trace_id" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the trace id for the reformulated constraints.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="adolcmodel.AdolcModel.grad">
+<code class="descname">grad</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#adolcmodel.AdolcModel.grad" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate the objective gradient at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="adolcmodel.AdolcModel.hess">
+<code class="descname">hess</code><span class="sig-paren">(</span><em>x</em>, <em>z=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#adolcmodel.AdolcModel.hess" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the dense Hessian of the objective at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="adolcmodel.AdolcModel.hprod">
+<code class="descname">hprod</code><span class="sig-paren">(</span><em>x</em>, <em>z</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#adolcmodel.AdolcModel.hprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the Hessian-vector product at (x,z) with v.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="adolcmodel.AdolcModel.jac">
+<code class="descname">jac</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#adolcmodel.AdolcModel.jac" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return dense constraints Jacobian at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="adolcmodel.AdolcModel.jac_pos">
+<code class="descname">jac_pos</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#adolcmodel.AdolcModel.jac_pos" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return dense Jacobian of reformulated constraints at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="adolcmodel.AdolcModel.jprod">
+<code class="descname">jprod</code><span class="sig-paren">(</span><em>x</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#adolcmodel.AdolcModel.jprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the product of v with the Jacobian at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="adolcmodel.AdolcModel.jtprod">
+<code class="descname">jtprod</code><span class="sig-paren">(</span><em>x</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#adolcmodel.AdolcModel.jtprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the product of v with the transpose Jacobian at x.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="adolcmodel.AdolcModel.lag_trace_id">
+<code class="descname">lag_trace_id</code><a class="headerlink" href="#adolcmodel.AdolcModel.lag_trace_id" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the trace id for the Lagrangian.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="adolcmodel.AdolcModel.obj_trace_id">
+<code class="descname">obj_trace_id</code><a class="headerlink" href="#adolcmodel.AdolcModel.obj_trace_id" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the trace id for the objective function.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-cppadmodel">
+<span id="the-cppadmodel-module"></span><h3>The <a class="reference internal" href="#module-cppadmodel" title="cppadmodel"><code class="xref py py-mod docutils literal"><span class="pre">cppadmodel</span></code></a> Module<a class="headerlink" href="#module-cppadmodel" title="Permalink to this headline">¶</a></h3>
+<p>Models where derivatives are computed by CPPAD.</p>
+<dl class="class">
+<dt id="cppadmodel.CppADModel">
+<em class="property">class </em><code class="descclassname">cppadmodel.</code><code class="descname">CppADModel</code><span class="sig-paren">(</span><em>n</em>, <em>m=0</em>, <em>name='CppAD-Generic'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#cppadmodel.CppADModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">nlp.model.nlpmodel.NLPModel</span></code></p>
+<p>Model with derivatives computed by CPPAD.</p>
+<p>A class to represent optimization problems in which derivatives
+are computed via algorithmic differentiation through CPPAD.
+See the documentation of <cite>NLPModel</cite> for further information.</p>
+<dl class="method">
+<dt id="cppadmodel.CppADModel.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>n</em>, <em>m=0</em>, <em>name='CppAD-Generic'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#cppadmodel.CppADModel.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize a model with <cite>n</cite> variables and <cite>m</cite> constraints.
+:parameters:</p>
+<blockquote>
+<div><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">n:</th><td class="field-body">number of variables</td>
+</tr>
+<tr class="field-even field"><th class="field-name">m:</th><td class="field-body">number of general (non bound) constraints (default: 0)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">name:</th><td class="field-body">model name (default: &#8216;Generic&#8217;)</td>
+</tr>
+</tbody>
+</table>
+</div></blockquote>
+</dd></dl>
+
+<dl class="method">
+<dt id="cppadmodel.CppADModel.grad">
+<code class="descname">grad</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#cppadmodel.CppADModel.grad" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the objective gradient at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cppadmodel.CppADModel.hess">
+<code class="descname">hess</code><span class="sig-paren">(</span><em>x</em>, <em>z=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#cppadmodel.CppADModel.hess" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the Hessian of the Lagrangian at (x,z).</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cppadmodel.CppADModel.hprod">
+<code class="descname">hprod</code><span class="sig-paren">(</span><em>x</em>, <em>z</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#cppadmodel.CppADModel.hprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the Hessian-vector product at x with v.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cppadmodel.CppADModel.jac">
+<code class="descname">jac</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#cppadmodel.CppADModel.jac" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return constraints Jacobian at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cppadmodel.CppADModel.jprod">
+<code class="descname">jprod</code><span class="sig-paren">(</span><em>x</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#cppadmodel.CppADModel.jprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the product of v with the Jacobian at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cppadmodel.CppADModel.jtprod">
+<code class="descname">jtprod</code><span class="sig-paren">(</span><em>x</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#cppadmodel.CppADModel.jtprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the product of v with the transpose Jacobian at x.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-algopymodel">
+<span id="the-algopymodel-module"></span><h3>The <a class="reference internal" href="#module-algopymodel" title="algopymodel"><code class="xref py py-mod docutils literal"><span class="pre">algopymodel</span></code></a> Module<a class="headerlink" href="#module-algopymodel" title="Permalink to this headline">¶</a></h3>
+<p>Models with derivatives computed by AlgoPy.</p>
+<p>Because AlgoPy does not support fancy indexing, it is necessary
+to formulate constraints in the form</p>
+<blockquote>
+<div>ci(x)  = 0  for i in equalC
+ci(x) &gt;= 0  for i in lowerC.</div></blockquote>
+<dl class="class">
+<dt id="algopymodel.AlgopyModel">
+<em class="property">class </em><code class="descclassname">algopymodel.</code><code class="descname">AlgopyModel</code><span class="sig-paren">(</span><em>n</em>, <em>m=0</em>, <em>name='Algopy-Generic'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#algopymodel.AlgopyModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">nlp.model.nlpmodel.NLPModel</span></code></p>
+<p>Model with derivatives computed by AlgoPy.</p>
+<p>A class to represent optimization problems in which derivatives
+are computed via algorithmic differentiation through AlgoPy.
+AlgoPy only supplies dense derivatives.
+See the documentation of <cite>NLPModel</cite> for further information.</p>
+<dl class="method">
+<dt id="algopymodel.AlgopyModel.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>n</em>, <em>m=0</em>, <em>name='Algopy-Generic'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#algopymodel.AlgopyModel.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize a model with <cite>n</cite> variables and <cite>m</cite> constraints.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">n:</th><td class="field-body">number of variables (default: 0)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">m:</th><td class="field-body">number of general (non bound) constraints (default: 0)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">name:</th><td class="field-body">model name (default: &#8216;Generic&#8217;)</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="algopymodel.AlgopyModel.cg_cons">
+<code class="descname">cg_cons</code><a class="headerlink" href="#algopymodel.AlgopyModel.cg_cons" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constraint call graph.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="algopymodel.AlgopyModel.cg_lag">
+<code class="descname">cg_lag</code><a class="headerlink" href="#algopymodel.AlgopyModel.cg_lag" title="Permalink to this definition">¶</a></dt>
+<dd><p>Lagrangian call graph.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="algopymodel.AlgopyModel.cg_obj">
+<code class="descname">cg_obj</code><a class="headerlink" href="#algopymodel.AlgopyModel.cg_obj" title="Permalink to this definition">¶</a></dt>
+<dd><p>Objective function call graph.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="algopymodel.AlgopyModel.cons_pos">
+<code class="descname">cons_pos</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#algopymodel.AlgopyModel.cons_pos" title="Permalink to this definition">¶</a></dt>
+<dd><p>Identical to <cite>cons</cite> for <a href="#id2"><span class="problematic" id="id3">`</span></a>AlgopyModel`s.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="algopymodel.AlgopyModel.grad">
+<code class="descname">grad</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#algopymodel.AlgopyModel.grad" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate the objective gradient at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="algopymodel.AlgopyModel.hess">
+<code class="descname">hess</code><span class="sig-paren">(</span><em>x</em>, <em>z=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#algopymodel.AlgopyModel.hess" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the Hessian of the objective at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="algopymodel.AlgopyModel.hprod">
+<code class="descname">hprod</code><span class="sig-paren">(</span><em>x</em>, <em>z</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#algopymodel.AlgopyModel.hprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the Hessian-vector product at x with v.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="algopymodel.AlgopyModel.jac">
+<code class="descname">jac</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#algopymodel.AlgopyModel.jac" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return constraints Jacobian at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="algopymodel.AlgopyModel.jac_pos">
+<code class="descname">jac_pos</code><span class="sig-paren">(</span><em>x</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#algopymodel.AlgopyModel.jac_pos" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return reformulated constraints Jacobian at x.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="algopymodel.AlgopyModel.jprod">
+<code class="descname">jprod</code><span class="sig-paren">(</span><em>x</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#algopymodel.AlgopyModel.jprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the Jacobian-vector product at x with v.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="algopymodel.AlgopyModel.jtprod">
+<code class="descname">jtprod</code><span class="sig-paren">(</span><em>x</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#algopymodel.AlgopyModel.jtprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the transpose-Jacobian-vector product at x with v.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="algopymodel.AlgopyModel.lag">
+<code class="descname">lag</code><span class="sig-paren">(</span><em>x</em>, <em>z</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#algopymodel.AlgopyModel.lag" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate Lagrangian at (x, z).</p>
+<p>The constraints and bounds are assumed to be ordered as in
+<a class="reference internal" href="#algopymodel.AlgopyModel.cons_pos" title="algopymodel.AlgopyModel.cons_pos"><code class="xref py py-meth docutils literal"><span class="pre">cons_pos()</span></code></a> and <code class="xref py py-meth docutils literal"><span class="pre">bounds()</span></code>.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="reformulating-models">
+<h2>Reformulating Models<a class="headerlink" href="#reformulating-models" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="module-snlp">
+<span id="the-snlp-module"></span><h3>The <a class="reference internal" href="#module-snlp" title="snlp"><code class="xref py py-mod docutils literal"><span class="pre">snlp</span></code></a> Module<a class="headerlink" href="#module-snlp" title="Permalink to this headline">¶</a></h3>
+<p>A slack framework for NLP.py.</p>
+<dl class="class">
+<dt id="snlp.SlackModel">
+<em class="property">class </em><code class="descclassname">snlp.</code><code class="descname">SlackModel</code><span class="sig-paren">(</span><em>model</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#snlp.SlackModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">nlp.model.nlpmodel.NLPModel</span></code></p>
+<p>General framework for converting a nonlinear optimization problem to a
+form using slack variables.</p>
+<p>Original problem:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span> cᴸ ≤ c(x)
+      c(x) ≤ cᵁ
+cᴿᴸ ≤ c(x) ≤ cᴿᵁ
+      c(x) = cᴱ
+  l ≤   x  ≤ u
+</pre></div>
+</div>
+<p>is transformed to:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>c(x) - sᴸ = 0
+c(x) - sᵁ = 0
+c(x) - sᴿ = 0
+c(x) - cᴱ = 0
+
+ cᴸ ≤ sᴸ
+      sᵁ ≤ cᵁ
+cᴿᴸ ≤ sᴿ ≤ cᴿᵁ
+  l ≤ x  ≤ u
+</pre></div>
+</div>
+<p>In the latter problem, the only inequality constraints are bounds on the
+slack and original variables. The other constraints are (typically)
+nonlinear equalities.</p>
+<p>The order of variables in the transformed problem is as follows:</p>
+<ol class="arabic simple">
+<li>x, the original problem variables.</li>
+<li>sᴸ, the slack variables corresponding to general constraints with
+a lower bound only.</li>
+<li>sᵁ, the slack variables corresponding to general constraints with
+an upper bound only.</li>
+<li>sᴿ, the slack variables corresponding to general constraints with
+a lower bound and an upper bound.</li>
+</ol>
+<p>This framework initializes the slack variables sL and sU to
+zero by default.</p>
+<p>Note that the slack framework does not update all members of NLPModel,
+such as the index set of constraints with an upper bound, etc., but
+rather performs the evaluations of the constraints for the updated
+model implicitly.</p>
+<dl class="method">
+<dt id="snlp.SlackModel.A">
+<code class="descname">A</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#snlp.SlackModel.A" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the constraint matrix if the problem is a linear program.</p>
+<p>See the documentation of <a class="reference internal" href="#snlp.SlackModel.jac" title="snlp.SlackModel.jac"><code class="xref py py-meth docutils literal"><span class="pre">jac()</span></code></a> for more information.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="snlp.SlackModel.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>model</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#snlp.SlackModel.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize a slack form of an <code class="xref py py-class docutils literal"><span class="pre">NLPModel</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">model:</th><td class="field-body">Original model to be transformed into a slack form.</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="snlp.SlackModel.cons">
+<code class="descname">cons</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#snlp.SlackModel.cons" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate vector of constraints at x.</p>
+<p>Constraints are stored in the order in which they appear in the
+original problem.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="snlp.SlackModel.ghivprod">
+<code class="descname">ghivprod</code><span class="sig-paren">(</span><em>x</em>, <em>g</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#snlp.SlackModel.ghivprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate individual dot products (g, Hi(x)*v).</p>
+<p>Evaluate the vector of dot products (g, Hi(x)*v) where Hi(x) is the
+Hessian of the i-th constraint at point x, i=1..m.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="snlp.SlackModel.grad">
+<code class="descname">grad</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#snlp.SlackModel.grad" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate the objective gradient at x.</p>
+<p>This function is specialized since the original objective function only
+depends on a subvector of <cite>x</cite>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="snlp.SlackModel.hess">
+<code class="descname">hess</code><span class="sig-paren">(</span><em>x</em>, <em>z=None</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#snlp.SlackModel.hess" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate Lagrangian Hessian at (x, z).</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="snlp.SlackModel.hprod">
+<code class="descname">hprod</code><span class="sig-paren">(</span><em>x</em>, <em>y</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#snlp.SlackModel.hprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Hessian-vector product.</p>
+<p>Evaluate matrix-vector product between the Hessian of the Lagrangian at
+(x, z) and p.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="snlp.SlackModel.initialize_slacks">
+<code class="descname">initialize_slacks</code><span class="sig-paren">(</span><em>val=0.0</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#snlp.SlackModel.initialize_slacks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize all slack variables to given value.</p>
+<p>This method may need to be overridden.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="snlp.SlackModel.jac">
+<code class="descname">jac</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#snlp.SlackModel.jac" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate constraints Jacobian at x.</p>
+<p>The gradients of the general constraints appear in &#8216;natural&#8217; order,
+i.e., in the order in which they appear in the problem.</p>
+<p>The overall Jacobian of the  constraints has the form:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">[</span> <span class="n">J</span>    <span class="o">-</span><span class="n">I</span> <span class="p">]</span>
+</pre></div>
+</div>
+<p>where the columns correspond to the variables <cite>x</cite> and <cite>s</cite>, and
+the rows correspond to the general constraints (in natural order).</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="snlp.SlackModel.jprod">
+<code class="descname">jprod</code><span class="sig-paren">(</span><em>x</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#snlp.SlackModel.jprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate Jacobian-vector product at x with p.</p>
+<p>See the documentation of <a class="reference internal" href="#snlp.SlackModel.jac" title="snlp.SlackModel.jac"><code class="xref py py-meth docutils literal"><span class="pre">jac()</span></code></a> for more details on how the
+constraints are ordered.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="snlp.SlackModel.jtprod">
+<code class="descname">jtprod</code><span class="sig-paren">(</span><em>x</em>, <em>v</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#snlp.SlackModel.jtprod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate transposed-Jacobian-vector product at x with p.</p>
+<p>See the documentation of <a class="reference internal" href="#snlp.SlackModel.jac" title="snlp.SlackModel.jac"><code class="xref py py-meth docutils literal"><span class="pre">jac()</span></code></a> for more details on how the
+constraints are ordered.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="snlp.SlackModel.obj">
+<code class="descname">obj</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#snlp.SlackModel.obj" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate the objective function at x..</p>
+<p>This function is specialized since the original objective function only
+depends on a subvector of <cite>x</cite>.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="id4">
+<h3>Example<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h3>
+<div class="admonition-todo admonition" id="index-1">
+<p class="first admonition-title">Todo</p>
+<p class="last">Insert example.</p>
+</div>
+</div>
+<div class="section" id="inheritance-diagrams">
+<h3>Inheritance Diagrams<a class="headerlink" href="#inheritance-diagrams" title="Permalink to this headline">¶</a></h3>
+digraph inheritancef0e37cc203 {
+bgcolor=transparent;
+rankdir=TB;
+size=&quot;&quot;;
+  &quot;AdolcModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;Model with derivatives computed by ADOL-C.&quot;];
+  &quot;NLPModel&quot; -&gt; &quot;AdolcModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;AlgopyModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;Model with derivatives computed by AlgoPy.&quot;];
+  &quot;NLPModel&quot; -&gt; &quot;AlgopyModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;AmplModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;AmplModel creates an instance of an AMPL model.&quot;];
+  &quot;NLPModel&quot; -&gt; &quot;AmplModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;BoundConstrainedNLPModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;Generic class to represent a bound-constrained problem.&quot;];
+  &quot;NLPModel&quot; -&gt; &quot;BoundConstrainedNLPModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;C1LineModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;Restriction of a C¹ model to a line.&quot;];
+  &quot;NLPModel&quot; -&gt; &quot;C1LineModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;C2LineModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;Restriction of a C² objective function to a line.&quot;];
+  &quot;C1LineModel&quot; -&gt; &quot;C2LineModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;CppADModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;Model with derivatives computed by CPPAD.&quot;];
+  &quot;NLPModel&quot; -&gt; &quot;CppADModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;CySparseAmplModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded];
+  &quot;CySparseNLPModel&quot; -&gt; &quot;CySparseAmplModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;AmplModel&quot; -&gt; &quot;CySparseAmplModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;CySparseNLPModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;An `NLPModel` where sparse matrices are returned as CySparse matrices.&quot;];
+  &quot;NLPModel&quot; -&gt; &quot;CySparseNLPModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;CySparseSlackModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;Reformulate an optimization problem using slack variables.&quot;];
+  &quot;SlackModel&quot; -&gt; &quot;CySparseSlackModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;LPModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;Generic class to represent a linear programming (LP) problem.&quot;];
+  &quot;QPModel&quot; -&gt; &quot;LPModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;NLPModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;Abstract continuous optimization model.&quot;];
+  &quot;PySparseAdolcModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;`AdolcModel` with PySparse sparse matrices.&quot;];
+  &quot;PySparseNLPModel&quot; -&gt; &quot;PySparseAdolcModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;SparseAdolcModel&quot; -&gt; &quot;PySparseAdolcModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;PySparseAmplModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded];
+  &quot;PySparseNLPModel&quot; -&gt; &quot;PySparseAmplModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;AmplModel&quot; -&gt; &quot;PySparseAmplModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;PySparseNLPModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;An `NLPModel` where sparse matrices are returned in PySparse format.&quot;];
+  &quot;NLPModel&quot; -&gt; &quot;PySparseNLPModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;PySparseSlackModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;SlackModel in wich matrices are PySparse matrices.&quot;];
+  &quot;SlackModel&quot; -&gt; &quot;PySparseSlackModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;QNAdolcModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;`AdolcModel` with quasi-Newton Hessian approximation.&quot;];
+  &quot;QuasiNewtonModel&quot; -&gt; &quot;QNAdolcModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;SparseAdolcModel&quot; -&gt; &quot;QNAdolcModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;QNAmplModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;AMPL model with quasi-Newton Hessian approximation.&quot;];
+  &quot;QuasiNewtonModel&quot; -&gt; &quot;QNAmplModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;AmplModel&quot; -&gt; &quot;QNAmplModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;QPModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;Generic class to represent a quadratic programming (QP) problem.&quot;];
+  &quot;NLPModel&quot; -&gt; &quot;QPModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;QnPySparseAmplModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded];
+  &quot;QuasiNewtonModel&quot; -&gt; &quot;QnPySparseAmplModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;PySparseAmplModel&quot; -&gt; &quot;QnPySparseAmplModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;QuasiNewtonModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;`NLPModel with a quasi-Newton Hessian approximation.&quot;];
+  &quot;NLPModel&quot; -&gt; &quot;QuasiNewtonModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;SciPyAdolcModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;`AdolcModel` with SciPy COO sparse matrices.&quot;];
+  &quot;SparseAdolcModel&quot; -&gt; &quot;SciPyAdolcModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;SciPyAmplModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;`AmplModel` with sparse matrices n SciPy coordinate (COO) format.&quot;];
+  &quot;AmplModel&quot; -&gt; &quot;SciPyAmplModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;SciPyNLPModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;`NLPModel` with sparse matrices in SciPy coordinate (COO) format.&quot;];
+  &quot;NLPModel&quot; -&gt; &quot;SciPyNLPModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;SciPySlackModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;`SlackModel` with sparse matrices in SciPy coordinate (COO) format.&quot;];
+  &quot;SlackModel&quot; -&gt; &quot;SciPySlackModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;SlackModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;General framework for converting a nonlinear optimization problem to a&quot;];
+  &quot;NLPModel&quot; -&gt; &quot;SlackModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;SparseAdolcModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;`AdolcModel` with sparse Jacobian and Hessian.&quot;];
+  &quot;AdolcModel&quot; -&gt; &quot;SparseAdolcModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+  &quot;UnconstrainedNLPModel&quot; [color=gray70,fontname=&quot;Vera Sans, DejaVu Sans, Liberation Sans, Arial, Helvetica, sans&quot;,fontsize=12,height=0.25,shape=box,style=rounded,tooltip=&quot;Generic class to represent an unconstrained problem.&quot;];
+  &quot;NLPModel&quot; -&gt; &quot;UnconstrainedNLPModel&quot; [arrowsize=0.5,style=&quot;setlinewidth(0.5)&quot;];
+}
+</div>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="globalization.html" class="btn btn-neutral float-right" title="Globalization Techniques" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="installing.html" class="btn btn-neutral" title="Installing NLP.py" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Sylvain Arreckx, Dominique Orban and Nikolaj Van Omme.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.2',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

@@ -1,0 +1,77 @@
+.. Installing NLP.py
+
+Installing NLP.py
+=================
+
+Dependencies
+------------
+
+-  `Numpy <http://www.numpy.org>`_
+-  `PyKrylov <https://github.com/PythonOptimizers/pykrylov>`_
+
+Optional dependencies
+---------------------
+
+Sparse matrix storage
+~~~~~~~~~~~~~~~~~~~~~
+
+One of:
+
+-  `CySparse <https://github.com/PythonOptimizers/cysparse>`_ (recommended)
+-  `PySparse <https://github.com/optimizers/pysparse.git>`_
+-  `Scipy <http://scipy.org/scipylib>`_ (does not have full support yet)
+
+Only certain numerical methods and functionalities are available without sparse matrix support.
+
+Derivatives computation
+~~~~~~~~~~~~~~~~~~~~~~~
+
+At least one of the following, depending on requirements:
+
+-  `ASL <https://github.com/ampl/mp>`_
+-  `pyadolc <https://github.com/b45ch1/pyadolc.git>`_
+-  `algopy <https://github.com/b45ch1/algopy.git>`_
+-  `pycppad <https://github.com/b45ch1/pycppad.git>`_
+
+Without one of the above dependencies, at least the first derivatives
+must be coded by hand. Second derivatives may be approximated used a
+quasi-Newton scheme.
+
+Factorizations
+~~~~~~~~~~~~~~
+
+One or more of the following, depending on requirements:
+
+-  `HSL.py <https://github.com/PythonOptimizers/HSL.py>`_
+-  `MUMPS.py <https://github.com/PythonOptimizers/MUMPS.py>`_
+-  `qr_mumps.py <https://github.com/PythonOptimizers/qr_mumps.py>`_
+-  `SuiteSparse.py <https://github.com/PythonOptimizers/SuiteSparse.py>`_
+
+Only matrix-free methods are available without one of the above
+factorizations.
+
+Installation
+------------
+
+1. Clone this repo:
+
+   .. code:: bash
+   
+       git clone https://github.com/PythonOptimizers/NLP.py
+
+2. Optional: Install optional dependencies. `macOS users <installing_macOS.html>`_.
+
+3. Optional: if you would like ASL support, copy ``site.template.cfg``
+   to ``site.cfg`` and modify ``site.cfg`` to match your configuration:
+
+   .. code:: bash
+
+       cp site.template.cfg site.cfg
+
+4. Install:
+
+   .. code:: bash
+
+       python setup.py build
+       python setup.py install [--prefix=...]
+
