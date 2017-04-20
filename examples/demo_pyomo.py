@@ -8,30 +8,32 @@ except ImportError:
     sys.exit(0)
 
 from nlp.model.amplmodel import AmplModel
+from nlp.optimize.tron import TRON
+from nlp.optimize.pcg import TruncatedCG
+from nlp.tools.logs import config_logger
+import logging
+
 import numpy as np
 
+tron_logger = config_logger("nlp.tron",
+                            "%(name)-8s %(levelname)-5s %(message)s",
+                            level=logging.INFO)
 
 def create_simple_model():
     model = ConcreteModel()
-    model.x = Var()
+    model.x = Var(bounds=(1., None))
     model.o = Objective(expr=model.x)
-    model.c = Constraint(expr=model.x >= 1)
-    model.x.set_value(1.0)
+    model.x.set_value(20.0)
     return model
 
-def create_quadratic_model():
+def create_rosenbrock_model():
     model = ConcreteModel()
-
-    model.x = Var(within=NonNegativeReals)
-    model.y = Var(within=NonNegativeReals)
-
-    def constraint_rule(model):
-        return model.x + model.y >= 10
-    model.c = Constraint(rule=constraint_rule)
-
-    def objective_rule(model):
-        return model.x + model.y + 0.5 * (model.x * model.x + 4 * model.x * model.y + 7 * model.y * model.y)
-    model.o = Objective(rule=objective_rule, sense=minimize)
+    model.x = Var()
+    model.y = Var(bounds=(-1.5, None))
+    model.o = Objective(expr=(model.x-1)**2 + \
+                              100*(model.y-model.x**2)**2)
+    model.x.set_value(-2.)
+    model.y.set_value(1.)
     return model
 
 def write_nl(model, nl_filename):
@@ -39,8 +41,12 @@ def write_nl(model, nl_filename):
     _, smap_id = model.write(nl_filename,
                              format=ProblemFormat.nl)
 
-
 def display_model(model):
+    
+    print '------------------------'
+    print 'Model: %15s' % model.name
+    print '------------------------'
+
     # Query the model
     x0 = model.x0
     pi0 = model.pi0
@@ -100,6 +106,7 @@ def display_model(model):
     e = np.ones(nvar)
     He = model.hprod(x0, pi0, e)
     print 'He = ', He
+    print '\n\n\n'
 
 if __name__ == "__main__":
     pyomo_simple_model = create_simple_model()
@@ -107,20 +114,17 @@ if __name__ == "__main__":
     write_nl(pyomo_simple_model, nl_filename)
 
     # Create an Amplmodel from the generated nl file
-    print '------------------------'
-    print 'Problem', nl_filename
-    print '------------------------'
     simple_model = AmplModel(nl_filename)
     display_model(simple_model)
+    
+    pyomo_rosenbrock_model = create_rosenbrock_model()
+    nl_filename = "rosenbrock.nl"
+    write_nl(pyomo_rosenbrock_model, nl_filename)
 
-    pyomo_quadratic_model = create_quadratic_model()
-    nl_filename = "quadratic.nl"
-    write_nl(pyomo_quadratic_model, nl_filename)
+    # Create an Amplmodel from the generated nl file
+    rosenbrock_model = AmplModel(nl_filename)
+    display_model(rosenbrock_model)
 
-    # Create an Amplmodel from the generated nl filel
-    print '\n\n\n------------------------'
-    print 'Problem', nl_filename
-    print '------------------------'
-    quadratic_model = AmplModel(nl_filename)
-    display_model(quadratic_model)
+    solver = TRON(rosenbrock_model, TruncatedCG)
+    solver.solve()
 
