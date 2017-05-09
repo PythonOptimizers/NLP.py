@@ -192,3 +192,69 @@ def breakpoints(x, d, l, u):
         brptmax = max(brptmax, np.max(steps))
 
     return (nbrpt, brptmin, brptmax)
+
+def evaluate_model_methods_at_starting_point(model):
+    
+    print 'Model name: %15s\n' % model.name
+
+    # Query the model
+    x0 = model.x0
+    pi0 = model.pi0
+    nvar = model.nvar
+    ncon = model.ncon
+    print 'There are %d variables and %d constraints' % (nvar, ncon)
+    
+    np.set_printoptions(precision=3, linewidth=79, threshold=10, edgeitems=3)
+    
+    print 'Initial point: ', x0
+    print 'Lower bounds on x: ', model.Lvar
+    print 'Upper bounds on x: ', model.Uvar
+    print 'f(x0) = ', model.obj(x0)
+    g0 = model.grad(x0)
+    print '∇f(x0) = ', g0
+    
+    if ncon > 0:
+        print 'Initial multipliers: ', pi0
+        print 'Lower constraint bounds: ', model.Lcon
+        print 'Upper constraint bounds: ', model.Ucon
+        print 'c(x0) = ', model.cons(x0)
+    
+        jvals, jrows, jcols = model.jac(x0)
+        print
+        print 'J(x0) = (in coordinate format)'
+        print 'nnzJ = ', len(jvals)
+        print 'vals: ', jvals
+        print 'rows: ', jrows
+        print 'cols: ', jcols
+    
+    hvals, hrows, hcols = model.hess(x0, pi0)
+    print 'Hessian (lower triangle in coordinate format):'
+    print '\nnnzH = ', len(hvals)
+    print 'vals: ', hvals
+    print 'rows: ', hrows
+    print 'cols: ', hcols
+    
+    if ncon > 0:
+        print
+        print ' Evaluating constraints individually, sparse gradients'
+        print
+    
+        for i in range(min(ncon, 5)):
+            ci = model.icons(i, x0)
+            print 'c%d(x0) = %-g' % (i, ci)
+            sgi = model.sigrad(i, x0)
+            k = sgi.keys()
+            ssgi = {}
+            for j in range(min(5, len(k))):
+                ssgi[k[j]] = sgi[k[j]]
+            print '∇c%d(x0) = ' % i, ssgi
+    
+    print
+    print ' Testing matrix-vector product:'
+    print
+    
+    e = np.ones(nvar)
+    He = model.hprod(x0, pi0, e)
+    print 'He = ', He
+    print '\n\n'
+
