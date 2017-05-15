@@ -426,7 +426,7 @@ class TRON(object):
                 self.g_old = self.g.copy()
 
             # Wrap Hessian into an operator.
-            H = model.hop(self.x.copy(), self.model.pi)
+            H = model.hop(self.x.copy())
 
             # Compute the Cauchy step and store in s.
             (s, self.alphac) = self.cauchy(self.x, self.g, H,
