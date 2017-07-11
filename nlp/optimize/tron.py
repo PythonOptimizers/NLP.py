@@ -59,6 +59,7 @@ class TRON(object):
         self.iter = 0         # Iteration counter
         self.total_cgiter = 0
         self.x = kwargs.get("x0", self.model.x0.copy())
+        self.x_old = None
         self.f = None
         self.f0 = None
         self.g = None
@@ -391,6 +392,7 @@ class TRON(object):
         self.f0 = self.f
         self.g = model.grad(self.x)  # Current  gradient
         self.g_old = self.g.copy()
+        self.x_old = self.x.copy()
         pgnorm = projected_gradient_norm2(self.x, self.g,
                                           model.Lvar, model.Uvar)
         self.pg0 = pgnorm
@@ -424,6 +426,7 @@ class TRON(object):
             self.step_accepted = False
             if self.save_g:
                 self.g_old = self.g.copy()
+                self.x_old = self.x.copy()
 
             # Wrap Hessian into an operator.
             H = model.hop(self.x.copy(), self.model.pi)
@@ -585,6 +588,28 @@ class QNTRON(TRON):
 
     def post_iteration(self, **kwargs):
         # Update quasi-Newton approximation.
-        # import ipdb; ipdb.set_trace()
         if self.step_accepted:
             self.model.H.store(self.dvars, self.dgrad)
+
+
+class StructQNTRON(QNTRON):
+    """A variant of TRON with a structured Hessian approximation.
+
+    This solver is designed for use within Auglag.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(StructQNTRON, self).__init__(*args, **kwargs)
+
+    def post_iteration(self, **kwargs):
+        if self.step_accepted:
+            # Form correction to the gradient difference to account for structure
+            on = self.model.model.original_n
+            cons_new = self.model.model.cons(self.x)
+            cons_old = self.model.model.cons(self.x_old)
+            J_old = self.model.model.jop(self.x_old)
+            penalty = self.model.penalty
+
+            dgrad_mod = self.dgrad + penalty * J_old.T * (cons_old - cons_new)
+
+            self.model.model.model.H.store(self.dvars[:on], self.dgrad[:on], dgrad_mod[:on])

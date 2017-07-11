@@ -77,9 +77,8 @@ class Auglag(object):
             :stal:   Problem converged to an infeasible point
             :time:   Time limit exceeded
         """
-        self.qn = kwargs.get("qn",False)
-
-        if self.qn:
+        full_qn = kwargs.get("full_qn",False)
+        if full_qn:
             self.model = QuasiNewtonAugmentedLagrangian(model, **kwargs)
         else:
             self.model = AugmentedLagrangian(model, **kwargs)
