@@ -9,6 +9,7 @@ from nlp.optimize.auglag import Auglag
 from nlp.tools.logs import config_logger
 from nlp.optimize.tron import TRON
 
+
 def auglag_stats(auglag):
     """Obtain Auglag statistics and indicate failures with negatives."""
     print auglag.status
