@@ -61,13 +61,16 @@ class SimpleBacktrackingLineSearch(LineSearch):
 
     @property
     def decr(self):
+        """Obtain step shrinking factor."""
         return self.__decr
 
     def check_slope(self, slope):
+        """Check whether slope yields sufficient descent."""
         # Don't check slope
         return
 
     def next(self):
+        """Update step length."""
         if self.trial_value <= self.__goal:
             raise StopIteration()
 
@@ -83,6 +86,7 @@ class SimpleBacktrackingLineSearch(LineSearch):
 
 
 class FnormModel(UnconstrainedNLPModel):
+    """Optimization model for the norm of the optimality residual."""
 
     def __init__(self, model, **kwargs):
         u"""Instantiate a :class:`FnormModel`.
@@ -562,12 +566,15 @@ class RegSQPSolver(object):
     def least_squares_multipliers(self, g, J):
         u"""Compute least-squares multipliers.
 
-            min_y   ½ ‖Jᵀy - g‖²
+        Compute least-squares multipliers y by solving
 
-        That is solving
-             [I  Jᵀ] [ r] = [-g]
-             [J  0 ] [-y]   [ 0]
-        and keeping only y.
+            min_y   ½ ‖J'y - g‖²,
+
+        which we do by solving
+             [I  J'] [r] = [g]
+             [J  0 ] [y]   [0].
+
+        We also return the residual r := g - J'y.
         """
         model = self.model
         n = model.nvar
@@ -595,7 +602,7 @@ class RegSQPSolver(object):
         return y
 
     def solve(self, **kwargs):
-
+        """Perform sequence of outer iterations."""
         # Transfer pointers for convenience.
         model = self.model
         x = self.x
@@ -790,7 +797,7 @@ class RegSQPSolver(object):
 
     def emergency_backtrack(self, x, y, dx, dy, prox, penalty,
                             Fnorm0, Fnorm_ext):
-        """Backtrack on ‖F(w)‖."""
+        u"""Backtrack on ‖F(w)‖."""
         model = self.model
         goal = self.theta * Fnorm0 + self.epsilon
 
@@ -881,7 +888,8 @@ class RegSQPSolver(object):
         return x, y, f, c, g, J, cnorm, gLnorm, Fnorm
 
     def post_iteration(self, x, g, **kwargs):
-        """
+        """Perform post-outer-iteration work.
+
         Override this method to perform additional work at the end of a
         major iteration. For example, use this method to restart an
         approximate Hessian.
@@ -889,7 +897,8 @@ class RegSQPSolver(object):
         return None
 
     def post_inner_iteration(self, x, g, **kwargs):
-        """
+        """Perform post-inner-iteration work.
+
         Override this method to perform additional work at the end of a
         minor iteration. For example, use this method to restart an
         approximate Hessian.
