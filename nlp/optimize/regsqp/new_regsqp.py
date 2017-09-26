@@ -606,18 +606,14 @@ class RegSQPSolver(object):
         # contribution of the Jacobian
         (val, irow, jcol) = J.find()
         M.put(val, (n + irow).tolist(), jcol.tolist())
+        LBL = LBLSolver(M, factorize=True)
 
         rhs = np.zeros(n + m)
         rhs[:n] = g
-        rhs[:n] *= -1.0
-
-        LBL = LBLSolver(M, factorize=True)
-
         LBL.solve(rhs)
         LBL.refine(rhs, nitref=3)
-        y = LBL.x[n:]
-        y *= -1.0
-        return y
+        # TODO: are copies necessary?
+        return LBL.x[:n].copy(), LBL.x[n:].copy()
 
     def solve(self, **kwargs):
         """Perform sequence of outer iterations."""
@@ -638,15 +634,12 @@ class RegSQPSolver(object):
         self.cnorm = cnorm = cnorm0 = norm2(c)
 
         g = model.grad(x)
-        J = model.jop(x)
-        gL = g - J.T * y
 
         # set Lagrange mutlipliers to least-squares estimates
-        y = self.least_squares_multipliers(g, model.jac(x))
+        # gL = g - J'y is the least-squares residual
+        gL, y = self.least_squares_multipliers(g, model.jac(x))
 
         J = model.jop(x)
-        # print J.to_array()
-        gL = g - J.T * y
         self.gLnorm = gLnorm = gLnorm0 = norm2(gL)
         Fnorm = Fnorm0 = gLnorm + cnorm
         self.log.debug("initial Fnorm: %8.2e", Fnorm0)
