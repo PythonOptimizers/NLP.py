@@ -17,10 +17,10 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
 
     The proximal augmented Lagrangian is defined as:
 
-        L(x, π; ρ) := f(x) - πᵀc(x) + ½ δ ‖c(x)‖² + ½ ρ ‖x - xₖ‖²,
+        L(x, π; ρ) := f(x) - πᵀc(x) + ½ δ ‖c(x)‖² + ½ ρ ‖x - xk‖²,
 
     where π are the current Lagrange multiplier estimates, δ is the
-    current penalty parameter, ρ is the current proximal parameter and xₖ is
+    current penalty parameter, ρ is the current proximal parameter and xk is
     a fixed vector.
     """
 
@@ -133,7 +133,7 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
         """Compute a magical step for the slack variables.
 
         This step minimizes the augmented Lagrangian with respect to the slack
-        variables only for fixed x and π. The function returns both the step 
+        variables only for fixed x and π. The function returns both the step
         and the updated x.
         """
         model = self.model
