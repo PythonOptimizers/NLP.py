@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
+"""Regularized SQP solver for equality-constrained optimization."""
 
-from nlp.model.pysparsemodel import PySparseAmplModel
 from nlp.model.nlpmodel import UnconstrainedNLPModel
 from nlp.model.augmented_lagrangian import AugmentedLagrangian
 from nlp.model.linemodel import C1LineModel
 from nlp.model.snlp import SlackModel
 
 from nlp.ls.linesearch import LineSearch, ArmijoLineSearch
-from nlp.ls.linesearch import ArmijoWolfeLineSearch, LineSearchFailure
-from nlp.ls.wolfe import StrongWolfeLineSearch
-from nlp.ls.quad_cub import QuadraticCubicLineSearch
+# from nlp.ls.linesearch import ArmijoWolfeLineSearch, LineSearchFailure
+from nlp.ls.linesearch import LineSearchFailure
+# from nlp.ls.wolfe import StrongWolfeLineSearch
+# from nlp.ls.quad_cub import QuadraticCubicLineSearch
 
 from nlp.tools.exceptions import UserExitRequest
 from nlp.tools.norms import norm2 as norm2
