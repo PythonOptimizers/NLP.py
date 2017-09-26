@@ -694,7 +694,7 @@ class RegSQPSolver(object):
 
             # check for acceptance of extrapolation step
             # self.epsilon = (2 - self.theta) * Fnorm # 10./ self.merit.penalty
-            self.epsilon = 10. / self.merit.penalty
+            self.epsilon = 1.0e+3 / self.merit.penalty
             xplus = x + dx
             yplus = y + dy
             f_ext = model.obj(xplus)  # only necessary for printing
