@@ -53,8 +53,8 @@ class SimpleBacktrackingLineSearch(LineSearch):
             :goal: Θ ϕ(0) + ϵ (default: √ϵM).
         """
         name = kwargs.pop("name", "Backtracking linesearch")
-        super(SimpleBacktrackingLineSearch, self).__init__(
-            *args, name=name, **kwargs)
+        super(SimpleBacktrackingLineSearch,
+              self).__init__(*args, name=name, **kwargs)
         self.__goal = max(kwargs.get("goal", 0), sqeps)
         self.__decr = max(min(kwargs.get("decr", 1.5), 100), 1.001)
         return
@@ -112,9 +112,11 @@ class FnormModel(UnconstrainedNLPModel):
         self.x0 = np.concatenate((self.model.x0, self.model.pi0))
 
         self.xk = kwargs.get("xk",
-                             np.zeros(self.model.n) if self.prox_init > 0 else None)
+                             np.zeros(self.model.n)
+                             if self.prox_init > 0 else None)
         self.yk = kwargs.get("yk",
-                             np.zeros(self.model.m) if self.penalty_init > 0 else None)
+                             np.zeros(self.model.m)
+                             if self.penalty_init > 0 else None)
 
     @property
     def penalty(self):
@@ -281,12 +283,12 @@ class RegSQPSolver(object):
                                    sizeHint=model.nnzh + model.nnzj + m,
                                    symmetric=True)
 
-        # contribution of the Hessian
-        # print "x: ", x, " y: ", y
+        # DEBUG: ensure derivatives are up to date
         f = model.obj(x)
-        g = model.grad(x)
-        J = model.jop(x)
         c = model.cons(x) - model.Lcon
+
+        # contribution of the Hessian
+        J = model.jop(x)
         H = model.hess(x, z=y)
         (val, irow, jcol) = H.find()
         self.K.put(val, irow.tolist(), jcol.tolist())
@@ -389,7 +391,6 @@ class RegSQPSolver(object):
             self.LBL = LBLSolver(self.K, factorize=True)
             inertia = self.LBL.inertia
             second_order_sufficient = inertia == (nvar, ncon, 0)
-
             full_rank = self.LBL.isFullRank
             nb_bump += 1
             tired = nb_bump > self.bump_max
@@ -673,22 +674,18 @@ class RegSQPSolver(object):
 
             # compute extrapolation step
             self.assemble_linear_system(x, y)
-            # self.update_rhs(rhs, g, J, y, c)
             rhs = self.assemble_rhs(g, J, y, c)
-
-            status, short_status, solved, dx, dy = self.solve_linear_system(
-                rhs, J)
-            # print 'dx_ext: ', dx
+            status, short_status, solved, dx, dy = \
+                self.solve_linear_system(rhs, J)
             assert solved
+
             penalty_ext = self.merit.penalty
             prox_ext = self.merit.prox
             self.log.debug("step norm: %6.2e", norm2(dx))
 
             # check for acceptance of extrapolation step
-            # self.epsilon = (2 - self.theta) * Fnorm  # 10./ self.merit.penalty
+            # self.epsilon = (2 - self.theta) * Fnorm # 10./ self.merit.penalty
             self.epsilon = 10. / self.merit.penalty
-            # x += dx
-            # y += dy
             xplus = x + dx
             yplus = y + dy
             f_ext = model.obj(xplus)  # only necessary for printing
@@ -727,20 +724,11 @@ class RegSQPSolver(object):
                 # starting from the old x and the old y
                 self.merit.pi = y.copy()
 
-                (x_in, y_in, f_in, g_in, J_in, c_in, gL_in, gLnorm_in,
-                 cnorm_in, Fnorm_in, solved) = self.solve_inner(x, y, f, g, J, c, gL,
-                                                                Fnorm, gLnorm, cnorm,
-                                                                Fnorm, gLnorm, cnorm)
-                # x = x_in
-                # y = y_in
-                # f = f_in
-                # g = g_in
-                # J = J_in
-                # c = c_in
-                # gL = gL_in
-                # gLnorm = gLnorm_in
-                # cnorm = cnorm_in
-                # Fnorm = Fnorm_in
+                (x_in, y_in, f_in, g_in, J_in, c_in, gL_in,
+                 gLnorm_in, cnorm_in, Fnorm_in, solved) = \
+                    self.solve_inner(x, y, f, g, J, c, gL,
+                                     Fnorm, gLnorm, cnorm,
+                                     Fnorm, gLnorm, cnorm)
 
                 if not solved:
                     self.merit.penalty = penalty_ext
