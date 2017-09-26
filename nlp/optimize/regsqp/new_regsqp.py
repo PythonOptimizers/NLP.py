@@ -652,7 +652,7 @@ class RegSQPSolver(object):
         #                                     cnorm0, gLnorm0, Fnorm0)
 
         # Initialize penalty parameter
-        self.merit.penalty = 1.0 / min(0.1, Fnorm)
+        # self.merit.penalty = 1.0 / min(0.1, Fnorm)
         # self.merit.penalty = 1. / Fnorm
         # delta = min(0.1, Fnorm0)
 
