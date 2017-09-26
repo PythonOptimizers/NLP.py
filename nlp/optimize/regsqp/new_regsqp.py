@@ -473,7 +473,6 @@ class RegSQPSolver(object):
 
         model = self.model
         failure = False
-        # ipdb.set_trace()
 
         # if infeasibility is large, immediately increase penalty
         # if cnorm > self.theta * cnorm0 + 0.5 * self.epsilon:
@@ -576,8 +575,7 @@ class RegSQPSolver(object):
             except LineSearchFailure:
                 self.status = "Linesearch failure"
                 failure = True
-            # plt.scatter(x_p, y_p)
-            # ipdb.set_trace()
+
         solved = Fnorm <= self.theta * Fnorm0 + self.epsilon
         return x, y, f, g, J, c, gphi, gphi_norm, cnorm, Fnorm, solved
 
