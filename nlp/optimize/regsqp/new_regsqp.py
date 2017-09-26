@@ -279,6 +279,10 @@ class RegSQPSolver(object):
         model = self.model
         n = model.n
         m = model.m
+
+        self.log.debug("x = " + str(x[:min(5, n)]))
+        self.log.debug("y = " + str(y[:min(5, m)]))
+
         self.K = ps.PysparseMatrix(nrow=n + m, ncol=n + m,
                                    sizeHint=model.nnzh + model.nnzj + m,
                                    symmetric=True)
@@ -321,6 +325,8 @@ class RegSQPSolver(object):
                           min(alpha / self.merit.penalty,
                               1.0 / self.merit.penalty**gamma)),
                       self.penalty_min)
+        self.log.debug("updating penalty parameter from %8.2e to %8.2e",
+                       self.merit.penalty, penalty)
         # penalty = max(
         # min(1.0 / self.merit.penalty / 10., 1.0 / self.merit.penalty**(1 +
         #    0.8)), self.penalty_min)
@@ -338,7 +344,7 @@ class RegSQPSolver(object):
         definite on the nullspace of J and increase δ in case the matrix is
         singular because the rank deficiency in J.
         """
-        self.log.debug('solving linear system, δ = %18.10e',
+        self.log.debug('solving linear system, δ = %8.2e',
                        1. / self.merit.penalty)
         nvar = self.model.nvar
         ncon = self.model.ncon
@@ -349,6 +355,11 @@ class RegSQPSolver(object):
         second_order_sufficient = inertia == (nvar, ncon, 0)
         full_rank = self.LBL.isFullRank
 
+        self.log.debug("desired inertia: (%d,%d,%d)", nvar, ncon, 0)
+        self.log.debug("actual  inertia: (%d,%d,%d)", *inertia)
+        self.log.debug("2nd-order sufficient: %s", second_order_sufficient)
+        self.log.debug("full rank: %s", full_rank)
+
         self.merit.prox = 0.0
 
         nb_bump = 0
@@ -356,10 +367,7 @@ class RegSQPSolver(object):
         while not (second_order_sufficient and full_rank) and not tired:
 
             if not second_order_sufficient:
-                self.log.debug("further convexifying model: inertia is " +
-                               "(%d,%d,%d) and should be (%d,%d,%d))",
-                               inertia[0], inertia[1], inertia[2],
-                               self.model.nvar, self.model.ncon, 0)
+                self.log.debug("further convexifying model")
 
                 if self.merit.prox == 0.0:
                     if self.prox_last == 0.0:
@@ -392,6 +400,11 @@ class RegSQPSolver(object):
             inertia = self.LBL.inertia
             second_order_sufficient = inertia == (nvar, ncon, 0)
             full_rank = self.LBL.isFullRank
+
+            self.log.debug("actual inertia: (%d,%d,%d)", *inertia)
+            self.log.debug("2nd-order sufficient: %s", second_order_sufficient)
+            self.log.debug("full rank: %s", full_rank)
+
             nb_bump += 1
             tired = nb_bump > self.bump_max
 
@@ -482,6 +495,8 @@ class RegSQPSolver(object):
         finished = Fnorm <= self.theta * Fnorm0 + self.epsilon
         tired = self.itn > self.itermax
 
+        self.log.debug("before main inner loop: finished = %s", finished)
+
         while not (failure or finished or tired):
 
             self.x_old = x.copy()
@@ -545,6 +560,8 @@ class RegSQPSolver(object):
                 Fnorm = gphi_norm + cnorm
                 finished = Fnorm <= self.theta * Fnorm0 + self.epsilon
                 tired = self.itn > self.itermax
+
+                self.log.debug("finished = %s", finished)
 
                 self.log.info(self.format, self.itn, f, cnorm, gphi_norm,
                               self.merit.prox, 1.0 / self.merit.penalty)
@@ -632,6 +649,7 @@ class RegSQPSolver(object):
         gL = g - J.T * y
         self.gLnorm = gLnorm = gLnorm0 = norm2(gL)
         Fnorm = Fnorm0 = gLnorm + cnorm
+        self.log.debug("initial Fnorm: %8.2e", Fnorm0)
 
         self.log.info(self.header)
         self.log.info(self.format, self.itn, self.f0, cnorm0, gLnorm0,
@@ -673,6 +691,7 @@ class RegSQPSolver(object):
             self.merit.penalty = 1.0 / self.new_penalty(Fnorm)
 
             # compute extrapolation step
+            self.log.debug("attempting extrapolation step")
             self.assemble_linear_system(x, y)
             rhs = self.assemble_rhs(g, J, y, c)
             status, short_status, solved, dx, dy = \
@@ -681,7 +700,6 @@ class RegSQPSolver(object):
 
             penalty_ext = self.merit.penalty
             prox_ext = self.merit.prox
-            self.log.debug("step norm: %6.2e", norm2(dx))
 
             # check for acceptance of extrapolation step
             # self.epsilon = (2 - self.theta) * Fnorm # 10./ self.merit.penalty
@@ -697,6 +715,11 @@ class RegSQPSolver(object):
             gLnorm_ext = norm2(gL_ext)
             cnorm_ext = norm2(c_ext)                # = ‖c(xk+)‖
             Fnorm_ext = gLnorm_ext + cnorm_ext      # = ‖F(wk+)‖
+
+            self.log.debug("target optimality residual: %8.2e",
+                           self.theta * Fnorm + self.epsilon)
+            self.log.debug("optimality residual at extrapolation point: %8.2e",
+                           Fnorm_ext)
 
             if Fnorm_ext <= self.theta * Fnorm + self.epsilon:
                 self.log.debug("extrapolation step accepted")
