@@ -128,9 +128,8 @@ class AugmentedLagrangian(BoundConstrainedNLPModel):
         """
         return self.hop(*args, **kwargs)
 
-
     def magical_step(self, x):
-        """Compute a magical step for the slack variables.
+        u"""Compute a magical step for the slack variables.
 
         This step minimizes the augmented Lagrangian with respect to the slack
         variables only for fixed x and π. The function returns both the step
