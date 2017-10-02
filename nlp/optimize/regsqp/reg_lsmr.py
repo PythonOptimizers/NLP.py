@@ -172,7 +172,6 @@ class RegLSMRFramework(KrylovMethod):
         D. C.-L. Fong and M. A. Saunders
         LSMR: An iterative algorithm for least-square problems
         Draft of 01 Jun 2010, submitted to SISC.
-
         """
 
         etol = kwargs.get('etol', 1.0e-6)
@@ -465,24 +464,16 @@ class RegLSMRFramework(KrylovMethod):
 
             if test3 <= ctol:
                 istop = 3
-            if test2 <= atol:
-                istop = 2
-            if test1 <= rtol:
-                istop = 1
 
-            # try:
-            #     self.user_criteria()
-            # except UserExitRequest:
-            #     istop = -1
-            # Tolerances set by the user.
+            # in RegSQP inner iterations, we need these two tests satisfied
             if inner:
-                if normar + gamma * normb <= normr and normar <= mu * normA * normb:
+                if normar**2 + gamma * normb**2 <= normr**2 and test2 <= atol:
                     istop = 9
             else:
-                if normar <= mu * normA * normb:
-                    istop = 10
-
-            # See if it is time to print something.
+                if test2 <= atol:
+                    istop = 2
+                if test1 <= rtol:
+                    istop = 1
 
             if show:
                 prnt = 0
