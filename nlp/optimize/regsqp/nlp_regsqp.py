@@ -14,20 +14,26 @@ def regsqp_stats(regsqp):
     if regsqp.short_status in ("opt"):
         it = regsqp.itn
         fc, gc = regsqp.model.obj.ncalls, regsqp.model.grad.ncalls
+        cc = regsqp.model.cons.ncalls
+        jc = regsqp.model.jac.ncalls
+        jprod = regsqp.jprod
         hc = regsqp.model.hess.ncalls
-        jprod = regsqp.model.jprod.ncalls + regsqp.model.jtprod.ncalls
+        hprod = regsqp.model.hprod.ncalls
         cn = regsqp.cnorm
         gLn = regsqp.gLnorm
         ts = regsqp.tsolve
     else:
         it = -regsqp.itn
         fc, gc = -regsqp.model.obj.ncalls, -regsqp.model.grad.ncalls
+        cc = -regsqp.model.cons.ncalls
+        jc = -regsqp.model.jac.ncalls
+        jprod = -regsqp.jprod
         hc = -regsqp.model.hess.ncalls
-        jprod = -(regsqp.model.jprod.ncalls + regsqp.model.jtprod.ncalls)
+        hprod = regsqp.model.hprod.ncalls
         cn = -1.0 if regsqp.cnorm is None else -regsqp.cnorm
         gLn = -1.0 if regsqp.gLnorm is None else -regsqp.gLnorm
         ts = -1.0 if regsqp.tsolve is None else -regsqp.tsolve
-    return (it, fc, gc, hc, jprod, cn, gLn, ts)
+    return (it, fc, gc, cc, jc, jprod, hc, hprod, cn, gLn, ts)
 
 
 desc = "Regularized SQP method for equality-constrained problems based."
@@ -59,11 +65,6 @@ parser.add_argument("-i", "--iter", action="store", type=int, default=1000,
 # Translate options to input arguments.
 opts = {}
 
-if args.quasi_newton:
-    from new_regsqp_BFGS import RegSQPBFGSIterativeSolver as RegSQP
-else:
-    from new_regsqp import RegSQPSolver as RegSQP
-
 nprobs = len(other)
 if nprobs == 0:
     raise ValueError("Please supply problem name as argument")
@@ -78,10 +79,20 @@ reg_logger = config_logger("nlp.regsqp",
                            colored=True,
                            level=logging.WARN if nprobs > 1 else logging.DEBUG)
 
-
-log.info('%12s %5s %5s %6s %8s %8s %8s %6s %6s %6s %5s %7s',
-         'name', 'nvar', 'ncons', 'iter', 'f', u'‖c‖', u'‖∇L‖',
-         '#f', '#g', '#jprod', 'stat', 'time')
+if args.quasi_newton:
+    from new_regsqp_BFGS import RegSQPBFGSIterativeSolver as RegSQP
+    fmt_header = "%12s %5s %5s %6s %8s %8s %8s %6s %6s %6s %6s %5s %7s"
+    header = "%12s %5d %5d %6d %8.1e %8.1e %8.1e %6d %6d %6d %6d %5s %7.3f"
+    log.info(fmt_header,
+             'name', 'nvar', 'ncons', 'iter', 'f', u'‖c‖', u'‖∇L‖',
+             '#f', '#g', '#c', '#jprod', 'stat', 'time')
+else:
+    from new_regsqp import RegSQPSolver as RegSQP
+    fmt_header = "%12s %5s %5s %6s %8s %8s %8s %6s %6s %6s %6s %6s %5s %7s"
+    header = "%12s %5d %5d %6d %8.1e %8.1e %8.1e %6d %6d %6d %6d %6d %5s %7.3f"
+    log.info(fmt_header,
+             'name', 'nvar', 'ncons', 'iter', 'f', u'‖c‖', u'‖∇L‖',
+             '#f', '#g', '#c', '#J', '#H', 'stat', 'time')
 
 # Solve each problem in turn.
 for problem in other:
@@ -109,15 +120,23 @@ for problem in other:
     try:
         regsqp.solve()
         status = regsqp.short_status
-    except:
+    except Exception as inst:
+        # print type(inst)
+        # print inst.args
+        # print inst
         msg = sys.exc_info()[1].message
         status = msg if len(msg) > 0 else "xfail"  # unknown failure
-    niter, fcalls, gcalls, hcalls, jprod, cnorm, gLn, tsolve = regsqp_stats(
-        regsqp)
+    (niter, fcalls, gcalls, ccalls, jcalls, jprod,
+     hcalls, hprod, cnorm, gLn, tslv) = regsqp_stats(regsqp)
 
-    log.info("%12s %5d %5d %6d %8.1e %8.1e %8.1e %6d %6d %6d %5s %7.3f",
-             model.name, model.nvar, model.m, niter, regsqp.f, cnorm, gLn,
-             fcalls, gcalls, jprod, status, tsolve)
+    if args.quasi_newton:
+        log.info(header,
+                 model.name, model.nvar, model.m, niter, regsqp.f, cnorm, gLn,
+                 fcalls, gcalls, ccalls, jprod, status, tslv)
+    else:
+        log.info(header,
+                 model.name, model.nvar, model.m, niter, regsqp.f, cnorm, gLn,
+                 fcalls, gcalls, ccalls, jcalls, hcalls, status, tslv)
 
 if nprobs == 1 and verbose:
     print regsqp.x
@@ -135,11 +154,12 @@ if nprobs == 1 and verbose:
     log.info('         inner iterations      : %-d', regsqp.inner_itn)
     log.info('  Number of function evals     : %-d', fcalls)
     log.info('  Number of gradient evals     : %-d', gcalls)
+    log.info('  Number of constraint evals   : %-d', ccalls)
+    # AmplModels call jac to perform jprod
     log.info('  Number of Jacobian evals     : %-d',
-             0 if args.quasi_newton else gcalls)
-    log.info('  Number of Jacobian products  : %-d',
-             jprod if args.quasi_newton else 0)
-    log.info('  Number of Hessian evals      : %-d',
-             0 if args.quasi_newton else hcalls)
-    log.info('  Solve time                   : %-gs', tsolve)
+             0 if args.quasi_newton else jcalls)
+    log.info('  Number of Jacobian products  : %-d', jprod)
+    log.info('  Number of Hessian evals      : %-d', hcalls)
+    log.info('  Number of Hessian products   : %-d', hprod)
+    log.info('  Solve time                   : %-gs', tslv)
     log.info('--------------------------------')
