@@ -12,33 +12,18 @@ __docformat__ = 'restructuredtext'
 
 
 class DampedInverseLBFGSOperator(InverseLBFGSOperator):
-    """
+    """Inverse LBFGS operator with damping."""
 
-    """
+    def __init__(self, *args, **kwargs):
+        u"""Instantiate a :class: `DampedInverseLBFGSOperator`.
 
-    def __init__(self, n, npairs=5, **kwargs):
-        u"""Instantiate a :class: `LBFGSOperator`.
-
-        :parameters:
-            :n: the number of variables.
-            :npairs: the number of {s, y} pairs stored (default: 5).
-
-        :keywords:
-            :scaling: enable scaling of the 'initial matrix'. Scaling is
-                         done as 'method M3' in the LBFGS paper by Zhou and
-                         Nocedal; the scaling factor is sᵀy/yᵀy
-                         (default: False).
+        The arguments are the same as `InverseLBFGSOperator`.
         """
-        super(DampedInverseLBFGSOperator, self).__init__(n, npairs, **kwargs)
+        super(DampedInverseLBFGSOperator, self).__init__(*args, **kwargs)
         self.eta = 0.2
 
     def store(self, new_s, new_y):
-        """Store the new pair {new_s,new_y}.
-
-        A new pair is only accepted if `self._storing_test()` is True. The
-        oldest pair is then discarded in case the storage limit has been
-        reached.
-        """
+        """Store the new pair {new_s,new_y}."""
         ys = np.dot(new_s, new_y)
         By = self.qn_matvec(new_y)
         yBy = np.dot(new_y, By)
@@ -65,33 +50,18 @@ class DampedInverseLBFGSOperator(InverseLBFGSOperator):
 
 
 class DampedLBFGSOperator(LBFGSOperator):
-    """
+    """LBFGS operator with damping."""
 
-    """
+    def __init__(self, *args, **kwargs):
+        u"""Instantiate a :class: `DampedLBFGSOperator`.
 
-    def __init__(self, n, npairs=5, **kwargs):
-        u"""Instantiate a :class: `LBFGSOperator`.
-
-        :parameters:
-            :n: the number of variables.
-            :npairs: the number of {s, y} pairs stored (default: 5).
-
-        :keywords:
-            :scaling: enable scaling of the 'initial matrix'. Scaling is
-                         done as 'method M3' in the LBFGS paper by Zhou and
-                         Nocedal; the scaling factor is sᵀy/yᵀy
-                         (default: False).
+        The arguments are the same as `LBFGSOperator`.
         """
-        super(DampedLBFGSOperator, self).__init__(n, npairs, **kwargs)
+        super(DampedLBFGSOperator, self).__init__(*args, **kwargs)
         self.eta = 0.2
 
     def store(self, new_s, new_y):
-        """Store the new pair {new_s,new_y}.
-
-        A new pair is only accepted if `self._storing_test()` is True. The
-        oldest pair is then discarded in case the storage limit has been
-        reached.
-        """
+        """Store the new pair {new_s,new_y}."""
         ys = np.dot(new_s, new_y)
         Bs = self.qn_matvec(new_s)
         sBs = np.dot(new_s, Bs)
